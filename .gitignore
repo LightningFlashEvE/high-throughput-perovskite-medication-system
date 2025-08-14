@@ -1,41 +1,54 @@
-# Prerequisites
-*.d
-
-# Compiled Object files
-*.slo
-*.lo
+# 编译器和构建文件
 *.o
 *.obj
-
-# Precompiled Headers
-*.gch
-*.pch
-
-# Linker files
-*.ilk
-
-# Debugger Files
-*.pdb
-
-# Compiled Dynamic libraries
 *.so
-*.dylib
-*.dll
-
-# Fortran module files
-*.mod
-*.smod
-
-# Compiled Static libraries
-*.lai
-*.la
 *.a
 *.lib
-
-# Executables
+*.dll
+*.dylib
 *.exe
 *.out
-*.app
 
-# debug information files
-*.dwo
+# Qt 临时文件
+*.pro.user
+*.pro.user.* 
+*.qmake.stash
+
+# Qt 构建目录
+/debug/
+.release/
+
+# 临时和日志文件
+*.log
+*.bak
+*.swp
+*.swo
+*~ 
+
+# IDE 文件
+.idea/
+.vscode/
+*.sublime-workspace
+*.sublime-project
+
+# 系统文件
+.DS_Store
+Thumbs.db
+
+# 自动生成的依赖文件
+*.moc
+*.ui.cpp
+*.qrc.cpp
+
+# CMake构建目录
+CMakeFiles/
+CMakeCache.txt
+Makefile
+cmake_install.cmake
+
+# Visual Studio 文件
+.vs/
+.vscode/
+
+# CMake生成的文件
+build/
