@@ -15,6 +15,7 @@ class QTimer;
 class QGraphicsScene;
 class QGraphicsPixmapItem;
 class QResizeEvent;
+class QShowEvent;
 
 class MainWindow : public QMainWindow
 {
@@ -29,6 +30,7 @@ private slots:
 
 protected:
     void resizeEvent(QResizeEvent *event) override;
+    void showEvent(QShowEvent *event) override;
 
 private:
     Ui::MainWindow *ui;
