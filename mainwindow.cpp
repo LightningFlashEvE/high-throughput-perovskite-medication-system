@@ -5,7 +5,9 @@
 #include <QGraphicsView>
 #include <QGraphicsScene>
 #include <QGraphicsPixmapItem>
+#include <QGraphicsDropShadowEffect>
 #include <QResizeEvent>
+#include <QShowEvent>
 #include <QPainter>
 
 MainWindow::MainWindow(QWidget *parent)
@@ -13,6 +15,11 @@ MainWindow::MainWindow(QWidget *parent)
     , ui(new Ui::MainWindow)
 {
     ui->setupUi(this);
+    // 设置较为合适的初始窗口与视图尺寸，避免棋盘初始显示过小
+ 
+    if (ui->graphicsView) {
+        ui->graphicsView->setMinimumSize(650, 440);
+    }
     /*** 显示logo ***/
     QPixmap logo(":/main/pic/logo.png");
     if (!logo.isNull()) {
@@ -58,6 +65,8 @@ void MainWindow::initChessView()
 
     if (!chessScene) chessScene = new QGraphicsScene(this);
     ui->graphicsView->setScene(chessScene);
+    ui->graphicsView->setInteractive(true);
+    ui->graphicsView->setDragMode(QGraphicsView::NoDrag);
 
     // 加载棋盘
     QPixmap boardPixmap(":/main/pic/Chessboard.png");
@@ -77,20 +86,30 @@ void MainWindow::initChessView()
     cellWidth = br.width() / (gridCols - 1);
     cellHeight = br.height() / (gridRows - 1);
 
-    // 创建若干棋子示例（可扩展为32个）。这里先放两个演示：红帅(4,9) 与 黑将(4,0)
+    // 创建一个默认棋子（放置在棋盘图片正中心）
     chessPieces.clear();
-    QPixmap piecePixmap(":/main/pic/ChessPiece.png");
-    for (int i = 0; i < 2; ++i) {
-        QGraphicsPixmapItem *item = chessScene->addPixmap(piecePixmap);
-        item->setZValue(1);
-        // 以图片中心对齐到网格交点
-        item->setOffset(-piecePixmap.width() / 2.0, -piecePixmap.height() / 2.0);
-        chessPieces.append(item);
-    }
-    if (chessPieces.size() >= 2) {
-        chessPieces[0]->setPos(gridCenterToScene(4, 9));
-        chessPieces[1]->setPos(gridCenterToScene(4, 0));
-    }
+    QPixmap piecePixmap(":/main/pic/zhua.png");
+    QGraphicsPixmapItem *item = chessScene->addPixmap(piecePixmap);
+    item->setZValue(1);
+    // 以图片中心对齐到网格交点
+    item->setOffset(-piecePixmap.width() / 2.0, -piecePixmap.height() / 2.0);
+    item->setTransformationMode(Qt::SmoothTransformation);
+    item->setScale(0.1); // 缩小到原来的10%
+
+    // 为棋子添加发光描边（白色）增强对比度
+    QGraphicsDropShadowEffect *glow = new QGraphicsDropShadowEffect();
+    glow->setOffset(0, 0);
+    glow->setBlurRadius(20);
+    glow->setColor(QColor(255, 255, 255, 220));
+    item->setGraphicsEffect(glow);
+
+    // 允许鼠标拖动棋子
+    item->setFlag(QGraphicsItem::ItemIsMovable, true);
+    item->setFlag(QGraphicsItem::ItemIsSelectable, true);
+    item->setAcceptedMouseButtons(Qt::LeftButton);
+    item->setCursor(Qt::OpenHandCursor);
+    chessPieces.append(item);
+    chessPieces[0]->setPos(boardItem->boundingRect().center());
 }
 
 QPointF MainWindow::gridCenterToScene(int col, int row) const
@@ -111,6 +130,15 @@ void MainWindow::moveChessPiece(int pieceIndex, int col, int row)
 void MainWindow::resizeEvent(QResizeEvent *event)
 {
     QMainWindow::resizeEvent(event);
+    if (ui->graphicsView && chessScene) {
+        ui->graphicsView->fitInView(chessScene->sceneRect(), Qt::KeepAspectRatio);
+    }
+}
+
+void MainWindow::showEvent(QShowEvent *event)
+{
+    QMainWindow::showEvent(event);
+    // 首次显示后再调用一次fitInView，确保初始布局完成后按容器尺寸适配
     if (ui->graphicsView && chessScene) {
         ui->graphicsView->fitInView(chessScene->sceneRect(), Qt::KeepAspectRatio);
     }

@@ -4,5 +4,7 @@
         <file>pic/main.png</file>
         <file>pic/Chessboard.png</file>
         <file>pic/ChessPiece.png</file>
+        <file>pic/ye.png</file>
+        <file>pic/zhua.png</file>
     </qresource>
 </RCC>
