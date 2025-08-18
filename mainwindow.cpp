@@ -3,10 +3,6 @@
 #include <QTimer>
 #include <QDateTime>
 #include <QGraphicsView>
-#include <QGraphicsScene>
-#include <QGraphicsPixmapItem>
-#include <QGraphicsDropShadowEffect>
-#include <QCursor>
 #include <QResizeEvent>
 #include <QShowEvent>
 #include <QPainter>
@@ -16,7 +12,7 @@ MainWindow::MainWindow(QWidget *parent)
     , ui(new Ui::MainWindow)
 {
     ui->setupUi(this);
-    // 设置较为合适的初始窗口与视图尺寸，避免棋盘初始显示过 小
+    // 设置较为合适的初始视图最小尺寸，避免棋盘初始显示过小
  
     if (ui->graphicsView) {
         ui->graphicsView->setMinimumSize(650, 440);
@@ -38,8 +34,9 @@ MainWindow::MainWindow(QWidget *parent)
     updateTime();
     timer->start(1000);
     
-    // 初始化棋盘视图与棋子
-    initChessView();
+    /*** 初始化棋盘视图与棋子（封装为 ChessBoardView） ***/
+    chessBoard = new ChessBoardView(this);
+    chessBoard->init(ui->graphicsView);
 }
 
 MainWindow::~MainWindow()
@@ -47,6 +44,7 @@ MainWindow::~MainWindow()
     delete ui;
 }
 
+// 每秒刷新日期与时间显示
 void MainWindow::updateTime()
 {
     QDateTime currentDateTime = QDateTime::currentDateTime();
@@ -60,87 +58,22 @@ void MainWindow::updateTime()
     ui->labelTime->setText(timeStr);
 }
 
-void MainWindow::initChessView()
-{
-    if (!ui->graphicsView) return;
-
-    if (!chessScene) chessScene = new QGraphicsScene(this);
-    ui->graphicsView->setScene(chessScene);
-    ui->graphicsView->setInteractive(true);
-    ui->graphicsView->setDragMode(QGraphicsView::NoDrag);
-
-    // 加载棋盘
-    QPixmap boardPixmap(":/main/pic/Chessboard.png");
-    chessScene->clear();
-    boardItem = chessScene->addPixmap(boardPixmap);
-    boardItem->setZValue(0);
-    chessScene->setSceneRect(boardItem->boundingRect());
-
-    // 视图设置
-    ui->graphicsView->setRenderHint(QPainter::SmoothPixmapTransform);
-    ui->graphicsView->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
-    ui->graphicsView->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
-    ui->graphicsView->fitInView(chessScene->sceneRect(), Qt::KeepAspectRatio);
-
-    // 计算网格单元尺寸（以交点为基准，9列10行 -> 相邻间距按 cols-1/rows-1 计算）
-    const QRectF br = boardItem->boundingRect();
-    cellWidth = br.width() / (gridCols - 1);
-    cellHeight = br.height() / (gridRows - 1);
-
-    // 创建一个默认棋子（放置在棋盘图片正中心）
-    chessPieces.clear();
-    QPixmap piecePixmap(":/main/pic/zhua.png");
-    QGraphicsPixmapItem *item = chessScene->addPixmap(piecePixmap);
-    item->setZValue(1);
-    // 以图片中心对齐到网格交点
-    item->setOffset(-piecePixmap.width() / 2.0, -piecePixmap.height() / 2.0);
-    item->setTransformationMode(Qt::SmoothTransformation);
-    item->setScale(0.1); // 缩小到原来的10%
-
-    // 为棋子添加发光描边（白色）增强对比度
-    QGraphicsDropShadowEffect *glow = new QGraphicsDropShadowEffect();
-    glow->setOffset(0, 0);
-    glow->setBlurRadius(20);
-    glow->setColor(QColor(255, 255, 255, 220));
-    item->setGraphicsEffect(glow);
-
-    // 允许鼠标拖动棋子
-    item->setFlag(QGraphicsItem::ItemIsMovable, true);
-    item->setFlag(QGraphicsItem::ItemIsSelectable, true);
-    item->setAcceptedMouseButtons(Qt::LeftButton);
-    item->setCursor(Qt::OpenHandCursor);
-    chessPieces.append(item);
-    chessPieces[0]->setPos(boardItem->boundingRect().center());
-}
-
-QPointF MainWindow::gridCenterToScene(int col, int row) const
-{
-    if (!boardItem) return QPointF();
-    const QRectF br = boardItem->boundingRect();
-    qreal x = br.left() + col * (br.width() / (gridCols - 1));
-    qreal y = br.top() + row * (br.height() / (gridRows - 1));
-    return QPointF(x, y);
-}
-
+// 将指定棋子移动到网格(col,row)
 void MainWindow::moveChessPiece(int pieceIndex, int col, int row)
 {
-    if (pieceIndex < 0 || pieceIndex >= chessPieces.size()) return;
-    chessPieces[pieceIndex]->setPos(gridCenterToScene(col, row));
+    if (!chessBoard) return;
+    chessBoard->movePiece(pieceIndex, col, row);
 }
 
 void MainWindow::resizeEvent(QResizeEvent *event)
 {
     QMainWindow::resizeEvent(event);
-    if (ui->graphicsView && chessScene) {
-        ui->graphicsView->fitInView(chessScene->sceneRect(), Qt::KeepAspectRatio);
-    }
+    if (chessBoard) chessBoard->relayout();
 }
 
 void MainWindow::showEvent(QShowEvent *event)
 {
     QMainWindow::showEvent(event);
-    // 首次显示后再调用一次fitInView，确保初始布局完成后按容器尺寸适配
-    if (ui->graphicsView && chessScene) {
-        ui->graphicsView->fitInView(chessScene->sceneRect(), Qt::KeepAspectRatio);
-    }
+    // 首次显示后再次自适应
+    if (chessBoard) chessBoard->relayout();
 }
