@@ -6,6 +6,7 @@
 #include <QGraphicsScene>
 #include <QGraphicsPixmapItem>
 #include <QGraphicsDropShadowEffect>
+#include <QCursor>
 #include <QResizeEvent>
 #include <QShowEvent>
 #include <QPainter>
