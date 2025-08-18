@@ -16,7 +16,7 @@ MainWindow::MainWindow(QWidget *parent)
     , ui(new Ui::MainWindow)
 {
     ui->setupUi(this);
-    // 设置较为合适的初始窗口与视图尺寸，避免棋盘初始显示过小
+    // 设置较为合适的初始窗口与视图尺寸，避免棋盘初始显示过 小
  
     if (ui->graphicsView) {
         ui->graphicsView->setMinimumSize(650, 440);
