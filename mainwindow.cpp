@@ -12,11 +12,7 @@ MainWindow::MainWindow(QWidget *parent)
     , ui(new Ui::MainWindow)
 {
     ui->setupUi(this);
-    // 设置较为合适的初始视图最小尺寸，避免棋盘初始显示过小
- 
-    if (ui->graphicsView) {
-        ui->graphicsView->setMinimumSize(650, 440);
-    }
+
     /*** 显示logo ***/
     QPixmap logo(":/main/pic/logo.png");
     if (!logo.isNull()) {
@@ -35,8 +31,19 @@ MainWindow::MainWindow(QWidget *parent)
     timer->start(1000);
     
     /*** 初始化棋盘视图与棋子（封装为 ChessBoardView） ***/
+    if (ui->graphicsView) {
+        ui->graphicsView->setMinimumSize(650, 440);
+    }
     chessBoard = new ChessBoardView(this);
     chessBoard->init(ui->graphicsView);
+
+    /*** 初始化流程视图（封装到 FlowViewManager，挂载 frame_2） ***/
+    if (ui->frame_2) {
+        ui->frame_2->setMinimumSize(450, 440);
+    }
+    flowManager = new FlowViewManager(this);
+    flowManager->init(ui->frame_2);
+
 }
 
 MainWindow::~MainWindow()

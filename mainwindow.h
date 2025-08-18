@@ -5,6 +5,7 @@
 #include <QVector>
 #include <QPointF>
 #include "chessboardview.h"
+#include "flowviewmanager.h"
 
 QT_BEGIN_NAMESPACE
 namespace Ui {
@@ -73,6 +74,8 @@ private:
 
     // 棋盘封装类
     ChessBoardView *chessBoard = nullptr;
+    // 流程图封装类（挂载在 frame_2）
+    FlowViewManager *flowManager = nullptr;
 
 public:
     /**
