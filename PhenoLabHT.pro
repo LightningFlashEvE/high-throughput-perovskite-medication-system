@@ -29,5 +29,12 @@ INCLUDEPATH += $$PWD/FlowViewManager   # 工程编译时，会去INCLUDEPATH列�
 include($$PWD/ChessBoardView/chessboardview.pri)  #include()包含的文件会显示在工程结构目录中
 INCLUDEPATH += $$PWD/chessboardview   # 工程编译时，会去INCLUDEPATH列表下的目录搜索文件
 
+include($$PWD/TcpFramedClient/tcpframedclient.pri)  # 引入 tcp 客户端模块
+INCLUDEPATH += $$PWD/TcpFramedClient  # 让编译器能找到该目录的头文件（可选；pri 已经加了 INCLUDEPATH）
+# include($$PWD/ModbusDevice/modbusdevice.pri)
+# INCLUDEPATH += $$PWD/ModbusDevice
+include($$PWD/SettingsButton/settingsbutton.pri)
+INCLUDEPATH += $$PWD/SettingsButton
+
 RESOURCES += \
     picture.qrc

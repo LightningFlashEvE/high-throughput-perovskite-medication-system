@@ -5,7 +5,10 @@
 #include <QVector>
 #include <QPointF>
 #include "chessboardview.h"
+#include "tcpframedclient.h"
 #include "flowviewmanager.h"
+#include "settingsbutton.h"
+
 
 QT_BEGIN_NAMESPACE
 namespace Ui {
@@ -76,6 +79,15 @@ private:
     ChessBoardView *chessBoard = nullptr;
     // 流程图封装类（挂载在 frame_2）
     FlowViewManager *flowManager = nullptr;
+    // TCP帧客户端（接收并解析自定义协议）
+    TcpFramedClient *tcpClient = nullptr;
+
+    // 设置面板（非模态，可频繁打开关闭）
+    SettingsButton *settingsPanel = nullptr;
+
+    // zhua 当前所在网格（用于方向键移动）
+    int zhuaCol = 4;
+    int zhuaRow = 5;
 
 public:
     /**

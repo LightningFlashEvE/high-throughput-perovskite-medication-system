@@ -9,6 +9,12 @@
 class QGraphicsView;
 class QGraphicsScene;
 class QGraphicsPixmapItem;
+/* ******  试管状态机  up ******/
+class QGraphicsEllipseItem;
+class QGraphicsSimpleTextItem;
+/* ******  试管状态机  down ******/
+class QGraphicsEllipseItem;
+class QGraphicsSimpleTextItem;
 
 /**
  * ChessBoardView
@@ -52,6 +58,21 @@ public:
      */
     QPointF gridCenterToScene(int col, int row) const;
 
+    // 统一查询网格尺寸（用于外部约束边界）
+    int gridMaxCol() const { return gridCols - 1; }
+    int gridMaxRow() const { return gridRows - 1; }
+    /* ******  试管状态机  up ******/
+    // 在棋盘上绘制试管并控制状态
+    // 步骤说明：
+    // 1) ensureTubeAtGrid ：在网格(col,row)定位中心 → 创建/更新圆形与标记图元
+    // 2) setTubeState：修改当前状态并调用 applyTubeStyle 应用对应“皮肤”
+    // 3) applyTubeStyle：根据状态选取颜色/边框/标记，直接作用到图元
+    enum class TubeState { Empty, Full, Using, Error, Disabled };
+    // 步骤1 实现：根据网格坐标创建/更新试管图元（圆+中心文字）
+    void ensureTubeAtGrid(int col, int row, qreal radius = 8.0);
+    void setTubeState(TubeState state);
+    /* ******  试管状态机  down ******/
+
 private:
     // 视图/场景与资源
     QGraphicsView *graphicsView = nullptr;
@@ -60,16 +81,25 @@ private:
     QVector<QGraphicsPixmapItem*> pieces;
     QString boardImagePath;
     QString pieceImagePath;
+    /* ******  试管状态机  up ******/
+    // 试管图形元素
+    QGraphicsEllipseItem *tubeItem = nullptr;
+    QGraphicsSimpleTextItem *tubeMarkItem = nullptr;
+    TubeState currentTubeState = TubeState::Empty;
+    /* ******  试管状态机  down ******/
 
-    // 网格参数（中国象棋）
-    int gridCols = 9;
-    int gridRows = 10;
+    // 网格参数
+    int gridCols = 200;
+    int gridRows = 200;
     qreal cellWidth = 0.0;
     qreal cellHeight = 0.0;
 
     void setupView();
     void loadBoard();
     void createDefaultPiece();
+    /* ******  试管状态机  up ******/
+    void applyTubeStyle();
+    /* ******  试管状态机  down ******/
 };
 
 #endif // CHESSBOARDVIEW_H
