@@ -1,5 +1,6 @@
 QT       += core gui
 QT += widgets
+QT += serialport
 
 greaterThan(QT_MAJOR_VERSION, 4): QT += widgets
 
@@ -31,10 +32,12 @@ INCLUDEPATH += $$PWD/chessboardview   # 工程编译时，会去INCLUDEPATH列�
 
 include($$PWD/TcpFramedClient/tcpframedclient.pri)  # 引入 tcp 客户端模块
 INCLUDEPATH += $$PWD/TcpFramedClient  # 让编译器能找到该目录的头文件（可选；pri 已经加了 INCLUDEPATH）
-# include($$PWD/ModbusDevice/modbusdevice.pri)
-# INCLUDEPATH += $$PWD/ModbusDevice
+
 include($$PWD/SettingsButton/settingsbutton.pri)
 INCLUDEPATH += $$PWD/SettingsButton
+
+include($$PWD/Modbus485/modbus485.pri)
+INCLUDEPATH += $$PWD/Modbus485
 
 RESOURCES += \
     picture.qrc

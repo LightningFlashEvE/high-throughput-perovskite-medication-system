@@ -98,6 +98,8 @@ private:
     void loadBoard();
     void createDefaultPiece();
     /* ******  试管状态机  up ******/
+    // 步骤3 实现：把当前状态对应的样式（颜色/边框/标记）套到图元上
+    // 步骤3 实现：把当前状态对应的样式（颜色/边框/标记）套到图元上
     void applyTubeStyle();
     /* ******  试管状态机  down ******/
 };

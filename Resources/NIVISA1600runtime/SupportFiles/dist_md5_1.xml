@@ -1,0 +1,243 @@
+﻿<?xml version="1.0" encoding="utf-8"?><FCIV>
+<FILE_ENTRY><name>nidist.id</name><MD5>/Q9ofg1YFisINJVsgk///A==</MD5></FILE_ENTRY>
+<FILE_ENTRY><name>patents.txt</name><MD5>nS28kCkLGVj88oLK++BFCg==</MD5></FILE_ENTRY>
+<FILE_ENTRY><name>setup.exe</name><MD5>fUGwg6t1rlYIn0MHa01HUA==</MD5></FILE_ENTRY>
+<FILE_ENTRY><name>setup.ini</name><MD5>CStS+pw0sLKZieoNrK96Hw==</MD5></FILE_ENTRY>
+<FILE_ENTRY><name>spec.ini</name><MD5>2bmR43MQKxRw00+tpz5TmA==</MD5></FILE_ENTRY>
+<FILE_ENTRY><name>license\Apache 2.0 License - English.pdf</name><MD5>7e4RClOSXb1hx4DMiW/u+Q==</MD5></FILE_ENTRY>
+<FILE_ENTRY><name>license\Boost 1.0 License - English.pdf</name><MD5>wHvXwyyXygGa3NPeTGSyVQ==</MD5></FILE_ENTRY>
+<FILE_ENTRY><name>license\BSD 3-clause License - English.rtf</name><MD5>6po30nzjO/XNwQ0KuhDjsQ==</MD5></FILE_ENTRY>
+<FILE_ENTRY><name>license\Code Project Open License - English.rtf</name><MD5>CK9OoI1mK7k1sbrbup7ZyQ==</MD5></FILE_ENTRY>
+<FILE_ENTRY><name>license\GNU Lesser General Public License 2.1 - English.rtf</name><MD5>W4dkNM8PAMILJK1ufLvyzA==</MD5></FILE_ENTRY>
+<FILE_ENTRY><name>license\IVI Foundation Inc License Agreement - English.rtf</name><MD5>8ekEJR7ALGJCxQNjdgB1tA==</MD5></FILE_ENTRY>
+<FILE_ENTRY><name>license\MD5 Message Digest Algorithm License - English.rtf</name><MD5>x5zw4yal5NLNxNglpLnSwQ==</MD5></FILE_ENTRY>
+<FILE_ENTRY><name>license\Microsoft Limited Public License MSDN - English.rtf</name><MD5>MiXL45J0zRzz6kUjb5wQ3A==</MD5></FILE_ENTRY>
+<FILE_ENTRY><name>license\Microsoft Platform SDK Server 2003 SP1 License - English.rtf</name><MD5>XkBkcMGpSI6dntSa5vZ1VA==</MD5></FILE_ENTRY>
+<FILE_ENTRY><name>license\Microsoft Visual C++ 2015 Runtime Libraries - English.rtf</name><MD5>1Phg/ShLLAqpIuRY7yqSRA==</MD5></FILE_ENTRY>
+<FILE_ENTRY><name>license\Microsoft Windows Driver Kit License - English.rtf</name><MD5>96dPkAX1AXSiXaDzBdCcmg==</MD5></FILE_ENTRY>
+<FILE_ENTRY><name>license\MIT 1.0 License - English.rtf</name><MD5>Q734zXu03+QbOIUqSdNzYg==</MD5></FILE_ENTRY>
+<FILE_ENTRY><name>license\MIT-X License.rtf</name><MD5>lUNY2j1zY0FLU21JibOWog==</MD5></FILE_ENTRY>
+<FILE_ENTRY><name>license\Mozilla Public License 2.0.rtf</name><MD5>cu6gycXU2DuDQvRD8snX5Q==</MD5></FILE_ENTRY>
+<FILE_ENTRY><name>license\NI Released License Agreement - English.rtf</name><MD5>NClQMEt5jbqzAvgkzFxKqg==</MD5></FILE_ENTRY>
+<FILE_ENTRY><name>license\NI Released License Agreement - French.rtf</name><MD5>0422JHNyMn78OZDm3wmOGA==</MD5></FILE_ENTRY>
+<FILE_ENTRY><name>license\NI Released License Agreement - German.rtf</name><MD5>1Yzt7mYJreJVBdPJzO9tWQ==</MD5></FILE_ENTRY>
+<FILE_ENTRY><name>license\NI Released License Agreement - Italian.rtf</name><MD5>nmD8CeyhqD96SyhMk+zqlg==</MD5></FILE_ENTRY>
+<FILE_ENTRY><name>license\NI Released License Agreement - Japanese.rtf</name><MD5>Iag2Z1IJ3UyqCJkCuj/bIw==</MD5></FILE_ENTRY>
+<FILE_ENTRY><name>license\NI Released License Agreement - Korean.rtf</name><MD5>Pf1bxvdnpM5dMCLB6wASTw==</MD5></FILE_ENTRY>
+<FILE_ENTRY><name>license\NI Released License Agreement - Simplified Chinese.rtf</name><MD5>jDQTsdJcuzb+1jRbleVCvQ==</MD5></FILE_ENTRY>
+<FILE_ENTRY><name>license\NI Released License Agreement - Spanish.rtf</name><MD5>3T4cPSDl1Ac0JsXU8g6vYw==</MD5></FILE_ENTRY>
+<FILE_ENTRY><name>license\NICTA 1.0 License - English.pdf</name><MD5>2NMTEeIs5YMfe9bxllxHMA==</MD5></FILE_ENTRY>
+<FILE_ENTRY><name>license\OPC Classic COM License - English.pdf</name><MD5>yhODUCfjDFF3DmGjkunZ4g==</MD5></FILE_ENTRY>
+<FILE_ENTRY><name>license\OpenSSL 1.0 License - English.pdf</name><MD5>Wa79w5tCxM41779bwACDxw==</MD5></FILE_ENTRY>
+<FILE_ENTRY><name>license\STLPort 1.0 License - English.pdf</name><MD5>QL818I0CytgSgLRaH/zgHw==</MD5></FILE_ENTRY>
+<FILE_ENTRY><name>license\UPX 1.0 license - English.pdf</name><MD5>nY6hy9jKJMfaLDuekXMlVA==</MD5></FILE_ENTRY>
+<FILE_ENTRY><name>license\wxWindows 3.1 License - English.pdf</name><MD5>5D54HNiQLmfAFPTvJwY1Ww==</MD5></FILE_ENTRY>
+<FILE_ENTRY><name>Products\EULADepot\EULADep2.cab</name><MD5>F6e4/nMyZiWHCxkdjB9cKw==</MD5></FILE_ENTRY>
+<FILE_ENTRY><name>Products\EULADepot\EULADepot2.msi</name><MD5>w2d+0Mqes1T8eBD0TYySQQ==</MD5></FILE_ENTRY>
+<FILE_ENTRY><name>Products\EULADepot\EULADepot2_mft.cab</name><MD5>zak2/fODwJdrgc+osEbupg==</MD5></FILE_ENTRY>
+<FILE_ENTRY><name>Products\EULADepot\NIYouLAs.bin</name><MD5>Enw/T3rdNvLfj/+tDRHzIQ==</MD5></FILE_ENTRY>
+<FILE_ENTRY><name>Products\MDF\MDF\MDFSupport.msi</name><MD5>Iv53Cuvi8gSYuKJK9wO/Sw==</MD5></FILE_ENTRY>
+<FILE_ENTRY><name>Products\MDF\MDF\MDFSupport1.cab</name><MD5>KfsR0ZSucYaPU8Zxd5ksLQ==</MD5></FILE_ENTRY>
+<FILE_ENTRY><name>Products\MDF\MDF\MDFSupport_mft.cab</name><MD5>yj45epeROUfeaRFpxk/d6Q==</MD5></FILE_ENTRY>
+<FILE_ENTRY><name>Products\mDNS_Responder\mDNSResponder.msi</name><MD5>y44zL36/5XS4jF/C7gtu8w==</MD5></FILE_ENTRY>
+<FILE_ENTRY><name>Products\mDNS_Responder\mDNSResponder_W64.msi</name><MD5>BKRvwO8YKNzHEzmYELBV3Q==</MD5></FILE_ENTRY>
+<FILE_ENTRY><name>Products\MetaUninstaller\MU\MetaUninstaller.msi</name><MD5>ZjuK0JGexkZa9rzEkA0Faw==</MD5></FILE_ENTRY>
+<FILE_ENTRY><name>Products\MetaUninstaller\MU\MetaUninstallerR1.cab</name><MD5>BjWip0C6ETpdY4y9+sP6Zg==</MD5></FILE_ENTRY>
+<FILE_ENTRY><name>Products\MetaUninstaller\MU\MetaUninstaller_mft.cab</name><MD5>ClNAK0scvJjZxuer6t69hA==</MD5></FILE_ENTRY>
+<FILE_ENTRY><name>Products\MStudioCommonRuntimev400\MSCRT400.cab</name><MD5>En8rXguspQSXTZbFYAZxDQ==</MD5></FILE_ENTRY>
+<FILE_ENTRY><name>Products\MStudioCommonRuntimev400\MStudioCommonRuntime.v400.msi</name><MD5>XiCCyN6ddkXVgdVYzesZHA==</MD5></FILE_ENTRY>
+<FILE_ENTRY><name>Products\MStudioCommonRuntimev400\MStudioCommonRuntime.v400_mft.cab</name><MD5>MYbqIHS+/w2N8megGuV/9A==</MD5></FILE_ENTRY>
+<FILE_ENTRY><name>Products\MStudioVisaNSRuntimev400\MStudioVISARuntime.v400.msi</name><MD5>hKMACcccEDqloJcUzQOdlg==</MD5></FILE_ENTRY>
+<FILE_ENTRY><name>Products\MStudioVisaNSRuntimev400\MStudioVISARuntime.v400_mft.cab</name><MD5>tu8q64q7RGZ6ywPXI6weDg==</MD5></FILE_ENTRY>
+<FILE_ENTRY><name>Products\MStudioVisaNSRuntimev400\MSVIS400.cab</name><MD5>G1i+0EXijSqwrwuapIBCaw==</MD5></FILE_ENTRY>
+<FILE_ENTRY><name>Products\MStudioVisaNSRuntimev450\MStudioVISARuntime.v450.msi</name><MD5>y4RxOfcJa0tpfJfM3lrktQ==</MD5></FILE_ENTRY>
+<FILE_ENTRY><name>Products\MStudioVisaNSRuntimev450\MStudioVISARuntime.v450_mft.cab</name><MD5>VPaZsTGA464K30PlZgDe+w==</MD5></FILE_ENTRY>
+<FILE_ENTRY><name>Products\MStudioVisaNSRuntimev450\MSVIS450.cab</name><MD5>XSzpPLRvilZB7zI9EdY1Sg==</MD5></FILE_ENTRY>
+<FILE_ENTRY><name>Products\MXS\mxs.msi</name><MD5>YNrsc4bPmfR3cuwlxiZKHQ==</MD5></FILE_ENTRY>
+<FILE_ENTRY><name>Products\MXS\mxs1.cab</name><MD5>8AEqf0+Aqh76uW89tvfqLA==</MD5></FILE_ENTRY>
+<FILE_ENTRY><name>Products\MXS\mxs64.msi</name><MD5>QNf0Qi1nqJHHVJq/FfbCiA==</MD5></FILE_ENTRY>
+<FILE_ENTRY><name>Products\MXS\mxs_mft.cab</name><MD5>ixxP/Rw+fYfc4/XF113pmg==</MD5></FILE_ENTRY>
+<FILE_ENTRY><name>Products\NI-APAL_Error_Files\apalerri.msi</name><MD5>t46uzvb4/Tkwh+jLQZQxfA==</MD5></FILE_ENTRY>
+<FILE_ENTRY><name>Products\NI-APAL_Error_Files\apalerri64.msi</name><MD5>2qa5hP7l1OTiAYRnCXIzCg==</MD5></FILE_ENTRY>
+<FILE_ENTRY><name>Products\NI-DIM\dimSetup.msi</name><MD5>62F5JmlJBdHduXPhIEqEMw==</MD5></FILE_ENTRY>
+<FILE_ENTRY><name>Products\NI-DIM\dimSetup64.msi</name><MD5>YZa/Oi2Sbmu965xtepnGKA==</MD5></FILE_ENTRY>
+<FILE_ENTRY><name>Products\NI-DIM\dimSetup_mft.cab</name><MD5>8oC1vTnd3mmwV9XKCZOdJQ==</MD5></FILE_ENTRY>
+<FILE_ENTRY><name>Products\NI-DIM\nidimi32.cab</name><MD5>Q7IGQvC9QSFobnOHJouaXA==</MD5></FILE_ENTRY>
+<FILE_ENTRY><name>Products\NI-DIM\nidimi64.cab</name><MD5>JWOnMGwHAfXBAtFPp1m7MA==</MD5></FILE_ENTRY>
+<FILE_ENTRY><name>Products\NI-mx_Remote_Configuration\mxrs.cab</name><MD5>7Y7I1m26BrhbWTGyHa0iFw==</MD5></FILE_ENTRY>
+<FILE_ENTRY><name>Products\NI-mx_Remote_Configuration\mxrs64.cab</name><MD5>WXaJjDABGjwhiHay5sTi+A==</MD5></FILE_ENTRY>
+<FILE_ENTRY><name>Products\NI-mx_Remote_Configuration\nimxRemoteServicei.msi</name><MD5>gFtP/fecFGeffbsq1mEEvA==</MD5></FILE_ENTRY>
+<FILE_ENTRY><name>Products\NI-mx_Remote_Configuration\nimxRemoteServicei64.msi</name><MD5>lsMtxI01f4bIuzSSMOk5+w==</MD5></FILE_ENTRY>
+<FILE_ENTRY><name>Products\NI-mx_Remote_Configuration\nimxRemoteServicei_mft.cab</name><MD5>Rktopkfik2lNA92qkGOFcw==</MD5></FILE_ENTRY>
+<FILE_ENTRY><name>Products\NI-ORB\niorb.cab</name><MD5>zS11Im2bp3x/2BXqNuCgWg==</MD5></FILE_ENTRY>
+<FILE_ENTRY><name>Products\NI-ORB\niorb64.cab</name><MD5>p+p7PqolXnSIU24cpvZUaQ==</MD5></FILE_ENTRY>
+<FILE_ENTRY><name>Products\NI-ORB\niorbi.msi</name><MD5>PJ5pDjCX2JC79LwuFtrCtA==</MD5></FILE_ENTRY>
+<FILE_ENTRY><name>Products\NI-ORB\niorbi64.msi</name><MD5>7lU/gR7Ft6xOPm76KgE50Q==</MD5></FILE_ENTRY>
+<FILE_ENTRY><name>Products\NI-ORB\niorbi_mft.cab</name><MD5>cgpX1dRQ7eYM0KiutlqgHQ==</MD5></FILE_ENTRY>
+<FILE_ENTRY><name>Products\NI-PAL\nipal.cab</name><MD5>laQk5vlLrRtl/EwHuUa1Vw==</MD5></FILE_ENTRY>
+<FILE_ENTRY><name>Products\NI-PAL\nipal64.cab</name><MD5>b+XSAwpjIGSh8CBe6beDpg==</MD5></FILE_ENTRY>
+<FILE_ENTRY><name>Products\NI-PAL\palSetup.msi</name><MD5>YiVd7OOj5ezSh8mgRSi1LQ==</MD5></FILE_ENTRY>
+<FILE_ENTRY><name>Products\NI-PAL\palSetup64.msi</name><MD5>lbKuvIY3ztirRxZkjOe6rA==</MD5></FILE_ENTRY>
+<FILE_ENTRY><name>Products\NI-PAL\palSetup64_chs.mst</name><MD5>TpMbf91GJ5z5op6adIQCBA==</MD5></FILE_ENTRY>
+<FILE_ENTRY><name>Products\NI-PAL\palSetup64_deu.mst</name><MD5>nXECNFSbxCcuLcfU7Yrvow==</MD5></FILE_ENTRY>
+<FILE_ENTRY><name>Products\NI-PAL\palSetup64_fra.mst</name><MD5>M8SeXpE7rV8hFjUovO7+Fw==</MD5></FILE_ENTRY>
+<FILE_ENTRY><name>Products\NI-PAL\palSetup64_jpn.mst</name><MD5>vZvIxhxGeCfjna/+VLi/hQ==</MD5></FILE_ENTRY>
+<FILE_ENTRY><name>Products\NI-PAL\palSetup64_kor.mst</name><MD5>KVlvWwXl9WZn/5ZY1SwHdg==</MD5></FILE_ENTRY>
+<FILE_ENTRY><name>Products\NI-PAL\palSetup_chs.mst</name><MD5>wIaXOZ8a9chrI2aPD8J+mQ==</MD5></FILE_ENTRY>
+<FILE_ENTRY><name>Products\NI-PAL\palSetup_deu.mst</name><MD5>rtRX1rrUNjPtqdSA2HSsYQ==</MD5></FILE_ENTRY>
+<FILE_ENTRY><name>Products\NI-PAL\palSetup_fra.mst</name><MD5>x2OwUZz4nTf/6nk9C6gwrQ==</MD5></FILE_ENTRY>
+<FILE_ENTRY><name>Products\NI-PAL\palSetup_jpn.mst</name><MD5>7Umc+i7aG/3tiV/CsOYsNA==</MD5></FILE_ENTRY>
+<FILE_ENTRY><name>Products\NI-PAL\palSetup_kor.mst</name><MD5>szydhSRHyUDVBIzbAaToZQ==</MD5></FILE_ENTRY>
+<FILE_ENTRY><name>Products\NI-PAL\palSetup_mft.cab</name><MD5>kkg4V4to7bvEfO1zwgXFDA==</MD5></FILE_ENTRY>
+<FILE_ENTRY><name>Products\NI-PAL_Error_Files\palerr.cab</name><MD5>Qoz0z0zIBBnbFkzUgG1JTA==</MD5></FILE_ENTRY>
+<FILE_ENTRY><name>Products\NI-PAL_Error_Files\palerr64.cab</name><MD5>Vf8uwLCI7HoV/w77RWtFOA==</MD5></FILE_ENTRY>
+<FILE_ENTRY><name>Products\NI-PAL_Error_Files\palerri.msi</name><MD5>lsG5dLrl7JDZqlMxMCdQCA==</MD5></FILE_ENTRY>
+<FILE_ENTRY><name>Products\NI-PAL_Error_Files\palerri64.msi</name><MD5>28I5hQgpLaJHQgQEfdnFQg==</MD5></FILE_ENTRY>
+<FILE_ENTRY><name>Products\NI-PAL_Error_Files\palerri_mft.cab</name><MD5>h4z5+ZS3X/yB38lnZGFiIw==</MD5></FILE_ENTRY>
+<FILE_ENTRY><name>Products\NI-QPXI\niqpxi32.cab</name><MD5>qSXPU53qky3T/uldZBxptQ==</MD5></FILE_ENTRY>
+<FILE_ENTRY><name>Products\NI-QPXI\niqpxi32.msi</name><MD5>iETmZQqDJLMx1KAO8UMSvA==</MD5></FILE_ENTRY>
+<FILE_ENTRY><name>Products\NI-QPXI\niqpxi32_mft.cab</name><MD5>FgLc5FMP0Ir6B5kIa5qe2g==</MD5></FILE_ENTRY>
+<FILE_ENTRY><name>Products\NI-QPXI\niqpxi64.cab</name><MD5>YEG74hN3P5DeyBk8ZmJoEQ==</MD5></FILE_ENTRY>
+<FILE_ENTRY><name>Products\NI-QPXI\niqpxi64.msi</name><MD5>c6s5nhxPtkcwhSiOukQZdw==</MD5></FILE_ENTRY>
+<FILE_ENTRY><name>Products\NI-ROCO_Error_Files\niroco32.cab</name><MD5>5WFgwME5zNYEe1CSAf1Epg==</MD5></FILE_ENTRY>
+<FILE_ENTRY><name>Products\NI-ROCO_Error_Files\niroco64.cab</name><MD5>f6iSrDmFL8s0lYupFSx/DA==</MD5></FILE_ENTRY>
+<FILE_ENTRY><name>Products\NI-ROCO_Error_Files\nirocoerri32.msi</name><MD5>9nUHRW+dnfTFzIp9HR2BIw==</MD5></FILE_ENTRY>
+<FILE_ENTRY><name>Products\NI-ROCO_Error_Files\nirocoerri32_mft.cab</name><MD5>1vqfKhvIZHcJJ+AX0/4OVQ==</MD5></FILE_ENTRY>
+<FILE_ENTRY><name>Products\NI-ROCO_Error_Files\nirocoerri64.msi</name><MD5>y9w8bnzzDYhOJ3ddr5uvww==</MD5></FILE_ENTRY>
+<FILE_ENTRY><name>Products\NI-RPC\rpcSetup.msi</name><MD5>hUsDJnHgIt9QSp1hyneONQ==</MD5></FILE_ENTRY>
+<FILE_ENTRY><name>Products\NI-RPC\rpcSetup64.msi</name><MD5>mtO2qj0Fp1Up3D7TwbS0xA==</MD5></FILE_ENTRY>
+<FILE_ENTRY><name>Products\NI-RPC_RT\rpcSetupLVRT.msi</name><MD5>bGs8UkG1Q97/pWqbK/xOFA==</MD5></FILE_ENTRY>
+<FILE_ENTRY><name>Products\NI-VISA_DotNet_Runtime\NIVISADN.cab</name><MD5>cWcwEMMOs8T4FuQtoaq0oA==</MD5></FILE_ENTRY>
+<FILE_ENTRY><name>Products\NI-VISA_DotNet_Runtime\NIVISADotNetRuntime.msi</name><MD5>7I99SOqinOA22AOXIVHJkw==</MD5></FILE_ENTRY>
+<FILE_ENTRY><name>Products\NI-VISA_DotNet_Runtime\NIVISADotNetRuntime_chs.mst</name><MD5>bvO/v5kOyP3H6uJ7B2l52g==</MD5></FILE_ENTRY>
+<FILE_ENTRY><name>Products\NI-VISA_DotNet_Runtime\NIVISADotNetRuntime_deu.mst</name><MD5>jzS5kOxEAbrlRHiIQBWH2g==</MD5></FILE_ENTRY>
+<FILE_ENTRY><name>Products\NI-VISA_DotNet_Runtime\NIVISADotNetRuntime_fra.mst</name><MD5>Eepwu6onV3MzLl/NdoYwcw==</MD5></FILE_ENTRY>
+<FILE_ENTRY><name>Products\NI-VISA_DotNet_Runtime\NIVISADotNetRuntime_jpn.mst</name><MD5>Szj00Ab9d2INQ4uLbtfDBA==</MD5></FILE_ENTRY>
+<FILE_ENTRY><name>Products\NI-VISA_DotNet_Runtime\NIVISADotNetRuntime_kor.mst</name><MD5>Vkwrt0ZB6gyLF9kOfXiplg==</MD5></FILE_ENTRY>
+<FILE_ENTRY><name>Products\NI-VISA_DotNet_Runtime\NIVISADotNetRuntime_mft.cab</name><MD5>IWKXYgFSwsDDxqgWBm+hag==</MD5></FILE_ENTRY>
+<FILE_ENTRY><name>Products\NI-VISA_Headers\NIVISAHeaders.msi</name><MD5>MiP2kVZvC+AmHwBMqqSrRA==</MD5></FILE_ENTRY>
+<FILE_ENTRY><name>Products\NI-VISA_Headers\NIVISAHeaders64.msi</name><MD5>SUJNDLPMxAZFHd7dESeBHA==</MD5></FILE_ENTRY>
+<FILE_ENTRY><name>Products\NI-VISA_Headers\NIVISAHeaders_mft.cab</name><MD5>1hqvsoSd6jnTIHCpmXnvnQ==</MD5></FILE_ENTRY>
+<FILE_ENTRY><name>Products\NI-VISA_Headers\visahd64.cab</name><MD5>fFFJFw3Zjrw1IC1W1s1Adg==</MD5></FILE_ENTRY>
+<FILE_ENTRY><name>Products\NI-VISA_Headers\visahdrs.cab</name><MD5>elHXRwB4CLWxjJud+CIWKQ==</MD5></FILE_ENTRY>
+<FILE_ENTRY><name>Products\NI-VISA_Runtime\LegacyGPIBVXI.msi</name><MD5>ppBTJ+fTURSF5Ga3XMmW6w==</MD5></FILE_ENTRY>
+<FILE_ENTRY><name>Products\NI-VISA_Runtime\LegacyGPIBVXI1.cab</name><MD5>yxYf4L/xTJziEhIGzTtnVg==</MD5></FILE_ENTRY>
+<FILE_ENTRY><name>Products\NI-VISA_Runtime\LegacyGPIBVXI_chs.mst</name><MD5>AIdVM+ZDnugDeq5EbV9+Iw==</MD5></FILE_ENTRY>
+<FILE_ENTRY><name>Products\NI-VISA_Runtime\LegacyGPIBVXI_deu.mst</name><MD5>jLhUSrfCWbYKKUIu/zPbBA==</MD5></FILE_ENTRY>
+<FILE_ENTRY><name>Products\NI-VISA_Runtime\LegacyGPIBVXI_fra.mst</name><MD5>lL/MwuQ4031STFt1Ix7Wkg==</MD5></FILE_ENTRY>
+<FILE_ENTRY><name>Products\NI-VISA_Runtime\LegacyGPIBVXI_jpn.mst</name><MD5>kjQxRRFTZJ3bJPjL6gI38w==</MD5></FILE_ENTRY>
+<FILE_ENTRY><name>Products\NI-VISA_Runtime\LegacyGPIBVXI_kor.mst</name><MD5>KI+HLcOmwmYMycBv1kLllg==</MD5></FILE_ENTRY>
+<FILE_ENTRY><name>Products\NI-VISA_Runtime\NIVISAruntime.msi</name><MD5>rvl6dysr5ec6BMhMjKdSDw==</MD5></FILE_ENTRY>
+<FILE_ENTRY><name>Products\NI-VISA_Runtime\NIVISAruntime1.cab</name><MD5>OEYhy6LGCmJJWEyKGT/pjQ==</MD5></FILE_ENTRY>
+<FILE_ENTRY><name>Products\NI-VISA_Runtime\NIVISAruntime64.msi</name><MD5>6opMfB7UR6yf1gPJqjVtFA==</MD5></FILE_ENTRY>
+<FILE_ENTRY><name>Products\NI-VISA_Runtime\NIVISAruntime641.cab</name><MD5>hlk+TzOYdFA4qEPy3XFcbg==</MD5></FILE_ENTRY>
+<FILE_ENTRY><name>Products\NI-VISA_Runtime\NIVISAruntime_chs.mst</name><MD5>cyE0bNMHTENdJD+T33tEnQ==</MD5></FILE_ENTRY>
+<FILE_ENTRY><name>Products\NI-VISA_Runtime\NIVISAruntime_deu.mst</name><MD5>CwcSbet3OBXLDsCWRmnEwQ==</MD5></FILE_ENTRY>
+<FILE_ENTRY><name>Products\NI-VISA_Runtime\NIVISAruntime_fra.mst</name><MD5>kuA/MZdRmkOUXKoLkRTVYw==</MD5></FILE_ENTRY>
+<FILE_ENTRY><name>Products\NI-VISA_Runtime\NIVISAruntime_jpn.mst</name><MD5>GSpz0/dZdcVH428yz0Lu1w==</MD5></FILE_ENTRY>
+<FILE_ENTRY><name>Products\NI-VISA_Runtime\NIVISAruntime_kor.mst</name><MD5>M73TjTmel4PD6AyS5uHB1w==</MD5></FILE_ENTRY>
+<FILE_ENTRY><name>Products\NI-VISA_Runtime\NIVISAruntime_mft.cab</name><MD5>oilMn8t8qKsLEY41MEmWmw==</MD5></FILE_ENTRY>
+<FILE_ENTRY><name>Products\NI-VISA_Runtime\visasc32.cab</name><MD5>n5ZuLeFaut0m4677XRu3eg==</MD5></FILE_ENTRY>
+<FILE_ENTRY><name>Products\NI-VISA_Runtime\visasc64.cab</name><MD5>WWownsTFsxHRDWYXv/cQIQ==</MD5></FILE_ENTRY>
+<FILE_ENTRY><name>Products\NI-VISA_Runtime\VisaSharedComponents32.msi</name><MD5>iZxkTukCeOCzLlXEQKuDBw==</MD5></FILE_ENTRY>
+<FILE_ENTRY><name>Products\NI-VISA_Runtime\VisaSharedComponents64.msi</name><MD5>8poTv9z/zM0e4TtF2Wqb8A==</MD5></FILE_ENTRY>
+<FILE_ENTRY><name>Products\NI-VISA_Runtime\VisaSharedComponentsWrapper32.msi</name><MD5>RaPqP+kIZLXFXACEpy7qGg==</MD5></FILE_ENTRY>
+<FILE_ENTRY><name>Products\NI-VISA_Runtime\VisaSharedComponentsWrapper64.msi</name><MD5>bwrBg9u9K6yBCyLY7sEe+g==</MD5></FILE_ENTRY>
+<FILE_ENTRY><name>Products\NIER_Interface\NIER_Interface.msi</name><MD5>+1l7J75pWU5q9Rh9JoynjA==</MD5></FILE_ENTRY>
+<FILE_ENTRY><name>Products\NIER_Interface\NIER_Interface64.msi</name><MD5>/ijgDW3pkoPWCSvey7WkeQ==</MD5></FILE_ENTRY>
+<FILE_ENTRY><name>Products\NIServiceLocator\svcloc\nisvcloc.msi</name><MD5>CzQuHxcF4disAvzfD8UXQg==</MD5></FILE_ENTRY>
+<FILE_ENTRY><name>Products\NIServiceLocator\svcloc\nisvcloc_mft.cab</name><MD5>F9L7nxKIGrCtQCXXmpK3Eg==</MD5></FILE_ENTRY>
+<FILE_ENTRY><name>Products\NIServiceLocator\svcloc\svcloc.cab</name><MD5>sPBvIKZABRSi8bPMHYYacw==</MD5></FILE_ENTRY>
+<FILE_ENTRY><name>Products\NIServiceLocator\svcloc\svcloc_chs.mst</name><MD5>Ap+W/8yrjjRE9itjEq46MQ==</MD5></FILE_ENTRY>
+<FILE_ENTRY><name>Products\NIServiceLocator\svcloc\svcloc_deu.mst</name><MD5>6X29nBndKDNp8Q3DcjAC7w==</MD5></FILE_ENTRY>
+<FILE_ENTRY><name>Products\NIServiceLocator\svcloc\svcloc_fra.mst</name><MD5>1jr2+LrbCWskT6Jo72dACw==</MD5></FILE_ENTRY>
+<FILE_ENTRY><name>Products\NIServiceLocator\svcloc\svcloc_jpn.mst</name><MD5>BzHfMRv5vmKlVw3FSXm+Jg==</MD5></FILE_ENTRY>
+<FILE_ENTRY><name>Products\NIServiceLocator\svcloc\svcloc_kor.mst</name><MD5>Jaak5oCG4yomQLCXyeOv6g==</MD5></FILE_ENTRY>
+<FILE_ENTRY><name>Products\NISysAPI_Framework\NISys00.cab</name><MD5>UgLgXnh+hO62rvopq0r4Fw==</MD5></FILE_ENTRY>
+<FILE_ENTRY><name>Products\NISysAPI_Framework\NISys01.cab</name><MD5>oKSp4xnGEE/66XxiDUV8IQ==</MD5></FILE_ENTRY>
+<FILE_ENTRY><name>Products\NISysAPI_Framework\nisysapi_x64.msi</name><MD5>+qJFyYhCud3HIQE7s9O66A==</MD5></FILE_ENTRY>
+<FILE_ENTRY><name>Products\NISysAPI_Framework\nisysapi_x86.msi</name><MD5>9TDZ/gzoU2VR/hifmEnv8Q==</MD5></FILE_ENTRY>
+<FILE_ENTRY><name>Products\NISysAPI_Framework\nisysapi_x86_mft.cab</name><MD5>v1dLOKBRq+kVAdK6Ofze5g==</MD5></FILE_ENTRY>
+<FILE_ENTRY><name>Products\NI_Certificates\signing.msi</name><MD5>AgOPA+3UgCe3z9hkf9IWzg==</MD5></FILE_ENTRY>
+<FILE_ENTRY><name>Products\NI_Certificates\signing_mft.cab</name><MD5>YjnBdsJk9t3EZQ+aFChCuA==</MD5></FILE_ENTRY>
+<FILE_ENTRY><name>Products\NI_Curl\nicurl.cab</name><MD5>Qb1FBh21SYhgW+KhFdO15w==</MD5></FILE_ENTRY>
+<FILE_ENTRY><name>Products\NI_Curl\nicurl.msi</name><MD5>EVeDHtNROmg293JH/8OTbQ==</MD5></FILE_ENTRY>
+<FILE_ENTRY><name>Products\NI_Curl\nicurl64.cab</name><MD5>2FsKFISL6aSd8Cee2iKiBw==</MD5></FILE_ENTRY>
+<FILE_ENTRY><name>Products\NI_Curl\nicurl64.msi</name><MD5>uQbNmSduPEo5g/o7RZETwg==</MD5></FILE_ENTRY>
+<FILE_ENTRY><name>Products\NI_Curl\nicurl_mft.cab</name><MD5>dXliKi/ZGl0Ti2z66yp1Mw==</MD5></FILE_ENTRY>
+<FILE_ENTRY><name>Products\NI_PXI_Platform_Framework_Error_Files\nipxipferr32.msi</name><MD5>hKAxbjDaZLSNJOte2HDQ9Q==</MD5></FILE_ENTRY>
+<FILE_ENTRY><name>Products\NI_PXI_Platform_Framework_Error_Files\nipxipferr32_mft.cab</name><MD5>/eHnIFyPRgRozLmdMAR9cA==</MD5></FILE_ENTRY>
+<FILE_ENTRY><name>Products\NI_PXI_Platform_Framework_Error_Files\nipxipferr64.msi</name><MD5>7HGh/oTEK416Y/4of6cEMw==</MD5></FILE_ENTRY>
+<FILE_ENTRY><name>Products\NI_PXI_Platform_Framework_Error_Files\pxierr.cab</name><MD5>5jwUCEjC0v24CAfgAwAwsw==</MD5></FILE_ENTRY>
+<FILE_ENTRY><name>Products\NI_PXI_Platform_Framework_Error_Files\pxierr64.cab</name><MD5>9q+fai7XAqtx7HwqwJ8I2A==</MD5></FILE_ENTRY>
+<FILE_ENTRY><name>Products\NI_SSL_Support\ni_ssl.msi</name><MD5>DRAXkt70F9F6yyorUqeC6w==</MD5></FILE_ENTRY>
+<FILE_ENTRY><name>Products\NI_SSL_Support\ni_ssl64.msi</name><MD5>VxvzC2CMH3l36QgNAnC8hA==</MD5></FILE_ENTRY>
+<FILE_ENTRY><name>Products\NI_SSL_Support\ni_ssl_mft.cab</name><MD5>5TdhAhVfwFf/CVYo78iZ3g==</MD5></FILE_ENTRY>
+<FILE_ENTRY><name>Products\NI_SSL_Support\ssl.cab</name><MD5>b0dlAtfxm37LavxLcLzRZA==</MD5></FILE_ENTRY>
+<FILE_ENTRY><name>Products\NI_SSL_Support\ssl64.cab</name><MD5>wSd0Fg6jUSwqA0FrC/dLdg==</MD5></FILE_ENTRY>
+<FILE_ENTRY><name>Products\NI_SSL_Support\ssl64_chs.mst</name><MD5>MZRxKmx/rJ13HMNno3TBLQ==</MD5></FILE_ENTRY>
+<FILE_ENTRY><name>Products\NI_SSL_Support\ssl64_deu.mst</name><MD5>yp+V/ek3bCqMkHwF54PoyQ==</MD5></FILE_ENTRY>
+<FILE_ENTRY><name>Products\NI_SSL_Support\ssl64_fra.mst</name><MD5>f8wQEWas1m3hn6jpctUmqw==</MD5></FILE_ENTRY>
+<FILE_ENTRY><name>Products\NI_SSL_Support\ssl64_jpn.mst</name><MD5>ZniNaDo4fu6JXGM7tqZ4gg==</MD5></FILE_ENTRY>
+<FILE_ENTRY><name>Products\NI_SSL_Support\ssl64_kor.mst</name><MD5>qe3MNL/WzxSe8gMCRwfjcw==</MD5></FILE_ENTRY>
+<FILE_ENTRY><name>Products\NI_SSL_Support\ssl_chs.mst</name><MD5>u+IX5b7ylm3Rfa0R0o5Bhg==</MD5></FILE_ENTRY>
+<FILE_ENTRY><name>Products\NI_SSL_Support\ssl_deu.mst</name><MD5>QkFjfL8RP7XJo+sKIqaxcw==</MD5></FILE_ENTRY>
+<FILE_ENTRY><name>Products\NI_SSL_Support\ssl_fra.mst</name><MD5>y7tk2pPN5uEGW/JNxorWxQ==</MD5></FILE_ENTRY>
+<FILE_ENTRY><name>Products\NI_SSL_Support\ssl_jpn.mst</name><MD5>/Lz0axs0fnh5CR+VGiJvPA==</MD5></FILE_ENTRY>
+<FILE_ENTRY><name>Products\NI_SSL_Support\ssl_kor.mst</name><MD5>81u0NJF4Hj7QbQUyujkJsg==</MD5></FILE_ENTRY>
+<FILE_ENTRY><name>Products\SecurityUpdate_KB67L8LCQW_KillBit\KillBit.msi</name><MD5>N+W51Mln4/Dq2t6m7YVSrg==</MD5></FILE_ENTRY>
+<FILE_ENTRY><name>Products\SecurityUpdate_KB67L8LCQW_KillBit\KillBit64.msi</name><MD5>WyHmXBk8QJt6Ne1JYmcBvg==</MD5></FILE_ENTRY>
+<FILE_ENTRY><name>Products\SecurityUpdate_KB67L8LCQW_KillBit\KillBit_mft.cab</name><MD5>3VyV8femael2cr0jF1fJ+w==</MD5></FILE_ENTRY>
+<FILE_ENTRY><name>Products\VC2008MSMs\VC2008MSMs\VC2008MSMs_x64.msi</name><MD5>e0KDic8xxODIkwOJ+MwaLQ==</MD5></FILE_ENTRY>
+<FILE_ENTRY><name>Products\VC2008MSMs\VC2008MSMs\VC2008MSMs_x86.msi</name><MD5>0fJu51VR/uJaTL74G5PnhA==</MD5></FILE_ENTRY>
+<FILE_ENTRY><name>Products\VC2008MSMs\VC2008MSMs\VC2008MSMs_x86_mft.cab</name><MD5>MAfEMgT8g0GcEsXVe08pGw==</MD5></FILE_ENTRY>
+<FILE_ENTRY><name>Products\VC2008MSMs\VC2008MSMs\x64.cab</name><MD5>W0WjEqJKXYJ0Wn8qLwHHYA==</MD5></FILE_ENTRY>
+<FILE_ENTRY><name>Products\VC2008MSMs\VC2008MSMs\x86.cab</name><MD5>JSaTB8FSM7IBKPmelmUpRA==</MD5></FILE_ENTRY>
+<FILE_ENTRY><name>Products\VC2015_Runtime\VC2015\VC2015-32Wrapper.msi</name><MD5>DWSpobqBd2zLm/Lmepz/Kg==</MD5></FILE_ENTRY>
+<FILE_ENTRY><name>Products\VC2015_Runtime\VC2015\VC2015-64Wrapper.msi</name><MD5>MOyhUVkLD6bAdKsfY6in4w==</MD5></FILE_ENTRY>
+<FILE_ENTRY><name>Products\VC2015_Runtime\VC2015\VC2015Core.msi</name><MD5>Y143LpdW2F5rMqdilF1a4w==</MD5></FILE_ENTRY>
+<FILE_ENTRY><name>Products\VC2015_Runtime\VC2015\VC2015Core_chs.mst</name><MD5>uKNs4x3LJy4XywZ7Kvj5mQ==</MD5></FILE_ENTRY>
+<FILE_ENTRY><name>Products\VC2015_Runtime\VC2015\VC2015Core_deu.mst</name><MD5>8zdJxK7aro4vc7i2ynSJeA==</MD5></FILE_ENTRY>
+<FILE_ENTRY><name>Products\VC2015_Runtime\VC2015\VC2015Core_fra.mst</name><MD5>EobzPGllumDahfjHgApm4Q==</MD5></FILE_ENTRY>
+<FILE_ENTRY><name>Products\VC2015_Runtime\VC2015\VC2015Core_jpn.mst</name><MD5>smdrXNZryRzxnx2u04U6UQ==</MD5></FILE_ENTRY>
+<FILE_ENTRY><name>Products\VC2015_Runtime\VC2015\VC2015Core_kor.mst</name><MD5>7B1ayxj9aneIczIrp1k6IA==</MD5></FILE_ENTRY>
+<FILE_ENTRY><name>Products\VC2015_Runtime\VC2015\VCRunTimeInstaller.exe</name><MD5>HbzDRR0F/cRBWJSiA5BVxA==</MD5></FILE_ENTRY>
+<FILE_ENTRY><name>Products\VC2015_Runtime\VC2015\vc_redist.x64.exe</name><MD5>igBeqdM9ByAx27qShhTLYg==</MD5></FILE_ENTRY>
+<FILE_ENTRY><name>Products\VC2015_Runtime\VC2015\vc_redist.x86.exe</name><MD5>L+lwKGHp+TpTvo2rNhKRpg==</MD5></FILE_ENTRY>
+<FILE_ENTRY><name>Products\VISA_NET_Shared_Components\vinet32.cab</name><MD5>IIDiV98eGHOapyQKs1zF3w==</MD5></FILE_ENTRY>
+<FILE_ENTRY><name>Products\VISA_NET_Shared_Components\vinet64.cab</name><MD5>MWIC+BPU52j1aKmD9zRjoA==</MD5></FILE_ENTRY>
+<FILE_ENTRY><name>Products\VISA_NET_Shared_Components\vinetcor.cab</name><MD5>hwhpnSxzvtMKCgjYD5bW1w==</MD5></FILE_ENTRY>
+<FILE_ENTRY><name>Products\VISA_NET_Shared_Components\VisaNetSharedComponents32.msi</name><MD5>3RRLHlIcPbXVxn4IPuGMeA==</MD5></FILE_ENTRY>
+<FILE_ENTRY><name>Products\VISA_NET_Shared_Components\VisaNetSharedComponents64.msi</name><MD5>zjCuoxfye5jf1xk5Zon0ZA==</MD5></FILE_ENTRY>
+<FILE_ENTRY><name>Products\VISA_NET_Shared_Components\VisaNetSharedComponentsWrapper32.msi</name><MD5>OgvB+s90/G3EPfcrdmVr1w==</MD5></FILE_ENTRY>
+<FILE_ENTRY><name>Products\VISA_NET_Shared_Components\VisaNetSharedComponentsWrapper64.msi</name><MD5>40bLGmBhoWZhgzFx5hCjAw==</MD5></FILE_ENTRY>
+<FILE_ENTRY><name>Products\VISA_NET_Shared_Components\VisaNetSharedComponentsWrapperCore.msi</name><MD5>UIaVPuXElXwekTBctPtRsw==</MD5></FILE_ENTRY>
+<FILE_ENTRY><name>Products\VISA_NET_Shared_Components\VisaNetSharedComponentsWrapperCore_mft.cab</name><MD5>jv7OIbytEgER9O945dQXew==</MD5></FILE_ENTRY>
+<FILE_ENTRY><name>Products\XercesDelayLoad27\nixerces27_win32.msi</name><MD5>38LsU/WbgzsY19Zlh0DFSg==</MD5></FILE_ENTRY>
+<FILE_ENTRY><name>Products\XercesDelayLoad27\nixerces27_win32_mft.cab</name><MD5>O8kHXPvNTliKXk4eXdJvMA==</MD5></FILE_ENTRY>
+<FILE_ENTRY><name>Products\XercesDelayLoad27\nixerces27_win64.msi</name><MD5>iWdtI0brR3pkgKC6d9sZfg==</MD5></FILE_ENTRY>
+<FILE_ENTRY><name>Products\XercesDelayLoad27\Xerce00.cab</name><MD5>8pu5soqzGw9z0eWdWCNqOg==</MD5></FILE_ENTRY>
+<FILE_ENTRY><name>Products\XercesDelayLoad27\Xerce01.cab</name><MD5>huyKkgYaDODN+4uKBVoulA==</MD5></FILE_ENTRY>
+<FILE_ENTRY><name>SupportFiles\merged.cab</name><MD5>bbpIOFLG4jr0+Klyegpu+Q==</MD5></FILE_ENTRY>
+<FILE_ENTRY><name>SupportFiles\merged_chs.mst</name><MD5>P8lf0TR+oi1TbwAfaXDJvg==</MD5></FILE_ENTRY>
+<FILE_ENTRY><name>SupportFiles\merged_cht.mst</name><MD5>pxbZur8nlrGKHiLe3VdShg==</MD5></FILE_ENTRY>
+<FILE_ENTRY><name>SupportFiles\merged_deu.mst</name><MD5>+aJ6hEYnr7/KM4EHush4yw==</MD5></FILE_ENTRY>
+<FILE_ENTRY><name>SupportFiles\merged_fra.mst</name><MD5>O9YqiGfUyuWLaqI2+4JAJw==</MD5></FILE_ENTRY>
+<FILE_ENTRY><name>SupportFiles\merged_jpn.mst</name><MD5>6JswcMs8k0QF4XVicm7EEQ==</MD5></FILE_ENTRY>
+<FILE_ENTRY><name>SupportFiles\merged_kor.mst</name><MD5>+w6z6Yf+I9JysiWDpDF1Wg==</MD5></FILE_ENTRY>
+<FILE_ENTRY><name>SupportFiles\MIFSystemUtility.dll</name><MD5>rLfyfBrFtyJ5SIp4SoOQWA==</MD5></FILE_ENTRY>
+<FILE_ENTRY><name>SupportFiles\niPie.exe</name><MD5>0zEHfBcMkafnSgjuZ5J7Vw==</MD5></FILE_ENTRY>
+<FILE_ENTRY><name>SupportFiles\niresjpn.cab</name><MD5>ZsEB3m74yeeDhsv42vWIiw==</MD5></FILE_ENTRY>
+<FILE_ENTRY><name>SupportFiles\nistdtrans0007.mst</name><MD5>UmaVhqwFVOib4QsBL/QBXg==</MD5></FILE_ENTRY>
+<FILE_ENTRY><name>SupportFiles\nistdtrans0012.mst</name><MD5>45VrL98iEy10XJwQggpQnQ==</MD5></FILE_ENTRY>
+<FILE_ENTRY><name>SupportFiles\nistdtrans0017.mst</name><MD5>EgDuIeqUHtZDXHusH4/GRQ==</MD5></FILE_ENTRY>
+<FILE_ENTRY><name>SupportFiles\nistdtrans0018.mst</name><MD5>9yacG3ulHSMDf9m3XPnZMw==</MD5></FILE_ENTRY>
+<FILE_ENTRY><name>SupportFiles\nistdtrans2052.mst</name><MD5>c9oztbH91vkJSQNKM7K7nA==</MD5></FILE_ENTRY>
+<FILE_ENTRY><name>SupportFiles\nistdtransbase.mst</name><MD5>6fYr89IIRZh8BrA21L2+FA==</MD5></FILE_ENTRY>
+<FILE_ENTRY><name>SupportFiles\notify.dll</name><MD5>4vr9Lt7uE5d4fRi28p8tKA==</MD5></FILE_ENTRY>
+<FILE_ENTRY><name>SupportFiles\notifyupdates.dll</name><MD5>x1lYb34gqrtfd3Sm3OKbvQ==</MD5></FILE_ENTRY>
+<FILE_ENTRY><name>SupportFiles\updateInfo.xml</name><MD5>Q7att4Z+qTKiXiywhTmxkg==</MD5></FILE_ENTRY>
+<FILE_ENTRY><name>SupportFiles\VisaInstallerEngResDll.cab</name><MD5>zHuGOq/fdZDb5xytHBOxqQ==</MD5></FILE_ENTRY>
+<FILE_ENTRY><name>SupportFiles\VisaInstallerJpnResDll.cab</name><MD5>WurqtUGi8ne8EJ0wwUiYtQ==</MD5></FILE_ENTRY>
+<FILE_ENTRY><name>SupportFiles\WindowsInstaller-KB893803-v2-x86.exe</name><MD5>NC95M3dldgrU45LrZ9XtLA==</MD5></FILE_ENTRY>
+</FCIV>
