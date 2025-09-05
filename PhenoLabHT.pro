@@ -39,5 +39,8 @@ INCLUDEPATH += $$PWD/SettingsButton
 include($$PWD/Modbus485/modbus485.pri)
 INCLUDEPATH += $$PWD/Modbus485
 
+# include($$PWD/ModbusTcp/modbustcp.pri)
+# INCLUDEPATH += $$PWD/ModbusTcp
+
 RESOURCES += \
     picture.qrc
