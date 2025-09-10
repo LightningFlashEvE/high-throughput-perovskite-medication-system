@@ -28,10 +28,7 @@ else: unix:!android: target.path = /opt/$${TARGET}/bin
 include($$PWD/FlowViewManager/flowviewmanager.pri)  #include()包含的文件会显示在工程结构目录中
 INCLUDEPATH += $$PWD/FlowViewManager   # 工程编译时，会去INCLUDEPATH列表下的目录搜索文件
 include($$PWD/ChessBoardView/chessboardview.pri)  #include()包含的文件会显示在工程结构目录中
-INCLUDEPATH += $$PWD/chessboardview   # 工程编译时，会去INCLUDEPATH列表下的目录搜索文件
-
-include($$PWD/TcpFramedClient/tcpframedclient.pri)  # 引入 tcp 客户端模块
-INCLUDEPATH += $$PWD/TcpFramedClient  # 让编译器能找到该目录的头文件（可选；pri 已经加了 INCLUDEPATH）
+INCLUDEPATH += $$PWD/chessboardview   # 工程编译时，会去INCLUDEPATH列表下的目录搜索文
 
 include($$PWD/SettingsButton/settingsbutton.pri)
 INCLUDEPATH += $$PWD/SettingsButton
@@ -39,8 +36,9 @@ INCLUDEPATH += $$PWD/SettingsButton
 include($$PWD/Modbus485/modbus485.pri)
 INCLUDEPATH += $$PWD/Modbus485
 
-# include($$PWD/ModbusTcp/modbustcp.pri)
-# INCLUDEPATH += $$PWD/ModbusTcp
+include($$PWD/TcpClient/tcpclient.pri)
+INCLUDEPATH += $$PWD/TcpClient
+
 
 RESOURCES += \
     picture.qrc

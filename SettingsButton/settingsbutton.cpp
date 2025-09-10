@@ -9,7 +9,9 @@
 #include <QLabel>
 #include <QLineEdit>
 #include <QSlider>
+#include <QSpinBox>
 #include "Modbus485/modbus485.h"
+
 
 SettingsButton::SettingsButton(QWidget *parent)
     : QWidget(parent)
@@ -25,8 +27,8 @@ SettingsButton::SettingsButton(QWidget *parent)
 
     /******  试管状态机 ******/
     // 初始化一个试管，中心(50,50)，半径8
-    Tube t; t.center = QPointF(50, 50); t.radius = 8; t.state = TubeState::Empty;
-    m_tubes = { t };
+    // Tube t; t.center = QPointF(50, 50); t.radius = 8; t.state = TubeState::Empty;
+    // m_tubes = { t };
 
     // 坐标编辑框：回车或失焦时发送 positionEdited(col,row)
     if (auto x = findChild<QLineEdit*>("lineEditX")) {
@@ -50,6 +52,8 @@ SettingsButton::SettingsButton(QWidget *parent)
 
     /****** 485通信初始化 ******/
     init485UI();
+    
+    // ModbusTcp 已移除
 }
 
 SettingsButton::~SettingsButton()
@@ -782,5 +786,5 @@ void SettingsButton::onRotationAngleChanged(int angle)
     // 发出角度变化信号
     emit rotationAngleChanged(angle);
 }
-
 /****** 485通信实现  down ******/
+

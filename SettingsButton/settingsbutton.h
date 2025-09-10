@@ -138,6 +138,7 @@ private slots:
     void onModbusDataChanged();
     // 旋转角度滑动条处理
     void onRotationAngleChanged(int value);
+    
 
 private:
     QVector<Tube> m_tubes; // 此处仅使用一个，中心(50,50)
@@ -147,10 +148,12 @@ private:
     Modbus485 *modbus485 = nullptr;
     QTextEdit *m_serverLog = nullptr;  // 485通信日志显示区域
     
+    
     // 初始化485相关UI
     void init485UI();
     // 初始化旋转角度滑动条
     void initRotationSlider();
+    
     
     // CRC-16计算函数（Modbus标准）
     quint16 calculateCRC16(const QByteArray &data) const;

@@ -5,9 +5,9 @@
 #include <QVector>
 #include <QPointF>
 #include "chessboardview.h"
-#include "tcpframedclient.h"
 #include "flowviewmanager.h"
 #include "settingsbutton.h"
+#include "tcpclient.h"
 
 
 QT_BEGIN_NAMESPACE
@@ -79,8 +79,7 @@ private:
     ChessBoardView *chessBoard = nullptr;
     // 流程图封装类（挂载在 frame_2）
     FlowViewManager *flowManager = nullptr;
-    // TCP帧客户端（接收并解析自定义协议）
-    TcpFramedClient *tcpClient = nullptr;
+    // TcpFramedClient 已移除
 
     // 设置面板（非模态，可频繁打开关闭）
     SettingsButton *settingsPanel = nullptr;

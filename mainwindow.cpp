@@ -7,6 +7,8 @@
 #include <QShowEvent>
 #include <QPainter>
 #include <algorithm> // for std::clamp
+#include <QMenu>
+#include <QPushButton>
 
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
@@ -45,39 +47,28 @@ MainWindow::MainWindow(QWidget *parent)
     flowManager = new FlowViewManager(this);
     flowManager->init(ui->frame_2);
 
-    /*** 绑定测试按钮 - 启动/暂停 TCP 接收并解析 ***/
-    tcpClient = new TcpFramedClient(this);
-    
-    // 设置字节序（true=大端序，false=小端序）
-    // 如果你的数据是 AA 55 格式（大端），设置为 true
-    // 如果你的数据是 55 AA 格式（小端），设置为 false
-    tcpClient->setByteOrder(true);  // 使用大端序
-    
-    connect(tcpClient, &TcpFramedClient::frameReceived, this, [](quint16 type, const QByteArray &payload){
-        qDebug() << "[TCP] frame type=" << type << ", len=" << payload.size();
-    });
-    connect(tcpClient, &TcpFramedClient::logMessage, this, [](const QString &msg){ qDebug() << msg; });
-    connect(tcpClient, &TcpFramedClient::errorOccurred, this, [](const QString &msg){ qWarning() << msg; });
 
-    // 测试按键
-    if (ui->pushButtonTest) {
-        connect(ui->pushButtonTest, &QPushButton::clicked, this, [this]{
-            static bool receiving = false;
-            receiving = !receiving;
-            if (receiving) {
-                ui->pushButtonTest->setText(QStringLiteral("暂停接收"));
-                tcpClient->start(QStringLiteral("127.0.0.1"), 9000);
-            } else {
-                ui->pushButtonTest->setText(QStringLiteral("开始接收"));
-                tcpClient->stop();
-            }
+    if (ui->menuStatus) {
+        // 创建一个菜单项
+        QAction *statusAction = new QAction("查看状态", this);
+        QAction *statusAction2 = new QAction("状态", this);
+        ui->menuStatus->addAction(statusAction);
+        ui->menuStatus->addAction(statusAction2);
+        
+        // 连接菜单项的点击事件
+        connect(statusAction, &QAction::triggered, this, []{
+            qDebug() << "哈哈哈";
         });
-        ui->pushButtonTest->setText(QStringLiteral("开始接收"));
+        connect(statusAction2, &QAction::triggered, this, []{
+            qDebug() << "哈哈哈";
+        });
     }
 
-    // 设置按钮：频繁打开/关闭 SettingsButton 窗口
-    if (ui->pushButtonSetting) {
-        connect(ui->pushButtonSetting, &QPushButton::clicked, this, [this] {
+    if (ui->menuSettings) {
+        // 创建一个菜单项
+        QAction *settingsAction485 = new QAction("485调试", this);
+        ui->menuSettings->addAction(settingsAction485);
+        connect(settingsAction485, &QAction::triggered, this, [this] {
             if (!settingsPanel) {
                 settingsPanel = new SettingsButton(nullptr); // 独立窗口
                 settingsPanel->setAttribute(Qt::WA_DeleteOnClose, true);
@@ -111,65 +102,79 @@ MainWindow::MainWindow(QWidget *parent)
                     moveChessPiece(0, zhuaCol, zhuaRow);
                     settingsPanel->setLocation(zhuaCol, zhuaRow);
                 });
+
+                // 坐标文本框提交后，移动至指定网格
+                connect(settingsPanel, &SettingsButton::positionEdited, this, [this](int col, int row){
+                    int maxCol = chessBoard ? chessBoard->gridMaxCol() : 199;
+                    int maxRow = chessBoard ? chessBoard->gridMaxRow() : 199;
+                    zhuaCol = std::clamp(col, 0, maxCol);
+                    zhuaRow = std::clamp(row, 0, maxRow);
+                    moveChessPiece(0, zhuaCol, zhuaRow);
+                    if (settingsPanel) settingsPanel->setLocation(zhuaCol, zhuaRow);
+                });
+
+                /******  试管状态机  up ******/
+                // 步骤4：UI按钮 -> 触发状态切换
+                // 1) 用户点击设置页按钮（Empty/Full/Using/Error/Disable）
+                // 2) 这里监听到点击后，调用 chessBoard->setTubeState(...)
+                // 3) setTubeState 内部修改状态并调用 applyTubeStyle 套用样式，圆形外观立即变化
+                // 将按钮作用于棋盘上(50,50)的试管状态
+                if (settingsPanel->findChild<QPushButton*>("pushButtonUsing")) {
+                    connect(settingsPanel->findChild<QPushButton*>("pushButtonUsing"), &QPushButton::clicked, this, [this]{
+                        if (chessBoard) chessBoard->setTubeState(ChessBoardView::TubeState::Using);
+                    });
+                }
+                if (settingsPanel->findChild<QPushButton*>("pushButtonFull")) {
+                    connect(settingsPanel->findChild<QPushButton*>("pushButtonFull"), &QPushButton::clicked, this, [this]{
+                        if (chessBoard) chessBoard->setTubeState(ChessBoardView::TubeState::Full);
+                    });
+                }
+                if (settingsPanel->findChild<QPushButton*>("pushButtonError")) {
+                    connect(settingsPanel->findChild<QPushButton*>("pushButtonError"), &QPushButton::clicked, this, [this]{
+                        if (chessBoard) chessBoard->setTubeState(ChessBoardView::TubeState::Error);
+                    });
+                }
+                if (settingsPanel->findChild<QPushButton*>("pushButtonDisable")) {
+                    connect(settingsPanel->findChild<QPushButton*>("pushButtonDisable"), &QPushButton::clicked, this, [this]{
+                        if (chessBoard) chessBoard->setTubeState(ChessBoardView::TubeState::Disabled);
+                    });
+                }
+                if (settingsPanel->findChild<QPushButton*>("pushButtonEmpty")) {
+                    connect(settingsPanel->findChild<QPushButton*>("pushButtonEmpty"), &QPushButton::clicked, this, [this]{
+                        if (chessBoard) chessBoard->setTubeState(ChessBoardView::TubeState::Empty);
+                    });
+                }
+                /******  试管状态机  down ******/
             }
             settingsPanel->show();
             settingsPanel->raise();
             settingsPanel->activateWindow();
             // 打开时同步显示当前位置
             settingsPanel->setLocation(zhuaCol, zhuaRow);
+        });
 
-            // 坐标文本框提交后，移动至指定网格
-            connect(settingsPanel, &SettingsButton::positionEdited, this, [this](int col, int row){
-                int maxCol = chessBoard ? chessBoard->gridMaxCol() : 199;
-                int maxRow = chessBoard ? chessBoard->gridMaxRow() : 199;
-                zhuaCol = std::clamp(col, 0, maxCol);
-                zhuaRow = std::clamp(row, 0, maxRow);
-                moveChessPiece(0, zhuaCol, zhuaRow);
-                if (settingsPanel) settingsPanel->setLocation(zhuaCol, zhuaRow);
-            });
+        QAction *settingsActionTcp = new QAction("TCP调试", this);
+        ui->menuSettings->addAction(settingsActionTcp);
+        connect(settingsActionTcp, &QAction::triggered, this, [this] {
+            // 创建并显示 TCP 客户端调试窗口
+            TcpClient *tcpClient = new TcpClient();
+            tcpClient->setAttribute(Qt::WA_DeleteOnClose);
+            tcpClient->show();
+            
+            qDebug() << "TCP调试窗口已打开";
+        });
+    }
 
-            /******  试管状态机  up ******/
-            // 步骤4：UI按钮 -> 触发状态切换
-            // 1) 用户点击设置页按钮（Empty/Full/Using/Error/Disable）
-            // 2) 这里监听到点击后，调用 chessBoard->setTubeState(...)
-            // 3) setTubeState 内部修改状态并调用 applyTubeStyle 套用样式，圆形外观立即变化
-            // 将按钮作用于棋盘上(50,50)的试管状态
-            if (settingsPanel->findChild<QPushButton*>("pushButtonUsing")) {
-                connect(settingsPanel->findChild<QPushButton*>("pushButtonUsing"), &QPushButton::clicked, this, [this]{
-                    if (chessBoard) chessBoard->setTubeState(ChessBoardView::TubeState::Using);
-                });
-            }
-            if (settingsPanel->findChild<QPushButton*>("pushButtonFull")) {
-                connect(settingsPanel->findChild<QPushButton*>("pushButtonFull"), &QPushButton::clicked, this, [this]{
-                    if (chessBoard) chessBoard->setTubeState(ChessBoardView::TubeState::Full);
-                });
-            }
-            if (settingsPanel->findChild<QPushButton*>("pushButtonError")) {
-                connect(settingsPanel->findChild<QPushButton*>("pushButtonError"), &QPushButton::clicked, this, [this]{
-                    if (chessBoard) chessBoard->setTubeState(ChessBoardView::TubeState::Error);
-                });
-            }
-            if (settingsPanel->findChild<QPushButton*>("pushButtonDisable")) {
-                connect(settingsPanel->findChild<QPushButton*>("pushButtonDisable"), &QPushButton::clicked, this, [this]{
-                    if (chessBoard) chessBoard->setTubeState(ChessBoardView::TubeState::Disabled);
-                });
-            }
-            if (settingsPanel->findChild<QPushButton*>("pushButtonEmpty")) {
-                connect(settingsPanel->findChild<QPushButton*>("pushButtonEmpty"), &QPushButton::clicked, this, [this]{
-                    if (chessBoard) chessBoard->setTubeState(ChessBoardView::TubeState::Empty);
-                });
-            }
-            /******  试管状态机  down ******/
+    if (ui->menuHistory) {
+        QAction *sthAction = new QAction("历史按键", this);
+        ui->menuHistory->addAction(sthAction);
+        connect(sthAction, &QAction::triggered, this, [] {
+            qDebug() << "xixihaha";
         });
     }
 
 
-    // 状态按键
-    if (ui->pushButtonStatus) {
-        connect(ui->pushButtonStatus, &QPushButton::clicked, this, []{
-            qDebug() << "状态点击";
-        });
-    }
+
 }
 
 MainWindow::~MainWindow()

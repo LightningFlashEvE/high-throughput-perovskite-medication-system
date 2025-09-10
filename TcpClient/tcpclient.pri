@@ -4,7 +4,7 @@ INCLUDEPATH += $$PWD/..
 DEPENDPATH += $$PWD/..
 
 HEADERS += \
-    $$PWD/tcpframedclient.h
+    $$PWD/tcpclient.h
 
 SOURCES += \
-    $$PWD/tcpframedclient.cpp
+    $$PWD/tcpclient.cpp
