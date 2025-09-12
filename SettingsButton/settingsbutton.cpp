@@ -347,6 +347,7 @@ void SettingsButton::onModbusDataChanged()
     // 拼接数据并计算CRC
     QString combined = id + func + addr + data;
     QByteArray hexData = QByteArray::fromHex(combined.toLatin1());
+    qDebug() << "----------2-------" << hexData;
     
     if (!hexData.isEmpty()) {
         quint16 crc = calculateCRC16(hexData);
@@ -363,7 +364,6 @@ void SettingsButton::onModbusDataChanged()
 quint16 SettingsButton::calculateCRC16(const QByteArray &data) const
 {
     quint16 crc = 0xFFFF;  // 初始值
-    
     for (int i = 0; i < data.length(); ++i) {
         crc ^= static_cast<quint8>(data[i]);  // XOR字节到CRC
         

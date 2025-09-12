@@ -79,7 +79,7 @@ MainWindow::MainWindow(QWidget *parent)
                 const int step = 1; // 每次移动一个网格
                 connect(settingsPanel, &SettingsButton::moveUpClicked, this, [this] {
                     int maxRow = chessBoard ? chessBoard->gridMaxRow() : 99;
-                    int maxCol = chessBoard ? chessBoard->gridMaxCol() : 99;
+                    //int maxCol = chessBoard ? chessBoard->gridMaxCol() : 99;
                     zhuaRow = std::clamp(zhuaRow - step, 0, maxRow);
                     moveChessPiece(0, zhuaCol, zhuaRow);
                     settingsPanel->setLocation(zhuaCol, zhuaRow);
@@ -156,11 +156,16 @@ MainWindow::MainWindow(QWidget *parent)
         QAction *settingsActionTcp = new QAction("TCP调试", this);
         ui->menuSettings->addAction(settingsActionTcp);
         connect(settingsActionTcp, &QAction::triggered, this, [this] {
-            // 创建并显示 TCP 客户端调试窗口
-            TcpClient *tcpClient = new TcpClient();
-            tcpClient->setAttribute(Qt::WA_DeleteOnClose);
-            tcpClient->show();
-            
+            if (!tcpClientPanel) {
+                tcpClientPanel = new TcpClient(nullptr); // 独立窗口
+                tcpClientPanel->setAttribute(Qt::WA_DeleteOnClose, true);
+                tcpClientPanel->setWindowFlag(Qt::Window, true);
+                tcpClientPanel->setWindowTitle("TCP 通信调试工具");
+                connect(tcpClientPanel, &QObject::destroyed, this, [this] { tcpClientPanel = nullptr; });
+            }
+            tcpClientPanel->show();
+            tcpClientPanel->raise();
+            tcpClientPanel->activateWindow();
             qDebug() << "TCP调试窗口已打开";
         });
     }

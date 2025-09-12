@@ -3,35 +3,24 @@
 
 #include <QWidget>
 #include <QTcpSocket>
+#include <QTcpServer>
 #include <QTimer>
-#include <QHostAddress>
+#include <QNetworkInterface>
+#include <QNetworkProxy>
+#include <QMap>
+#include <QJsonObject>
+#include <QJsonDocument>
+#include "protocolbase.h"
 
-QT_BEGIN_NAMESPACE
-class QVBoxLayout;
-class QHBoxLayout;
-class QGridLayout;
-class QLineEdit;
-class QSpinBox;
-class QTextEdit;
-class QPushButton;
-class QCheckBox;
-class QLabel;
-class QGroupBox;
-QT_END_NAMESPACE
+// 前向声明
+class TcpClientCrc;
 
-/**
- * TcpClient - 专业的TCP客户端调试工具
- * 
- * 功能特性：
- * - TCP连接管理（连接/断开/重连）
- * - 远端和本地IP/端口配置
- * - 实时连接状态显示
- * - 数据发送（支持16进制/字符串模式）
- * - 接收数据日志显示
- * - 连接状态可视化指示
- * - 自动重连功能
- * - 数据统计显示
- */
+namespace Ui {
+class TcpClient;
+}
+
+// 旧的协议结构已删除，使用新的模块化ProtocolBase系统
+
 class TcpClient : public QWidget
 {
     Q_OBJECT
@@ -40,125 +29,90 @@ public:
     explicit TcpClient(QWidget *parent = nullptr);
     ~TcpClient();
 
-    // 公共接口
-    bool connectToHost(const QString &host, quint16 port);
-    bool connectToHost(const QString &host, quint16 port, const QString &localHost, quint16 localPort);
-    void disconnectFromHost();
-    bool isConnected() const;
-    
-    // 数据发送
-    void sendData(const QByteArray &data);
-    void sendText(const QString &text);
-    void sendHexString(const QString &hexString);
-    
-    // 获取连接信息
-    QString getRemoteAddress() const;
-    quint16 getRemotePort() const;
-    QString getLocalAddress() const;
-    quint16 getLocalPort() const;
-    
-    // 日志管理
-    void clearLog();
-    QString getLogContent() const;
-    
-    // 设置选项
-    void setAutoReconnect(bool enabled);
-    void setReconnectInterval(int milliseconds);
-
-signals:
-    // 连接状态信号
-    void connected();
-    void disconnected();
-    void connectionError(const QString &error);
-    
-    // 数据信号
-    void dataReceived(const QByteArray &data);
-    void dataSent(const QByteArray &data);
-    
-    // 状态信号
-    void statusChanged(const QString &status);
-
 private slots:
-    // 内部槽函数
+    void onModeChanged();
     void onConnectClicked();
+    void onDisconnectClicked();
     void onSendClicked();
-    void onClearLogClicked();
-    void onHexModeChanged(bool hexMode);
-    
-    // TCP事件处理
-    void onSocketConnected();
-    void onSocketDisconnected();
+    void onClearClicked();
+    void onNewConnection();
+    void onClientConnected();
+    void onClientDisconnected();
+    void onDataReceived();
     void onSocketError(QAbstractSocket::SocketError error);
-    void onSocketDataReady();
+    void updateLocalIPs();
     
-    // 重连定时器
-    void onReconnectTimer();
+    // 协议相关槽函数 (仅用于帧结构编辑器)
+    void onProtocolTypeChanged();
     
-    // UI更新
-    void updateConnectionStatus(bool connected);
-    void updateDataStatistics();
+    // 帧结构编辑器槽函数
+    void onFrameFieldChanged();
+    void onBuildFrameClicked();
+    void onPreviewModeChanged();
+    
+    // 数据解析功能已整合到模块化协议系统中
+
+public:
+    void setupConnections();
+    void initializeNetworkObjects();
+    void updateProxySettings();
+    void updateUI();
+    void appendMessage(const QString &message, const QString &type = "info");
+    void updateConnectionInfo();
+    QString getCurrentTimestamp();
+    void refreshLocalIPs();
+    
+    // 旧协议管理方法已删除，使用新的模块化系统
+    quint16 calculateCRC16(const QByteArray &data);
+    QString formatFrameForDisplay(const QByteArray &frame, bool hexDisplay = true);
+    
+    // 帧结构编辑器方法
+    void initializeFrameBuilder();
+    void syncFrameFields(); // 更新combox值, 初始化会调用，选择协议会调用
+    QString buildFrameFromFields();
+    void updateCrcDisplay();
+    QString formatFrameASCII(const QString &frame);
+    QString formatFrameHex(const QString &frame);
+    
+    // UI控件访问器方法 (供CRC辅助类使用)
+    QString getComboBox1Text() const;
+    QString getComboBox2Text() const;
+    QString getComboBox3Text() const;
+    QString getComboBox3Data() const;
+    QString getLineEdit4Text() const;
+    void setLineEdit5Text(const QString &text);
+    void clearLineEdit5();
+    QString getCurrentProtocolName() const;
+    
+    // 协议管理方法 (新的模块化系统)
+    void initializeProtocolSystem();
+    void updateProtocolUI(); // 更新眉头
+    void populateProtocolComboBoxes();
+    void applyProtocolFields();
 
 private:
-    // UI组件
-    void setupUI();
-    void createConnectionGroup();
-    void createControlGroup();
-    void createLogGroup();
-    void createStatusGroup();
+    Ui::TcpClient *ui;
     
-    // 工具函数
-    QString formatByteArray(const QByteArray &data, bool asHex = false) const;
-    QByteArray parseHexString(const QString &hexString) const;
-    void appendLog(const QString &message, const QString &prefix = "", const QColor &color = QColor());
-    void setButtonStyle(QPushButton *button, bool success);
+    // 网络相关
+    QTcpSocket *m_tcpSocket;
+    QTcpServer *m_tcpServer;
+    QList<QTcpSocket*> m_clientSockets;
     
-    // 网络组件
-    QTcpSocket *m_socket;
-    QTimer *m_reconnectTimer;
-    
-    // UI组件
-    QVBoxLayout *m_mainLayout;
-    
-    // 连接配置组
-    QGroupBox *m_connectionGroup;
-    QLineEdit *m_remoteHostEdit;
-    QSpinBox *m_remotePortSpin;
-    QLineEdit *m_localHostEdit;
-    QSpinBox *m_localPortSpin;
-    QPushButton *m_connectButton;
-    QLabel *m_connectionStatusLabel;
-    
-    // 控制组
-    QGroupBox *m_controlGroup;
-    QTextEdit *m_sendEdit;
-    QPushButton *m_sendButton;
-    QCheckBox *m_hexModeCheck;
-    QPushButton *m_clearLogButton;
-    
-    // 日志组
-    QGroupBox *m_logGroup;
-    QTextEdit *m_logEdit;
-    
-    // 状态组
-    QGroupBox *m_statusGroup;
-    QLabel *m_statusLabel;
-    QLabel *m_bytesSentLabel;
-    QLabel *m_bytesReceivedLabel;
-    QLabel *m_connectionTimeLabel;
-    
-    // 状态变量
+    // 状态管理
     bool m_isConnected;
-    bool m_autoReconnect;
-    int m_reconnectInterval;
-    qint64 m_bytesSent;
-    qint64 m_bytesReceived;
-    QDateTime m_connectionTime;
+    bool m_isServerMode;
+    QString m_currentConnectionInfo;
     
-    // 配置
-    QString m_lastRemoteHost;
-    quint16 m_lastRemotePort;
-    QString m_lastLocalHost;
-    quint16 m_lastLocalPort;
+    // 定时器
+    QTimer *m_updateTimer;
+    
+    // 协议管理 (新的模块化系统) 基类指针指向派生类。
+    // 多态:基类指针指向基类对象时就使用基类的成员（包括成员函数和成员变量），指向派生类对象时就使用派生类的成员。
+    ProtocolBase* m_currentProtocol; // 更换协议的时候会赋值
+    QString m_currentProtocolName; // 更换协议的时候会赋值
+    
+    // CRC计算辅助类
+    TcpClientCrc* m_crcHelper;
 };
 
 #endif // TCPCLIENT_H

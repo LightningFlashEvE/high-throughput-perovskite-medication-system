@@ -83,6 +83,8 @@ private:
 
     // 设置面板（非模态，可频繁打开关闭）
     SettingsButton *settingsPanel = nullptr;
+    // TCP客户端调试面板
+    TcpClient *tcpClientPanel = nullptr;
 
     // zhua 当前所在网格（用于方向键移动）
     int zhuaCol = 4;

@@ -1,570 +1,992 @@
 #include "tcpclient.h"
-#include <QVBoxLayout>
-#include <QHBoxLayout>
-#include <QGridLayout>
-#include <QLineEdit>
-#include <QSpinBox>
-#include <QTextEdit>
-#include <QPushButton>
-#include <QCheckBox>
-#include <QLabel>
-#include <QGroupBox>
-#include <QTcpSocket>
-#include <QTimer>
-#include <QDateTime>
-#include <QHostAddress>
-#include <QNetworkInterface>
-#include <QDebug>
+#include "ui_tcpclient.h"
 #include <QMessageBox>
+#include <QDateTime>
 #include <QScrollBar>
-#include <QFont>
+#include <QDebug>
+#include <QApplication>
+#include <QClipboard>
+#include <QRegularExpression>
+#include <QRadioButton>
+#include <QPushButton>
+#include <QLineEdit>
+#include <QComboBox>
+#include <QCheckBox>
+#include <QTextEdit>
+#include <utility>
+// 包含协议系统
+#include "tcpclient_crc.h"
 
 TcpClient::TcpClient(QWidget *parent)
     : QWidget(parent)
-    , m_socket(nullptr)
-    , m_reconnectTimer(nullptr)
+    , ui(new Ui::TcpClient)
+    , m_tcpSocket(nullptr)
+    , m_tcpServer(nullptr)
     , m_isConnected(false)
-    , m_autoReconnect(false)
-    , m_reconnectInterval(3000)
-    , m_bytesSent(0)
-    , m_bytesReceived(0)
-    , m_lastRemoteHost("127.0.0.1")
-    , m_lastRemotePort(8080)
-    , m_lastLocalHost("")
-    , m_lastLocalPort(0)
+    , m_isServerMode(false)
+    , m_updateTimer(new QTimer(this))
+    , m_currentProtocol(nullptr)
+    , m_crcHelper(nullptr)
 {
-    setWindowTitle("TCP客户端调试工具");
-    setMinimumSize(600, 500);
-    resize(800, 600);
+    ui->setupUi(this);
     
-    // 初始化网络组件
-    m_socket = new QTcpSocket(this);
-    m_reconnectTimer = new QTimer(this);
-    m_reconnectTimer->setSingleShot(true);
+    // 延迟初始化网络对象 - 在第一次连接时才创建
+    // m_tcpSocket = new QTcpSocket(this);
+    // m_tcpServer = new QTcpServer(this);
     
-    // 连接信号
-    connect(m_socket, &QTcpSocket::connected, this, &TcpClient::onSocketConnected);
-    connect(m_socket, &QTcpSocket::disconnected, this, &TcpClient::onSocketDisconnected);
-    connect(m_socket, QOverload<QAbstractSocket::SocketError>::of(&QTcpSocket::errorOccurred),
-            this, &TcpClient::onSocketError);
-    connect(m_socket, &QTcpSocket::readyRead, this, &TcpClient::onSocketDataReady);
-    connect(m_reconnectTimer, &QTimer::timeout, this, &TcpClient::onReconnectTimer);
+    // 设置connect
+    setupConnections();
     
-    // 设置UI
-    setupUI();
+    // 初始化UI
+    updateUI();
     
-    // 初始化状态
-    updateConnectionStatus(false);
+    // 延迟加载网络信息 - 使用定时器延迟执行
+    QTimer::singleShot(200, this, &TcpClient::refreshLocalIPs);
+    // 设置定时器 - 降低频率减少CPU占用
+    m_updateTimer->setInterval(5000);
+    connect(m_updateTimer, &QTimer::timeout, this, &TcpClient::updateLocalIPs);
+    // 延迟启动定时器
+    QTimer::singleShot(1000, this, [this]() { m_updateTimer->start(); });
+    
+    // 初始化新的模块化协议系统
+    initializeProtocolSystem();
+    
+    // 初始化帧结构编辑器
+    initializeFrameBuilder();
+    
+    // 初始化CRC辅助类
+    m_crcHelper = new TcpClientCrc(this);
+    
+    // 设置默认模式
+    ui->radioButton_client->setChecked(true);
+    onModeChanged();
 }
 
 TcpClient::~TcpClient()
 {
-    if (m_socket && m_socket->state() == QAbstractSocket::ConnectedState) {
-        m_socket->disconnectFromHost();
+    if (m_tcpSocket) {
+        m_tcpSocket->disconnectFromHost();
     }
-}
-
-void TcpClient::setupUI()
-{
-    m_mainLayout = new QVBoxLayout(this);
-    m_mainLayout->setSpacing(10);
-    m_mainLayout->setContentsMargins(10, 10, 10, 10);
-    
-    createConnectionGroup();
-    createControlGroup();
-    createLogGroup();
-    createStatusGroup();
-    
-    // 设置布局比例
-    m_mainLayout->addWidget(m_connectionGroup);
-    m_mainLayout->addWidget(m_controlGroup);
-    m_mainLayout->addWidget(m_logGroup, 1); // 日志区域占据剩余空间
-    m_mainLayout->addWidget(m_statusGroup);
-}
-
-void TcpClient::createConnectionGroup()
-{
-    m_connectionGroup = new QGroupBox("连接配置", this);
-    QGridLayout *layout = new QGridLayout(m_connectionGroup);
-    
-    // 远端配置
-    layout->addWidget(new QLabel("远端IP:"), 0, 0);
-    m_remoteHostEdit = new QLineEdit(m_lastRemoteHost);
-    m_remoteHostEdit->setPlaceholderText("目标服务器IP地址");
-    layout->addWidget(m_remoteHostEdit, 0, 1);
-    
-    layout->addWidget(new QLabel("远端端口:"), 0, 2);
-    m_remotePortSpin = new QSpinBox();
-    m_remotePortSpin->setRange(1, 65535);
-    m_remotePortSpin->setValue(m_lastRemotePort);
-    layout->addWidget(m_remotePortSpin, 0, 3);
-    
-    // 本地配置
-    layout->addWidget(new QLabel("本机IP:"), 1, 0);
-    m_localHostEdit = new QLineEdit(m_lastLocalHost);
-    m_localHostEdit->setPlaceholderText("本地IP(可选，留空自动选择)");
-    layout->addWidget(m_localHostEdit, 1, 1);
-    
-    layout->addWidget(new QLabel("本机端口:"), 1, 2);
-    m_localPortSpin = new QSpinBox();
-    m_localPortSpin->setRange(0, 65535);
-    m_localPortSpin->setValue(m_lastLocalPort);
-    m_localPortSpin->setSpecialValueText("自动");
-    layout->addWidget(m_localPortSpin, 1, 3);
-    
-    // 连接按钮和状态
-    m_connectButton = new QPushButton("连接");
-    m_connectButton->setMinimumHeight(40);
-    connect(m_connectButton, &QPushButton::clicked, this, &TcpClient::onConnectClicked);
-    layout->addWidget(m_connectButton, 2, 0, 1, 2);
-    
-    m_connectionStatusLabel = new QLabel("未连接");
-    m_connectionStatusLabel->setAlignment(Qt::AlignCenter);
-    m_connectionStatusLabel->setStyleSheet("QLabel { background-color: #ffcccc; border: 1px solid #ff6666; border-radius: 3px; padding: 5px; }");
-    layout->addWidget(m_connectionStatusLabel, 2, 2, 1, 2);
-}
-
-void TcpClient::createControlGroup()
-{
-    m_controlGroup = new QGroupBox("数据发送", this);
-    QVBoxLayout *layout = new QVBoxLayout(m_controlGroup);
-    
-    // 发送数据输入
-    m_sendEdit = new QTextEdit();
-    m_sendEdit->setMaximumHeight(80);
-    m_sendEdit->setPlaceholderText("输入要发送的数据...");
-    layout->addWidget(m_sendEdit);
-    
-    // 控制按钮行
-    QHBoxLayout *controlLayout = new QHBoxLayout();
-    
-    m_hexModeCheck = new QCheckBox("16进制发送");
-    m_hexModeCheck->setToolTip("勾选时以16进制格式发送数据，取消勾选时以字符串发送");
-    connect(m_hexModeCheck, &QCheckBox::toggled, this, &TcpClient::onHexModeChanged);
-    controlLayout->addWidget(m_hexModeCheck);
-    
-    controlLayout->addStretch();
-    
-    m_sendButton = new QPushButton("发送");
-    m_sendButton->setEnabled(false);
-    connect(m_sendButton, &QPushButton::clicked, this, &TcpClient::onSendClicked);
-    controlLayout->addWidget(m_sendButton);
-    
-    m_clearLogButton = new QPushButton("清空日志");
-    connect(m_clearLogButton, &QPushButton::clicked, this, &TcpClient::onClearLogClicked);
-    controlLayout->addWidget(m_clearLogButton);
-    
-    layout->addLayout(controlLayout);
-}
-
-void TcpClient::createLogGroup()
-{
-    m_logGroup = new QGroupBox("通信日志", this);
-    QVBoxLayout *layout = new QVBoxLayout(m_logGroup);
-    
-    m_logEdit = new QTextEdit();
-    m_logEdit->setReadOnly(true);
-    m_logEdit->setFont(QFont("Consolas", 9));
-    m_logEdit->setStyleSheet("QTextEdit { background-color: #f5f5f5; }");
-    layout->addWidget(m_logEdit);
-}
-
-void TcpClient::createStatusGroup()
-{
-    m_statusGroup = new QGroupBox("状态信息", this);
-    QHBoxLayout *layout = new QHBoxLayout(m_statusGroup);
-    
-    m_statusLabel = new QLabel("就绪");
-    layout->addWidget(new QLabel("状态:"));
-    layout->addWidget(m_statusLabel);
-    
-    layout->addStretch();
-    
-    m_bytesSentLabel = new QLabel("0");
-    layout->addWidget(new QLabel("已发送:"));
-    layout->addWidget(m_bytesSentLabel);
-    layout->addWidget(new QLabel("字节"));
-    
-    layout->addStretch();
-    
-    m_bytesReceivedLabel = new QLabel("0");
-    layout->addWidget(new QLabel("已接收:"));
-    layout->addWidget(m_bytesReceivedLabel);
-    layout->addWidget(new QLabel("字节"));
-    
-    layout->addStretch();
-    
-    m_connectionTimeLabel = new QLabel("--");
-    layout->addWidget(new QLabel("连接时长:"));
-    layout->addWidget(m_connectionTimeLabel);
-}
-
-bool TcpClient::connectToHost(const QString &host, quint16 port)
-{
-    return connectToHost(host, port, "", 0);
-}
-
-bool TcpClient::connectToHost(const QString &host, quint16 port, const QString &localHost, quint16 localPort)
-{
-    if (m_socket->state() != QAbstractSocket::UnconnectedState) {
-        appendLog("正在断开现有连接...", "[系统]", QColor(255, 165, 0));
-        m_socket->disconnectFromHost();
+    if (m_tcpServer) {
+        m_tcpServer->close();
     }
     
-    // 保存连接参数
-    m_lastRemoteHost = host;
-    m_lastRemotePort = port;
-    m_lastLocalHost = localHost;
-    m_lastLocalPort = localPort;
+    // 清理CRC辅助类
+    delete m_crcHelper;
     
-    // 绑定本地地址（如果指定）
-    if (!localHost.isEmpty() && localPort > 0) {
-        bool bindResult = m_socket->bind(QHostAddress(localHost), localPort);
-        if (!bindResult) {
-            QString error = QString("绑定本地地址失败: %1:%2").arg(localHost).arg(localPort);
-            appendLog(error, "[错误]", Qt::red);
-            emit connectionError(error);
-            return false;
+    delete ui;
+}
+
+void TcpClient::setupConnections()
+{
+    // 模式切换
+    connect(ui->radioButton_client, &QRadioButton::toggled, this, &TcpClient::onModeChanged);
+    connect(ui->radioButton_server, &QRadioButton::toggled, this, &TcpClient::onModeChanged);
+    
+    // 按钮连接
+    connect(ui->pushButton_connect, &QPushButton::clicked, this, &TcpClient::onConnectClicked);
+    connect(ui->pushButton_disconnect, &QPushButton::clicked, this, &TcpClient::onDisconnectClicked);
+    connect(ui->pushButton_send, &QPushButton::clicked, this, &TcpClient::onSendClicked);
+    connect(ui->pushButton_clear, &QPushButton::clicked, this, &TcpClient::onClearClicked);
+    
+    // 发送框回车键
+    connect(ui->lineEdit_send, &QLineEdit::returnPressed, this, &TcpClient::onSendClicked);
+    
+    // 代理设置变化时更新网络配置
+    connect(ui->checkBox_disable_proxy, &QCheckBox::toggled, this, [this]() {
+        if (m_tcpSocket && m_tcpServer) {
+            updateProxySettings();
         }
-        appendLog(QString("已绑定本地地址: %1:%2").arg(localHost).arg(localPort), "[系统]", QColor(0, 128, 255));
+    });
+    
+    // 协议相关信号连接已移除 - 现在只使用帧结构编辑器
+    
+    // 帧结构编辑器信号连接
+    connect(ui->comboBox_protocol_type_frame, QOverload<int>::of(&QComboBox::currentIndexChanged),
+            this, &TcpClient::onProtocolTypeChanged);
+    connect(ui->comboBox1, QOverload<int>::of(&QComboBox::currentIndexChanged),
+            this, &TcpClient::onFrameFieldChanged);
+    connect(ui->comboBox2, QOverload<int>::of(&QComboBox::currentIndexChanged),
+            this, &TcpClient::onFrameFieldChanged);
+    connect(ui->comboBox3, QOverload<int>::of(&QComboBox::currentIndexChanged),
+            this, &TcpClient::onFrameFieldChanged);
+    connect(ui->lineEdit4, &QLineEdit::textChanged,
+            this, &TcpClient::onFrameFieldChanged);
+    connect(ui->comboBox6, QOverload<int>::of(&QComboBox::currentIndexChanged),
+            this, &TcpClient::onFrameFieldChanged);
+    connect(ui->pushButton_build_frame, &QPushButton::clicked,
+            this, &TcpClient::onBuildFrameClicked);
+    
+    // 预览模式切换信号连接
+    connect(ui->radioButton_ascii_display, &QRadioButton::toggled, 
+            this, &TcpClient::onPreviewModeChanged);
+    connect(ui->radioButton_hex_display, &QRadioButton::toggled,
+            this, &TcpClient::onPreviewModeChanged);
+    
+    // 数据解析信号连接已删除 - 使用模块化协议系统
+    
+    // 十六进制显示模式已改为单选按钮，相关连接已在预览模式中处理
+    
+    // 实时构建模式变化时的处理
+    connect(ui->checkBox_real_time_build, &QCheckBox::toggled, this, [this](bool enabled) {
+        if (enabled) {
+            onFrameFieldChanged(); // 启用时立即更新
+        }
+    });
+    
+    // 网络对象的信号连接将在延迟初始化时设置
+}
+
+void TcpClient::initializeNetworkObjects()
+{
+    if (m_tcpSocket && m_tcpServer) {
+        return; // 已经初始化过了
     }
     
-    appendLog(QString("正在连接到 %1:%2...").arg(host).arg(port), "[系统]", QColor(0, 128, 255));
-    m_socket->connectToHost(host, port);
-    
-    return true;
-}
-
-void TcpClient::disconnectFromHost()
-{
-    m_reconnectTimer->stop();
-    if (m_socket->state() != QAbstractSocket::UnconnectedState) {
-        appendLog("正在断开连接...", "[系统]", QColor(255, 165, 0));
-        m_socket->disconnectFromHost();
+    // 创建网络对象
+    if (!m_tcpSocket) {
+        m_tcpSocket = new QTcpSocket(this);
     }
+    if (!m_tcpServer) {
+        m_tcpServer = new QTcpServer(this);
+    }
+    
+    // 根据用户设置配置代理
+    updateProxySettings();
+    
+    // 设置网络对象的信号连接
+    connect(m_tcpSocket, &QTcpSocket::connected, this, &TcpClient::onClientConnected);
+    connect(m_tcpSocket, &QTcpSocket::disconnected, this, &TcpClient::onClientDisconnected);
+    connect(m_tcpSocket, &QTcpSocket::readyRead, this, &TcpClient::onDataReceived);
+    
+    // 兼容不同Qt版本的错误信号
+    #if QT_VERSION >= QT_VERSION_CHECK(5, 15, 0)
+    connect(m_tcpSocket, &QAbstractSocket::errorOccurred,
+            this, &TcpClient::onSocketError);
+    #else
+    connect(m_tcpSocket, static_cast<void(QAbstractSocket::*)(QAbstractSocket::SocketError)>(&QAbstractSocket::error),
+            this, &TcpClient::onSocketError);
+    #endif
+    
+    // TCP Server 信号
+    connect(m_tcpServer, &QTcpServer::newConnection, this, &TcpClient::onNewConnection);
+    
+    qDebug() << "网络对象延迟初始化完成";
 }
 
-bool TcpClient::isConnected() const
+void TcpClient::updateProxySettings()
 {
-    return m_isConnected;
-}
-
-void TcpClient::sendData(const QByteArray &data)
-{
-    if (!m_isConnected) {
-        appendLog("发送失败: 未连接", "[错误]", Qt::red);
+    if (!m_tcpSocket || !m_tcpServer) {
         return;
     }
     
-    qint64 written = m_socket->write(data);
-    if (written == -1) {
-        appendLog("发送失败: " + m_socket->errorString(), "[错误]", Qt::red);
-        return;
+    // 检查用户是否选择禁用代理
+    bool disableProxy = ui->checkBox_disable_proxy->isChecked();
+    
+    if (disableProxy) {
+        // 禁用代理
+        m_tcpSocket->setProxy(QNetworkProxy::NoProxy);
+        m_tcpServer->setProxy(QNetworkProxy::NoProxy);
+        qDebug() << "网络代理已禁用";
+    } else {
+        // 使用默认代理设置
+        m_tcpSocket->setProxy(QNetworkProxy::DefaultProxy);
+        m_tcpServer->setProxy(QNetworkProxy::DefaultProxy);
+        qDebug() << "使用默认网络代理设置";
     }
+}
+
+void TcpClient::onModeChanged()
+{
+    m_isServerMode = ui->radioButton_server->isChecked();
+    updateUI();
     
-    m_bytesSent += written;
-    updateDataStatistics();
-    
-    QString hexStr = data.toHex(' ').toUpper();
-    QString textStr = QString::fromUtf8(data);
-    
-    appendLog(QString("HEX: %1").arg(hexStr), "[发送]", QColor(0, 128, 0));
-    if (data.isPrint()) {
-        appendLog(QString("TXT: %1").arg(textStr), "[发送]", QColor(0, 128, 0));
+    if (m_isServerMode) {
+        ui->lineEdit_remote_ip->setEnabled(false);
+        ui->spinBox_remote_port->setEnabled(false);
+        ui->label_remote_ip->setText("客户端IP:");
+        ui->label_remote_port->setText("客户端端口:");
+    } else {
+        ui->lineEdit_remote_ip->setEnabled(true);
+        ui->spinBox_remote_port->setEnabled(true);
+        ui->label_remote_ip->setText("远端IP:");
+        ui->label_remote_port->setText("远端端口:");
     }
-    
-    emit dataSent(data);
-}
-
-void TcpClient::sendText(const QString &text)
-{
-    sendData(text.toUtf8());
-}
-
-void TcpClient::sendHexString(const QString &hexString)
-{
-    QByteArray data = parseHexString(hexString);
-    if (data.isEmpty() && !hexString.isEmpty()) {
-        appendLog("发送失败: 16进制格式错误", "[错误]", Qt::red);
-        return;
-    }
-    sendData(data);
-}
-
-QString TcpClient::getRemoteAddress() const
-{
-    return m_socket->peerAddress().toString();
-}
-
-quint16 TcpClient::getRemotePort() const
-{
-    return m_socket->peerPort();
-}
-
-QString TcpClient::getLocalAddress() const
-{
-    return m_socket->localAddress().toString();
-}
-
-quint16 TcpClient::getLocalPort() const
-{
-    return m_socket->localPort();
-}
-
-void TcpClient::clearLog()
-{
-    m_logEdit->clear();
-}
-
-QString TcpClient::getLogContent() const
-{
-    return m_logEdit->toPlainText();
-}
-
-void TcpClient::setAutoReconnect(bool enabled)
-{
-    m_autoReconnect = enabled;
-}
-
-void TcpClient::setReconnectInterval(int milliseconds)
-{
-    m_reconnectInterval = milliseconds;
 }
 
 void TcpClient::onConnectClicked()
 {
-    if (m_isConnected) {
-        disconnectFromHost();
-    } else {
-        QString host = m_remoteHostEdit->text().trimmed();
-        quint16 port = static_cast<quint16>(m_remotePortSpin->value());
-        QString localHost = m_localHostEdit->text().trimmed();
-        quint16 localPort = static_cast<quint16>(m_localPortSpin->value());
-        
-        if (host.isEmpty()) {
-            QMessageBox::warning(this, "错误", "请输入远端IP地址");
+    // 延迟初始化网络对象
+    if (!m_tcpSocket || !m_tcpServer) {
+        initializeNetworkObjects();
+    }
+    
+    if (m_isServerMode) {
+        // 服务端模式
+        if (m_tcpServer->isListening()) {
             return;
         }
         
-        connectToHost(host, port, localHost, localPort);
+        quint16 port = ui->spinBox_local_port->value();
+        if (m_tcpServer->listen(QHostAddress::Any, port)) {
+            m_isConnected = true;
+            updateUI();
+            updateConnectionInfo();
+            appendMessage(QString("服务端启动成功，监听端口: %1").arg(port), "success");
+        } else {
+            appendMessage(QString("服务端启动失败: %1").arg(m_tcpServer->errorString()), "error");
+        }
+    } else {
+        // 客户端模式
+        if (m_tcpSocket->state() == QAbstractSocket::ConnectedState) {
+            return;
+        }
+        
+        QString host = ui->lineEdit_remote_ip->text();
+        quint16 port = ui->spinBox_remote_port->value();
+        
+        // 先显示连接信息，再发起连接
+        appendMessage(QString("正在连接到 %1:%2...").arg(host).arg(port), "info");
+        m_tcpSocket->connectToHost(host, port);
+    }
+}
+
+void TcpClient::onDisconnectClicked()
+{
+    if (!m_tcpSocket || !m_tcpServer) {
+        return; // 网络对象未初始化
+    }
+    
+    if (m_isServerMode) {
+        // 服务端模式 - 关闭所有客户端连接
+        for (QTcpSocket *client : m_clientSockets) {
+            client->disconnectFromHost();
+        }
+        m_clientSockets.clear();
+        m_tcpServer->close();
+        m_isConnected = false;
+        updateUI();
+        updateConnectionInfo();
+        appendMessage("服务端已关闭", "info");
+    } else {
+        // 客户端模式
+        m_tcpSocket->disconnectFromHost();
     }
 }
 
 void TcpClient::onSendClicked()
 {
-    QString text = m_sendEdit->toPlainText();
-    if (text.isEmpty()) {
+    QString message = ui->lineEdit_send->text();
+    if (message.isEmpty()) {
         return;
     }
     
-    if (m_hexModeCheck->isChecked()) {
-        sendHexString(text);
-    } else {
-        sendText(text);
+    if (!m_tcpSocket || !m_tcpServer) {
+        appendMessage("网络对象未初始化，请先点击连接", "error");
+        return;
     }
     
-    // 清空发送框
-    m_sendEdit->clear();
-}
-
-void TcpClient::onClearLogClicked()
-{
-    clearLog();
-    m_bytesSent = 0;
-    m_bytesReceived = 0;
-    updateDataStatistics();
-}
-
-void TcpClient::onHexModeChanged(bool hexMode)
-{
-    if (hexMode) {
-        m_sendEdit->setPlaceholderText("输入16进制数据 (如: 48 65 6C 6C 6F)...");
+    if (m_isServerMode) {
+        // 服务端模式 - 发送给所有客户端
+        if (m_clientSockets.isEmpty()) {
+            appendMessage("没有连接的客户端", "warning");
+            return;
+        }
+        
+        QByteArray data;
+        if (ui->checkBox_hex_mode->isChecked()) {
+            data = QByteArray::fromHex(message.toUtf8());
+        } else {
+            data = message.toUtf8();
+        }
+        
+        for (QTcpSocket *client : m_clientSockets) {
+            client->write(data);
+        }
+        appendMessage(QString("发送给 %1 个客户端: %2").arg(m_clientSockets.size()).arg(message), "send");
     } else {
-        m_sendEdit->setPlaceholderText("输入要发送的文本...");
+        // 客户端模式
+        if (m_tcpSocket->state() != QAbstractSocket::ConnectedState) {
+            appendMessage("未连接到服务器", "error");
+            return;
+        }
+        
+        QByteArray data;
+        if (ui->checkBox_hex_mode->isChecked()) {
+            data = QByteArray::fromHex(message.toUtf8());
+        } else {
+            data = message.toUtf8();
+        }
+        
+        m_tcpSocket->write(data);
+        appendMessage(QString("发送: %1").arg(message), "send");
     }
+    
+    ui->lineEdit_send->clear();
 }
 
-void TcpClient::onSocketConnected()
+void TcpClient::onClearClicked()
+{
+    ui->textEdit_receive->clear();
+}
+
+void TcpClient::onNewConnection()
+{
+    QTcpSocket *clientSocket = m_tcpServer->nextPendingConnection();
+    m_clientSockets.append(clientSocket);
+    
+    connect(clientSocket, &QTcpSocket::readyRead, this, &TcpClient::onDataReceived);
+    connect(clientSocket, &QTcpSocket::disconnected, this, [this, clientSocket]() {
+        m_clientSockets.removeAll(clientSocket);
+        clientSocket->deleteLater();
+        updateConnectionInfo();
+        appendMessage(QString("客户端断开连接: %1:%2")
+                     .arg(clientSocket->peerAddress().toString())
+                     .arg(clientSocket->peerPort()), "info");
+    });
+    
+    updateConnectionInfo();
+    appendMessage(QString("新客户端连接: %1:%2")
+                 .arg(clientSocket->peerAddress().toString())
+                 .arg(clientSocket->peerPort()), "success");
+}
+
+void TcpClient::onClientConnected()
 {
     m_isConnected = true;
-    m_connectionTime = QDateTime::currentDateTime();
-    updateConnectionStatus(true);
-    
-    QString localInfo = QString("%1:%2").arg(getLocalAddress()).arg(getLocalPort());
-    QString remoteInfo = QString("%1:%2").arg(getRemoteAddress()).arg(getRemotePort());
-    appendLog(QString("连接成功! 本地: %1, 远端: %2").arg(localInfo).arg(remoteInfo), "[系统]", QColor(0, 128, 0));
-    
-    emit connected();
-    emit statusChanged("已连接");
+    updateUI();
+    updateConnectionInfo();
+    appendMessage("已连接到服务器", "success");
 }
 
-void TcpClient::onSocketDisconnected()
+void TcpClient::onClientDisconnected()
 {
     m_isConnected = false;
-    updateConnectionStatus(false);
-    
-    appendLog("连接已断开", "[系统]", QColor(255, 165, 0));
-    
-    if (m_autoReconnect) {
-        appendLog(QString("将在 %1 秒后自动重连...").arg(m_reconnectInterval / 1000), "[系统]", QColor(0, 128, 255));
-        m_reconnectTimer->start(m_reconnectInterval);
-    }
-    
-    emit disconnected();
-    emit statusChanged("已断开");
+    updateUI();
+    updateConnectionInfo();
+    appendMessage("与服务器断开连接", "info");
 }
 
-void TcpClient::onSocketError(QAbstractSocket::SocketError error)
+void TcpClient::onDataReceived()
 {
-    Q_UNUSED(error)
-    QString errorString = m_socket->errorString();
-    appendLog("连接错误: " + errorString, "[错误]", Qt::red);
+    QTcpSocket *sender = qobject_cast<QTcpSocket*>(QObject::sender());
+    if (!sender) return;
     
-    m_isConnected = false;
-    updateConnectionStatus(false);
+    QByteArray data = sender->readAll();
+    QString message;
     
-    emit connectionError(errorString);
-    emit statusChanged("错误: " + errorString);
-}
-
-void TcpClient::onSocketDataReady()
-{
-    QByteArray data = m_socket->readAll();
-    if (data.isEmpty()) return;
-    
-    m_bytesReceived += data.size();
-    updateDataStatistics();
-    
-    QString hexStr = data.toHex(' ').toUpper();
-    QString textStr = QString::fromUtf8(data);
-    
-    appendLog(QString("HEX: %1").arg(hexStr), "[接收]", QColor(0, 0, 255));
-    if (data.isPrint()) {
-        appendLog(QString("TXT: %1").arg(textStr), "[接收]", QColor(0, 0, 255));
-    }
-    
-    emit dataReceived(data);
-}
-
-void TcpClient::onReconnectTimer()
-{
-    if (!m_isConnected) {
-        appendLog("自动重连中...", "[系统]", QColor(0, 128, 255));
-        connectToHost(m_lastRemoteHost, m_lastRemotePort, m_lastLocalHost, m_lastLocalPort);
-    }
-}
-
-void TcpClient::updateConnectionStatus(bool connected)
-{
-    if (connected) {
-        m_connectButton->setText("断开");
-        setButtonStyle(m_connectButton, true);
-        m_connectionStatusLabel->setText("已连接");
-        m_connectionStatusLabel->setStyleSheet("QLabel { background-color: #ccffcc; border: 1px solid #66cc66; border-radius: 3px; padding: 5px; color: #006600; }");
-        m_sendButton->setEnabled(true);
-        
-        // 禁用连接配置编辑
-        m_remoteHostEdit->setEnabled(false);
-        m_remotePortSpin->setEnabled(false);
-        m_localHostEdit->setEnabled(false);
-        m_localPortSpin->setEnabled(false);
+    if (ui->checkBox_hex_mode->isChecked()) {
+        message = data.toHex(' ').toUpper();
     } else {
-        m_connectButton->setText("连接");
-        setButtonStyle(m_connectButton, false);
-        m_connectionStatusLabel->setText("未连接");
-        m_connectionStatusLabel->setStyleSheet("QLabel { background-color: #ffcccc; border: 1px solid #ff6666; border-radius: 3px; padding: 5px; color: #cc0000; }");
-        m_sendButton->setEnabled(false);
-        
-        // 启用连接配置编辑
-        m_remoteHostEdit->setEnabled(true);
-        m_remotePortSpin->setEnabled(true);
-        m_localHostEdit->setEnabled(true);
-        m_localPortSpin->setEnabled(true);
-        
-        m_connectionTimeLabel->setText("--");
+        message = QString::fromUtf8(data);
     }
+    
+    QString senderInfo;
+    if (m_isServerMode) {
+        senderInfo = QString("[%1:%2] ").arg(sender->peerAddress().toString()).arg(sender->peerPort());
+    } else {
+        senderInfo = "[服务器] ";
+    }
+    
+    appendMessage(senderInfo + message, "receive");
 }
 
-void TcpClient::updateDataStatistics()
+void TcpClient::updateLocalIPs()
 {
-    m_bytesSentLabel->setText(QString::number(m_bytesSent));
-    m_bytesReceivedLabel->setText(QString::number(m_bytesReceived));
+    // 这个方法可以定期更新本机IP列表
+    // 目前保持简单实现
+}
+
+void TcpClient::updateUI()
+{
+    ui->pushButton_connect->setEnabled(!m_isConnected);
+    ui->pushButton_disconnect->setEnabled(m_isConnected);
+    ui->pushButton_send->setEnabled(m_isConnected);
     
     if (m_isConnected) {
-        qint64 seconds = m_connectionTime.secsTo(QDateTime::currentDateTime());
-        int hours = seconds / 3600;
-        int minutes = (seconds % 3600) / 60;
-        int secs = seconds % 60;
-        m_connectionTimeLabel->setText(QString("%1:%2:%3")
-                                      .arg(hours, 2, 10, QChar('0'))
-                                      .arg(minutes, 2, 10, QChar('0'))
-                                      .arg(secs, 2, 10, QChar('0')));
-    }
-}
-
-QString TcpClient::formatByteArray(const QByteArray &data, bool asHex) const
-{
-    if (asHex) {
-        return data.toHex(' ').toUpper();
+        ui->label_status->setText("状态: 已连接");
+        ui->label_status->setStyleSheet("QLabel { color: #28a745; font-weight: bold; padding: 4px 8px; background-color: #d4edda; border-radius: 4px; }");
     } else {
-        return QString::fromUtf8(data);
+        ui->label_status->setText("状态: 未连接");
+        ui->label_status->setStyleSheet("QLabel { color: #666; font-weight: bold; padding: 4px 8px; background-color: #f0f0f0; border-radius: 4px; }");
     }
 }
 
-QByteArray TcpClient::parseHexString(const QString &hexString) const
+void TcpClient::appendMessage(const QString &message, const QString &type)
 {
-    QString cleaned = hexString;
-    cleaned.remove(QRegExp("[^0-9A-Fa-f]")); // 移除非16进制字符
+    QString timestamp = ui->checkBox_show_timestamp->isChecked() ? getCurrentTimestamp() : "";
+    QString formattedMessage = QString("[%1] %2").arg(timestamp).arg(message);
     
-    if (cleaned.length() % 2 != 0) {
-        return QByteArray(); // 长度必须是偶数
-    }
+    // 根据消息类型设置颜色
+    QString color;
+    if (type == "error") color = "#dc3545";
+    else if (type == "success") color = "#28a745";
+    else if (type == "warning") color = "#ffc107";
+    else if (type == "send") color = "#007bff";
+    else if (type == "receive") color = "#6f42c1";
+    else color = "#6c757d";
     
-    QByteArray result;
-    for (int i = 0; i < cleaned.length(); i += 2) {
-        QString byteString = cleaned.mid(i, 2);
-        bool ok;
-        quint8 byte = static_cast<quint8>(byteString.toUInt(&ok, 16));
-        if (!ok) {
-            return QByteArray(); // 解析失败
-        }
-        result.append(static_cast<char>(byte));
-    }
+    ui->textEdit_receive->setTextColor(QColor(color));
+    ui->textEdit_receive->append(formattedMessage);
     
-    return result;
-}
-
-void TcpClient::appendLog(const QString &message, const QString &prefix, const QColor &color)
-{
-    QString timestamp = QDateTime::currentDateTime().toString("hh:mm:ss.zzz");
-    QString fullMessage = QString("[%1] %2 %3").arg(timestamp).arg(prefix).arg(message);
-    
-    // 保存当前滚动位置
-    QScrollBar *scrollBar = m_logEdit->verticalScrollBar();
-    bool shouldScrollToBottom = scrollBar->value() == scrollBar->maximum();
-    
-    // 添加带颜色的文本
-    QTextCursor cursor = m_logEdit->textCursor();
-    cursor.movePosition(QTextCursor::End);
-    
-    QTextCharFormat format;
-    format.setForeground(color);
-    cursor.setCharFormat(format);
-    cursor.insertText(fullMessage + "\n");
-    
-    // 如果之前在底部，继续滚动到底部
-    if (shouldScrollToBottom) {
+    // 自动滚动
+    if (ui->checkBox_auto_scroll->isChecked()) {
+        QScrollBar *scrollBar = ui->textEdit_receive->verticalScrollBar();
         scrollBar->setValue(scrollBar->maximum());
     }
 }
 
-void TcpClient::setButtonStyle(QPushButton *button, bool success)
+void TcpClient::updateConnectionInfo()
 {
-    if (success) {
-        button->setStyleSheet("QPushButton { background-color: #4CAF50; color: white; font-weight: bold; border: none; padding: 8px; border-radius: 4px; }"
-                             "QPushButton:hover { background-color: #45a049; }"
-                             "QPushButton:pressed { background-color: #3d8b40; }");
-    } else {
-        button->setStyleSheet(""); // 恢复默认样式
+    if (!m_tcpSocket || !m_tcpServer) {
+        ui->label_connection_info->setText("连接信息: 网络对象未初始化");
+        return;
     }
+    
+    if (m_isServerMode) {
+        if (m_isConnected) {
+            ui->label_connection_info->setText(QString("连接信息: 服务端运行中，%1 个客户端连接").arg(m_clientSockets.size()));
+        } else {
+            ui->label_connection_info->setText("连接信息: 服务端未启动");
+        }
+    } else {
+        if (m_isConnected) {
+            ui->label_connection_info->setText(QString("连接信息: 已连接到 %1:%2")
+                                             .arg(m_tcpSocket->peerAddress().toString())
+                                             .arg(m_tcpSocket->peerPort()));
+        } else {
+            ui->label_connection_info->setText("连接信息: 未连接");
+        }
+    }
+}
+
+QString TcpClient::getCurrentTimestamp()
+{
+    return QDateTime::currentDateTime().toString("hh:mm:ss.zzz");
+}
+
+void TcpClient::refreshLocalIPs()
+{
+    // 获取本机所有IP地址
+    QStringList ipList;
+    QList<QNetworkInterface> interfaces = QNetworkInterface::allInterfaces();
+    
+    for (const QNetworkInterface &interface : interfaces) {
+        if (interface.flags().testFlag(QNetworkInterface::IsUp) && 
+            !interface.flags().testFlag(QNetworkInterface::IsLoopBack)) {
+            
+            QList<QNetworkAddressEntry> entries = interface.addressEntries();
+            for (const QNetworkAddressEntry &entry : entries) {
+                if (entry.ip().protocol() == QAbstractSocket::IPv4Protocol) {
+                    ipList.append(entry.ip().toString());
+                }
+            }
+        }
+    }
+    
+    // 更新本机IP下拉框（如果需要的话）
+    // 这里可以添加IP选择功能
+}
+
+void TcpClient::onProtocolTypeChanged() // 更换协议
+{
+    // 获取选中的协议名称
+    QString protocolName = ui->comboBox_protocol_type_frame->currentData().toString();
+    if (protocolName.isEmpty())
+    {
+        protocolName = ui->comboBox_protocol_type_frame->currentText();
+    }
+    
+    // 切换协议
+    if (protocolName != m_currentProtocolName)
+    {
+        if (m_currentProtocol)
+        {
+            delete m_currentProtocol;
+        }
+        
+        m_currentProtocolName = protocolName;
+        m_currentProtocol = ProtocolFactory::instance().createProtocol(protocolName);
+        
+        if (m_currentProtocol)
+        {
+            updateProtocolUI();
+            syncFrameFields();
+        }
+    }
+    
+    qDebug() << "协议切换到:" << m_currentProtocolName;
+}
+
+quint16 TcpClient::calculateCRC16(const QByteArray &data)
+{
+    quint16 crc = 0xFFFF;  // 初始值
+    for (int i = 0; i < data.length(); ++i) {
+        crc ^= static_cast<quint8>(data[i]);  // XOR字节到CRC
+
+        for (int j = 0; j < 8; ++j) {  // 处理8位
+            if (crc & 0x0001) {
+                crc >>= 1;
+                crc ^= 0xA001;  // Modbus多项式（反向）
+            } else {
+                crc >>= 1;
+            }
+        }
+    }
+
+    return crc;
+}
+
+QString TcpClient::formatFrameForDisplay(const QByteArray &frame, bool hexDisplay)
+{
+    if (hexDisplay) {
+        QString hexStr;
+        for (int i = 0; i < frame.length(); ++i) {
+            if (i > 0) hexStr += " ";
+            hexStr += QString("%1").arg(static_cast<quint8>(frame[i]), 2, 16, QChar('0')).toUpper();
+        }
+        return hexStr;
+    } else {
+        return QString::fromUtf8(frame);
+    }
+}
+
+void TcpClient::onFrameFieldChanged()
+{
+    // 总是更新CRC显示
+    updateCrcDisplay();
+    
+    // 如果启用实时构建，更新发送框
+    if (ui->checkBox_real_time_build->isChecked()) {
+        QString frame = buildFrameFromFields();
+        if (!frame.isEmpty()) {
+            ui->lineEdit_send->setText(frame);
+            
+            // 显示构建的帧到消息区域
+            QString displayMode = ui->radioButton_hex_display->isChecked() ? "十六进制" : "ASCII";
+            QString displayFrame = ui->radioButton_hex_display->isChecked() ? 
+                formatFrameHex(frame) : formatFrameASCII(frame);
+            appendMessage(QString("实时构建[%1]: %2").arg(displayMode).arg(displayFrame), "info");
+        }
+    }
+}
+
+// CRC计算已移至 tcpclient_crc.cpp
+void TcpClient::updateCrcDisplay()
+{
+    if (m_crcHelper) {
+        m_crcHelper->updateCrcDisplay();
+    }
+}
+
+QString TcpClient::getCurrentProtocolName() const
+{
+    return m_currentProtocolName;
+}
+
+void TcpClient::onPreviewModeChanged()
+{
+    // 显示模式改变时，如果有当前帧则重新显示
+    if (ui->checkBox_real_time_build->isChecked()) {
+        onFrameFieldChanged();
+    }
+}
+
+QString TcpClient::formatFrameASCII(const QString &frame)
+{
+    QString result = frame;
+    // 将不可见字符替换为可见的表示
+    result.replace('\r', "<CR>");
+    result.replace('\n', "<LF>");
+    result.replace('\0', "<NULL>");
+    
+    return result;
+}
+
+QString TcpClient::formatFrameHex(const QString &frame)
+{
+    QByteArray frameBytes = frame.toUtf8();
+    QString hexStr;
+    
+    for (int i = 0; i < frameBytes.length(); ++i) {
+        if (i > 0) hexStr += " ";
+        hexStr += QString("%1").arg(static_cast<quint8>(frameBytes[i]), 2, 16, QChar('0')).toUpper();
+    }
+    
+    return hexStr;
+}
+
+
+void TcpClient::initializeProtocolSystem()
+{
+    // 协议已通过REGISTER_PROTOCOL宏自动注册
+    // 注释：协议类在编译时通过宏自动注册到ProtocolFactory中，无需手动注册
+    
+    // 填充协议下拉框
+    populateProtocolComboBoxes();
+    // 注释：调用函数将已注册的协议添加到UI的下拉框组件中
+    
+    // 设置默认协议
+    // 注释：从协议工厂获取所有可用的协议名称列表
+    QStringList protocols = ProtocolFactory::instance().availableProtocols(); // 注册器的键
+    // 检查是否有可用协议
+    if (!protocols.isEmpty()) {
+        // 注释：如果协议列表不为空，则设置第一个协议为默认协议
+        
+        // 设置当前协议名称为第一个可用协议
+        m_currentProtocolName = protocols.first();
+        // 注释：将协议名称保存到成员变量中，用于后续协议切换
+        
+        // 创建【当前】协议的实例对象
+        m_currentProtocol = ProtocolFactory::instance().createProtocol(m_currentProtocolName);
+        // 注释：通过协议工厂创建协议对象实例，用于实际的协议处理
+        
+        // 更新协议相关的UI界面
+        updateProtocolUI();
+        // 注释：根据当前协议更新界面显示，如协议特定的参数设置等
+    }
+    
+    // 输出调试信息，显示初始化结果
+    qDebug() << "协议系统初始化完成，可用协议:" << protocols;
+    // 注释：在调试模式下输出所有可用的协议名称，便于调试和验证
+}
+
+void TcpClient::populateProtocolComboBoxes()
+{
+    // 清空现有项
+    ui->comboBox_protocol_type_frame->clear();
+    
+    // 添加所有可用协议
+    QStringList protocols = ProtocolFactory::instance().availableProtocols();
+    for (const QString &protocolName : std::as_const(protocols)) {
+        QString displayName = ProtocolFactory::instance().getDisplayName(protocolName);
+        qDebug() << "===添加协议类型===" << displayName << protocolName;
+        ui->comboBox_protocol_type_frame->addItem(displayName, protocolName);
+    }
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+/*********************************** 下面是被动查看 ***********************************/
+
+void TcpClient::updateProtocolUI()
+{
+    if (!m_currentProtocol) {
+        qWarning() << "当前协议为空";
+        return;
+    }
+
+    // 更新协议选择框的当前项
+    for (int i = 0; i < ui->comboBox_protocol_type_frame->count(); ++i)
+    {
+        if (ui->comboBox_protocol_type_frame->itemData(i).toString() == m_currentProtocolName)
+        {
+            ui->comboBox_protocol_type_frame->setCurrentIndex(i);
+            break;
+        }
+    }
+
+    // 更新眉头：应用协议字段配置
+    applyProtocolFields();
+
+    qDebug() << "已切换到协议:" << m_currentProtocolName;
+}
+
+// UI控件访问器方法实现
+QString TcpClient::getComboBox1Text() const
+{
+    return ui->comboBox1->currentText();
+}
+
+QString TcpClient::getComboBox2Text() const
+{
+    return ui->comboBox2->currentText();
+}
+
+QString TcpClient::getComboBox3Text() const
+{
+    return ui->comboBox3->currentText();
+}
+
+QString TcpClient::getComboBox3Data() const
+{
+    return ui->comboBox3->currentData().toString();
+}
+
+QString TcpClient::getLineEdit4Text() const
+{
+    return ui->lineEdit4->text();
+}
+
+void TcpClient::setLineEdit5Text(const QString &text)
+{
+    ui->lineEdit5->setText(text);
+}
+
+void TcpClient::clearLineEdit5()
+{
+    ui->lineEdit5->clear();
+}
+
+void TcpClient::onSocketError(QAbstractSocket::SocketError error)
+{
+    // 使用参数获取更详细的错误信息
+    QString errorTypeString;
+    switch (error) {
+    case QAbstractSocket::ConnectionRefusedError:
+        errorTypeString = "连接被拒绝";
+        break;
+    case QAbstractSocket::RemoteHostClosedError:
+        errorTypeString = "远程主机关闭连接";
+        break;
+    case QAbstractSocket::HostNotFoundError:
+        errorTypeString = "找不到主机";
+        break;
+    case QAbstractSocket::SocketTimeoutError:
+        errorTypeString = "连接超时";
+        break;
+    case QAbstractSocket::NetworkError:
+        errorTypeString = "网络错误";
+        break;
+    case QAbstractSocket::SocketAccessError:
+        errorTypeString = "访问权限错误";
+        break;
+    case QAbstractSocket::SocketResourceError:
+        errorTypeString = "资源不足";
+        break;
+    case QAbstractSocket::DatagramTooLargeError:
+        errorTypeString = "数据包过大";
+        break;
+    case QAbstractSocket::UnsupportedSocketOperationError:
+        errorTypeString = "不支持的Socket操作";
+        break;
+    case QAbstractSocket::UnfinishedSocketOperationError:
+        errorTypeString = "Socket操作未完成";
+        break;
+    case QAbstractSocket::AddressInUseError:
+        errorTypeString = "地址已被使用";
+        break;
+    case QAbstractSocket::SocketAddressNotAvailableError:
+        errorTypeString = "Socket地址不可用";
+        break;
+    case QAbstractSocket::ProxyAuthenticationRequiredError:  // 错误代码 12
+        errorTypeString = "代理认证错误";
+        break;
+    case QAbstractSocket::SslHandshakeFailedError:           // 错误代码 13
+        errorTypeString = "SSL握手失败";
+        break;
+    case QAbstractSocket::ProxyConnectionRefusedError:      // 错误代码 14
+        errorTypeString = "代理连接被拒绝";
+        break;
+    case QAbstractSocket::ProxyConnectionClosedError:       // 错误代码 15
+        errorTypeString = "代理连接已关闭";
+        break;
+    case QAbstractSocket::ProxyConnectionTimeoutError:      // 错误代码 16
+        errorTypeString = "代理连接超时";
+        break;
+    case QAbstractSocket::ProxyNotFoundError:               // 错误代码 17
+        errorTypeString = "找不到代理服务器";
+        break;
+    case QAbstractSocket::ProxyProtocolError:               // 错误代码 18
+        errorTypeString = "代理协议错误";
+        break;
+    case QAbstractSocket::OperationError:                   // 错误代码 19
+        errorTypeString = "操作错误";
+        break;
+    case QAbstractSocket::SslInternalError:                 // 错误代码 20
+        errorTypeString = "SSL内部错误";
+        break;
+    case QAbstractSocket::SslInvalidUserDataError:          // 错误代码 21
+        errorTypeString = "SSL用户数据错误";
+        break;
+    case QAbstractSocket::TemporaryError:                   // 错误代码 22
+        errorTypeString = "临时错误";
+        break;
+    case QAbstractSocket::UnknownSocketError:               // 错误代码 -1
+        errorTypeString = "未知Socket错误";
+        break;
+    default:
+        errorTypeString = QString("未知错误(代码:%1)").arg(error);
+        break;
+    }
+
+    QString detailedError = m_tcpSocket ? m_tcpSocket->errorString() : "无详细信息";
+    appendMessage(QString("连接错误: %1 - %2").arg(errorTypeString).arg(detailedError), "error");
+
+    if (m_isConnected) {
+        m_isConnected = false;
+        updateUI();
+        updateConnectionInfo();
+    }
+}
+
+void TcpClient::applyProtocolFields()
+{
+    if (!m_currentProtocol) return;
+
+    // 获取帧结构字段
+    QList<ProtocolField> frameFields = m_currentProtocol->frameFields();
+    //QList<ProtocolField> parseFields = m_currentProtocol->parseFields();
+
+    // 更新帧结构编辑器标签
+    if (frameFields.size() >= 6) {
+        ui->label_frame_header->setText(QString("1.%1").arg(frameFields[0].name));  // 1.帧头
+        ui->label_frame_header_desc->setText(frameFields[0].description);           // （2字符）
+        ui->comboBox1->clear();                                                     // comboBox里面的内容
+        ui->comboBox1->addItems(frameFields[0].options);
+        if (!frameFields[0].options.isEmpty()) {
+            ui->comboBox1->setCurrentText(frameFields[0].placeholder);
+        }
+
+        ui->label_slave_address_frame->setText(QString("2.%1").arg(frameFields[1].name));
+        ui->label_slave_address_desc->setText(frameFields[1].description);
+        ui->comboBox2->clear();
+        ui->comboBox2->addItems(frameFields[1].options);
+
+        ui->label_function_code_frame->setText(QString("3.%1").arg(frameFields[2].name));
+        ui->label_function_code_desc->setText(frameFields[2].description);
+        ui->comboBox3->clear();
+        ui->comboBox3->addItems(frameFields[2].options);
+
+        ui->label_command_data_frame->setText(QString("4.%1").arg(frameFields[3].name));
+        ui->label_command_data_desc->setText(frameFields[3].description);
+        ui->lineEdit4->setPlaceholderText(frameFields[3].placeholder);
+
+        ui->label_crc_frame->setText(QString("5.%1").arg(frameFields[4].name));
+        ui->label_crc_desc->setText(frameFields[4].description);
+        ui->lineEdit5->setPlaceholderText(frameFields[4].placeholder);
+
+        ui->label_frame_tail->setText(QString("6.%1").arg(frameFields[5].name));
+        ui->label_frame_tail_desc->setText(frameFields[5].description);
+        ui->comboBox6->clear();
+        ui->comboBox6->addItems(frameFields[5].options);
+    }
+
+}
+
+void TcpClient::onBuildFrameClicked()
+{
+    QString frame = buildFrameFromFields();
+    if (!frame.isEmpty()) {
+        // 自动填充到发送框
+        ui->lineEdit_send->setText(frame);
+
+        // 显示构建的帧到消息区域
+        QString displayMode = ui->radioButton_hex_display->isChecked() ? "十六进制" : "ASCII";
+        QString displayFrame = ui->radioButton_hex_display->isChecked() ?
+                                   formatFrameHex(frame) : formatFrameASCII(frame);
+        appendMessage(QString("手动构建[%1]: %2").arg(displayMode).arg(displayFrame), "success");
+    }
+}
+
+void TcpClient::initializeFrameBuilder()
+{
+
+    // 同步协议配置到帧编辑器
+    syncFrameFields();
+}
+
+void TcpClient::syncFrameFields()
+{
+    // 在 initializeProtocolSystem() 已经被赋值: 创建【当前】协议的实例对象
+    if (!m_currentProtocol) {
+        qWarning() << "当前协议为空，无法同步字段";
+        return;
+    }
+
+    // 获取协议对应的基础包 frameFields
+    QList<ProtocolField> frameFields = m_currentProtocol->frameFields();
+
+    // 填充comBox2
+    ui->comboBox2->clear();
+    if (frameFields.size() > 1 && !frameFields[1].options.isEmpty())
+    {
+        ui->comboBox2->addItems(frameFields[1].options);
+    }
+    else
+    {
+        // 如果没有预定义选项，添加默认地址范围
+        for (int i = 1; i <= 9; ++i) {
+            ui->comboBox2->addItem(QString("%1").arg(i, 2, 10, QChar('0')));
+        }
+    }
+
+    // 填充comBox3
+    ui->comboBox3->clear();
+    if (frameFields.size() > 2 && !frameFields[2].options.isEmpty()) {
+        for (const QString &option : std::as_const(frameFields[2].options)) {
+            // 获取选项的描述
+            QString description = m_currentProtocol->getFieldDescription("功能代码", option);
+            QString displayText = QString("%1:%2").arg(option, description);
+            ui->comboBox3->addItem(displayText, option);
+        }
+    }
+    else // 空就是夹爪
+    {
+        ui->comboBox3->addItem(frameFields[2].placeholder);
+    }
+
+
+    // 如果启用实时构建，立即更新
+    if (ui->checkBox_real_time_build->isChecked()) {
+        onFrameFieldChanged();
+    }
+}
+
+QString TcpClient::buildFrameFromFields()
+{
+    // 1) 获取并处理 data（原帧头）
+    const QString dataHeadRaw = ui->comboBox1->currentText();
+    const QString dataHead    = (dataHeadRaw == "3E") ? QString(">") : dataHeadRaw;
+
+    // 2) 获取并处理 data2（原从机地址）
+    const QString data1Raw = ui->comboBox2->currentText();
+    const QString data1    = data1Raw; // 此处无需转换
+
+    // 3) 获取并处理 data2（原功能码：优先 itemData，其次解析 "X:描述" -> "X"）
+    QString data2 = ui->comboBox3->currentData().toString();
+    if (data2.isEmpty()) {
+        const QString display = ui->comboBox3->currentText();
+        const int sep = display.indexOf(':');
+        data2 = (sep > -1) ? display.left(sep) : display;
+    }
+
+    // 4) 获取并处理 data4（原命令数据：十进制 -> 4位HEX 大写；否则原样）
+    const QString data3Raw = ui->lineEdit4->text();
+    QString data3 = data3Raw;
+    if (QRegularExpression("^[0-9]+$").match(data3Raw).hasMatch()) {
+        bool ok = false;
+        const int dec = data3Raw.toInt(&ok, 10);
+        if (ok && dec >= 0) {
+            data3 = QString("%1").arg(dec, 4, 16, QChar('0')).toUpper();
+        }
+    }
+
+    // 5) 获取并处理 data5（原帧尾）
+    const QString data4Raw = ui->comboBox6->currentText();
+    const QString data4    = (data4Raw == "0D0A") ? QString("\r\n") : data4Raw;
+
+    // 6) 构建内容并计算CRC
+    const QString frameContent = dataHead + data1 + data2 + data3;
+    const QByteArray dataForCrc = frameContent.toUtf8();
+    const quint16 crc = calculateCRC16(dataForCrc);
+    const QString crcStr = QString("%1").arg(crc, 4, 16, QChar('0')).toUpper();
+
+    // 7) 拼接完整帧并返回
+    return frameContent + crcStr + data4;
 }

@@ -6,13 +6,831 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>400</width>
-    <height>300</height>
+    <width>765</width>
+    <height>538</height>
    </rect>
   </property>
   <property name="windowTitle">
-   <string>Form</string>
+   <string>TCP 通信工具</string>
   </property>
+  <layout class="QVBoxLayout" name="verticalLayout_10" stretch="0,1">
+   <item>
+    <widget class="QTabWidget" name="tabWidget">
+     <property name="currentIndex">
+      <number>2</number>
+     </property>
+     <widget class="QWidget" name="tab">
+      <attribute name="title">
+       <string>连接</string>
+      </attribute>
+      <layout class="QGridLayout" name="gridLayout_3">
+       <item row="0" column="0">
+        <layout class="QVBoxLayout" name="verticalLayout" stretch="0,0,1">
+         <item>
+          <widget class="QGroupBox" name="groupBox_mode">
+           <property name="title">
+            <string>工作模式</string>
+           </property>
+           <layout class="QHBoxLayout" name="horizontalLayout_mode">
+            <item>
+             <widget class="QRadioButton" name="radioButton_client">
+              <property name="text">
+               <string>客户端模式</string>
+              </property>
+              <property name="checked">
+               <bool>true</bool>
+              </property>
+             </widget>
+            </item>
+            <item>
+             <widget class="QRadioButton" name="radioButton_server">
+              <property name="text">
+               <string>服务端模式</string>
+              </property>
+             </widget>
+            </item>
+            <item>
+             <spacer name="horizontalSpacer_mode">
+              <property name="orientation">
+               <enum>Qt::Orientation::Horizontal</enum>
+              </property>
+              <property name="sizeHint" stdset="0">
+               <size>
+                <width>40</width>
+                <height>20</height>
+               </size>
+              </property>
+             </spacer>
+            </item>
+           </layout>
+          </widget>
+         </item>
+         <item>
+          <widget class="QGroupBox" name="groupBox_control">
+           <property name="title">
+            <string>连接控制</string>
+           </property>
+           <layout class="QHBoxLayout" name="horizontalLayout_control">
+            <item>
+             <widget class="QPushButton" name="pushButton_connect">
+              <property name="styleSheet">
+               <string notr="true">QPushButton {
+    background-color: #4CAF50;
+    color: white;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 4px;
+    font-weight: bold;
+}
+QPushButton:hover {
+    background-color: #45a049;
+}
+QPushButton:pressed {
+    background-color: #3d8b40;
+}</string>
+              </property>
+              <property name="text">
+               <string>连接</string>
+              </property>
+             </widget>
+            </item>
+            <item>
+             <widget class="QPushButton" name="pushButton_disconnect">
+              <property name="enabled">
+               <bool>false</bool>
+              </property>
+              <property name="styleSheet">
+               <string notr="true">QPushButton {
+    background-color: #f44336;
+    color: white;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 4px;
+    font-weight: bold;
+}
+QPushButton:hover {
+    background-color: #da190b;
+}
+QPushButton:pressed {
+    background-color: #c1170b;
+}</string>
+              </property>
+              <property name="text">
+               <string>断开</string>
+              </property>
+             </widget>
+            </item>
+            <item>
+             <widget class="QPushButton" name="pushButton_clear">
+              <property name="styleSheet">
+               <string notr="true">QPushButton {
+    background-color: #ff9800;
+    color: white;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 4px;
+    font-weight: bold;
+}
+QPushButton:hover {
+    background-color: #e68900;
+}
+QPushButton:pressed {
+    background-color: #cc7a00;
+}</string>
+              </property>
+              <property name="text">
+               <string>清空</string>
+              </property>
+             </widget>
+            </item>
+            <item>
+             <spacer name="horizontalSpacer_control">
+              <property name="orientation">
+               <enum>Qt::Orientation::Horizontal</enum>
+              </property>
+              <property name="sizeHint" stdset="0">
+               <size>
+                <width>40</width>
+                <height>20</height>
+               </size>
+              </property>
+             </spacer>
+            </item>
+            <item>
+             <widget class="QLabel" name="label_status">
+              <property name="styleSheet">
+               <string notr="true">QLabel {
+    color: #666;
+    font-weight: bold;
+    padding: 4px 8px;
+    background-color: #f0f0f0;
+    border-radius: 4px;
+}</string>
+              </property>
+              <property name="text">
+               <string>状态: 未连接</string>
+              </property>
+             </widget>
+            </item>
+           </layout>
+          </widget>
+         </item>
+         <item>
+          <widget class="QGroupBox" name="groupBox_network">
+           <property name="title">
+            <string>网络配置</string>
+           </property>
+           <layout class="QGridLayout" name="gridLayout_network">
+            <item row="1" column="1">
+             <widget class="QLineEdit" name="lineEdit_remote_ip">
+              <property name="text">
+               <string>192.168.5.201</string>
+              </property>
+              <property name="placeholderText">
+               <string>远端IP地址</string>
+              </property>
+             </widget>
+            </item>
+            <item row="0" column="2">
+             <widget class="QLabel" name="label_local_port">
+              <property name="text">
+               <string>本机端口:</string>
+              </property>
+             </widget>
+            </item>
+            <item row="0" column="3">
+             <widget class="QSpinBox" name="spinBox_local_port">
+              <property name="minimum">
+               <number>1</number>
+              </property>
+              <property name="maximum">
+               <number>65535</number>
+              </property>
+              <property name="value">
+               <number>4196</number>
+              </property>
+             </widget>
+            </item>
+            <item row="0" column="0">
+             <widget class="QLabel" name="label_local_ip">
+              <property name="text">
+               <string>本机IP:</string>
+              </property>
+             </widget>
+            </item>
+            <item row="0" column="1">
+             <widget class="QLineEdit" name="lineEdit_local_ip">
+              <property name="text">
+               <string>192.168.5.22</string>
+              </property>
+              <property name="placeholderText">
+               <string>本机IP地址</string>
+              </property>
+             </widget>
+            </item>
+            <item row="1" column="3">
+             <widget class="QSpinBox" name="spinBox_remote_port">
+              <property name="minimum">
+               <number>1</number>
+              </property>
+              <property name="maximum">
+               <number>65535</number>
+              </property>
+              <property name="value">
+               <number>4196</number>
+              </property>
+             </widget>
+            </item>
+            <item row="1" column="2">
+             <widget class="QLabel" name="label_remote_port">
+              <property name="text">
+               <string>远端端口:</string>
+              </property>
+             </widget>
+            </item>
+            <item row="1" column="0">
+             <widget class="QLabel" name="label_remote_ip">
+              <property name="text">
+               <string>远端IP:</string>
+              </property>
+             </widget>
+            </item>
+           </layout>
+          </widget>
+         </item>
+        </layout>
+       </item>
+      </layout>
+     </widget>
+     <widget class="QWidget" name="tab_2">
+      <attribute name="title">
+       <string>控制</string>
+      </attribute>
+      <layout class="QGridLayout" name="gridLayout"/>
+     </widget>
+     <widget class="QWidget" name="tabTcpCtl">
+      <attribute name="title">
+       <string>协议调试</string>
+      </attribute>
+      <layout class="QGridLayout" name="gridLayout_4">
+       <item row="0" column="0">
+        <widget class="QGroupBox" name="groupBox_frame_builder">
+         <property name="title">
+          <string>帧结构编辑器</string>
+         </property>
+         <layout class="QVBoxLayout" name="verticalLayout_9">
+          <item>
+           <layout class="QHBoxLayout" name="horizontalLayout_8" stretch="0,0,0,1,0,0,0">
+            <item>
+             <layout class="QVBoxLayout" name="verticalLayout_2">
+              <item>
+               <layout class="QHBoxLayout" name="horizontalLayout">
+                <item>
+                 <widget class="QLabel" name="label_protocol_type_frame">
+                  <property name="styleSheet">
+                   <string notr="true">QLabel { font-weight: bold; color: #007bff; }</string>
+                  </property>
+                  <property name="text">
+                   <string>协议类型:</string>
+                  </property>
+                 </widget>
+                </item>
+                <item>
+                 <widget class="QLabel" name="label_function_code_desc_2">
+                  <property name="styleSheet">
+                   <string notr="true">QLabel { color: #666; font-size: 11px; }</string>
+                  </property>
+                  <property name="text">
+                   <string>(1字符)</string>
+                  </property>
+                 </widget>
+                </item>
+               </layout>
+              </item>
+              <item>
+               <widget class="QComboBox" name="comboBox_protocol_type_frame">
+                <property name="placeholderText">
+                 <string/>
+                </property>
+                <property name="frame">
+                 <bool>true</bool>
+                </property>
+               </widget>
+              </item>
+             </layout>
+            </item>
+            <item>
+             <layout class="QVBoxLayout" name="verticalLayout_3">
+              <item>
+               <layout class="QHBoxLayout" name="horizontalLayout_2">
+                <item>
+                 <widget class="QLabel" name="label_frame_header">
+                  <property name="styleSheet">
+                   <string notr="true">QLabel { font-weight: bold; }</string>
+                  </property>
+                  <property name="text">
+                   <string>1. 帧头:</string>
+                  </property>
+                 </widget>
+                </item>
+                <item>
+                 <widget class="QLabel" name="label_frame_header_desc">
+                  <property name="styleSheet">
+                   <string notr="true">QLabel { color: #666; font-size: 11px; }</string>
+                  </property>
+                  <property name="text">
+                   <string>(0x3E)</string>
+                  </property>
+                 </widget>
+                </item>
+               </layout>
+              </item>
+              <item>
+               <widget class="QComboBox" name="comboBox1">
+                <property name="editable">
+                 <bool>true</bool>
+                </property>
+                <item>
+                 <property name="text">
+                  <string>3E</string>
+                 </property>
+                </item>
+                <item>
+                 <property name="text">
+                  <string>&gt;</string>
+                 </property>
+                </item>
+               </widget>
+              </item>
+             </layout>
+            </item>
+            <item>
+             <layout class="QVBoxLayout" name="verticalLayout_4">
+              <item>
+               <layout class="QHBoxLayout" name="horizontalLayout_3">
+                <item>
+                 <widget class="QLabel" name="label_slave_address_frame">
+                  <property name="styleSheet">
+                   <string notr="true">QLabel { font-weight: bold; }</string>
+                  </property>
+                  <property name="text">
+                   <string>2. 从机地址:</string>
+                  </property>
+                 </widget>
+                </item>
+                <item>
+                 <widget class="QLabel" name="label_slave_address_desc">
+                  <property name="styleSheet">
+                   <string notr="true">QLabel { color: #666; font-size: 11px; }</string>
+                  </property>
+                  <property name="text">
+                   <string>(2字符)</string>
+                  </property>
+                 </widget>
+                </item>
+               </layout>
+              </item>
+              <item>
+               <widget class="QComboBox" name="comboBox2">
+                <property name="editable">
+                 <bool>true</bool>
+                </property>
+               </widget>
+              </item>
+             </layout>
+            </item>
+            <item>
+             <layout class="QVBoxLayout" name="verticalLayout_5">
+              <item>
+               <layout class="QHBoxLayout" name="horizontalLayout_4">
+                <item>
+                 <widget class="QLabel" name="label_function_code_frame">
+                  <property name="styleSheet">
+                   <string notr="true">QLabel { font-weight: bold; }</string>
+                  </property>
+                  <property name="text">
+                   <string>3. 功能代码:</string>
+                  </property>
+                 </widget>
+                </item>
+                <item>
+                 <widget class="QLabel" name="label_function_code_desc">
+                  <property name="styleSheet">
+                   <string notr="true">QLabel { color: #666; font-size: 11px; }</string>
+                  </property>
+                  <property name="text">
+                   <string>(1字符)</string>
+                  </property>
+                 </widget>
+                </item>
+               </layout>
+              </item>
+              <item>
+               <widget class="QComboBox" name="comboBox3">
+                <property name="editable">
+                 <bool>true</bool>
+                </property>
+                <property name="placeholderText">
+                 <string/>
+                </property>
+               </widget>
+              </item>
+             </layout>
+            </item>
+            <item>
+             <layout class="QVBoxLayout" name="verticalLayout_6">
+              <item>
+               <layout class="QHBoxLayout" name="horizontalLayout_5">
+                <item>
+                 <widget class="QLabel" name="label_command_data_frame">
+                  <property name="styleSheet">
+                   <string notr="true">QLabel { font-weight: bold; }</string>
+                  </property>
+                  <property name="text">
+                   <string>4. 命令数据:</string>
+                  </property>
+                 </widget>
+                </item>
+                <item>
+                 <widget class="QLabel" name="label_command_data_desc">
+                  <property name="styleSheet">
+                   <string notr="true">QLabel { color: #666; font-size: 11px; }</string>
+                  </property>
+                  <property name="text">
+                   <string>(N字符)</string>
+                  </property>
+                 </widget>
+                </item>
+               </layout>
+              </item>
+              <item>
+               <widget class="QLineEdit" name="lineEdit4">
+                <property name="placeholderText">
+                 <string>输入命令数据（可选 </string>
+                </property>
+               </widget>
+              </item>
+             </layout>
+            </item>
+            <item>
+             <layout class="QVBoxLayout" name="verticalLayout_7">
+              <item>
+               <layout class="QHBoxLayout" name="horizontalLayout_6">
+                <item>
+                 <widget class="QLabel" name="label_crc_frame">
+                  <property name="styleSheet">
+                   <string notr="true">QLabel { font-weight: bold; }</string>
+                  </property>
+                  <property name="text">
+                   <string>5. 校验和:</string>
+                  </property>
+                 </widget>
+                </item>
+                <item>
+                 <widget class="QLabel" name="label_crc_desc">
+                  <property name="styleSheet">
+                   <string notr="true">QLabel { color: #666; font-size: 11px; }</string>
+                  </property>
+                  <property name="text">
+                   <string>(4字符)</string>
+                  </property>
+                 </widget>
+                </item>
+               </layout>
+              </item>
+              <item>
+               <widget class="QLineEdit" name="lineEdit5">
+                <property name="styleSheet">
+                 <string notr="true">QLineEdit { background-color: #f8f9fa; }</string>
+                </property>
+                <property name="readOnly">
+                 <bool>true</bool>
+                </property>
+                <property name="placeholderText">
+                 <string>自动计算</string>
+                </property>
+               </widget>
+              </item>
+             </layout>
+            </item>
+            <item>
+             <layout class="QVBoxLayout" name="verticalLayout_8">
+              <item>
+               <layout class="QHBoxLayout" name="horizontalLayout_7">
+                <item>
+                 <widget class="QLabel" name="label_frame_tail">
+                  <property name="styleSheet">
+                   <string notr="true">QLabel { font-weight: bold; }</string>
+                  </property>
+                  <property name="text">
+                   <string>6. 帧尾:</string>
+                  </property>
+                 </widget>
+                </item>
+                <item>
+                 <widget class="QLabel" name="label_frame_tail_desc">
+                  <property name="styleSheet">
+                   <string notr="true">QLabel { color: #666; font-size: 11px; }</string>
+                  </property>
+                  <property name="text">
+                   <string>(2字符)</string>
+                  </property>
+                 </widget>
+                </item>
+               </layout>
+              </item>
+              <item>
+               <widget class="QComboBox" name="comboBox6">
+                <property name="editable">
+                 <bool>true</bool>
+                </property>
+                <property name="currentText">
+                 <string/>
+                </property>
+                <property name="currentIndex">
+                 <number>0</number>
+                </property>
+                <item>
+                 <property name="text">
+                  <string/>
+                 </property>
+                </item>
+                <item>
+                 <property name="text">
+                  <string>0D0A</string>
+                 </property>
+                </item>
+                <item>
+                 <property name="text">
+                  <string>\r\n</string>
+                 </property>
+                </item>
+               </widget>
+              </item>
+             </layout>
+            </item>
+           </layout>
+          </item>
+          <item>
+           <spacer name="verticalSpacer">
+            <property name="orientation">
+             <enum>Qt::Orientation::Vertical</enum>
+            </property>
+            <property name="sizeHint" stdset="0">
+             <size>
+              <width>20</width>
+              <height>40</height>
+             </size>
+            </property>
+           </spacer>
+          </item>
+          <item>
+           <layout class="QHBoxLayout" name="horizontalLayout_frame_actions">
+            <item>
+             <widget class="QPushButton" name="pushButton_build_frame">
+              <property name="styleSheet">
+               <string notr="true">QPushButton {
+    background-color: #17a2b8;
+    color: white;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 4px;
+    font-weight: bold;
+}
+QPushButton:hover {
+    background-color: #138496;
+}
+QPushButton:pressed {
+    background-color: #0f6674;
+}</string>
+              </property>
+              <property name="text">
+               <string>构建帧</string>
+              </property>
+             </widget>
+            </item>
+            <item>
+             <widget class="QLabel" name="label_display_mode">
+              <property name="styleSheet">
+               <string notr="true">QLabel { font-weight: bold; }</string>
+              </property>
+              <property name="text">
+               <string>显示模式:</string>
+              </property>
+             </widget>
+            </item>
+            <item>
+             <widget class="QRadioButton" name="radioButton_ascii_display">
+              <property name="text">
+               <string>ASCII</string>
+              </property>
+              <property name="checked">
+               <bool>true</bool>
+              </property>
+             </widget>
+            </item>
+            <item>
+             <widget class="QRadioButton" name="radioButton_hex_display">
+              <property name="text">
+               <string>十六进制</string>
+              </property>
+             </widget>
+            </item>
+            <item>
+             <spacer name="horizontalSpacer_frame_actions">
+              <property name="orientation">
+               <enum>Qt::Orientation::Horizontal</enum>
+              </property>
+              <property name="sizeHint" stdset="0">
+               <size>
+                <width>40</width>
+                <height>20</height>
+               </size>
+              </property>
+             </spacer>
+            </item>
+            <item>
+             <widget class="QCheckBox" name="checkBox_real_time_build">
+              <property name="text">
+               <string>实时构建</string>
+              </property>
+              <property name="checked">
+               <bool>true</bool>
+              </property>
+             </widget>
+            </item>
+           </layout>
+          </item>
+         </layout>
+        </widget>
+       </item>
+      </layout>
+     </widget>
+    </widget>
+   </item>
+   <item>
+    <widget class="QGroupBox" name="groupBox_message">
+     <property name="title">
+      <string>消息收发</string>
+     </property>
+     <layout class="QVBoxLayout" name="verticalLayout_message">
+      <item>
+       <widget class="QTextEdit" name="textEdit_receive">
+        <property name="maximumSize">
+         <size>
+          <width>16777215</width>
+          <height>200</height>
+         </size>
+        </property>
+        <property name="styleSheet">
+         <string notr="true">QTextEdit {
+    background-color: #f8f9fa;
+    border: 1px solid #dee2e6;
+    border-radius: 4px;
+    padding: 8px;
+    font-family: 'Consolas', 'Monaco', monospace;
+    font-size: 12px;
+}</string>
+        </property>
+        <property name="readOnly">
+         <bool>false</bool>
+        </property>
+        <property name="placeholderText">
+         <string>接收到的消息将显示在这里...</string>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <layout class="QHBoxLayout" name="horizontalLayout_send">
+        <item>
+         <widget class="QLineEdit" name="lineEdit_send">
+          <property name="styleSheet">
+           <string notr="true">QLineEdit {
+    padding: 8px;
+    border: 1px solid #dee2e6;
+    border-radius: 4px;
+    font-size: 12px;
+}
+QLineEdit:focus {
+    border-color: #007bff;
+    outline: none;
+}</string>
+          </property>
+          <property name="text">
+           <string>&gt;01M66D8</string>
+          </property>
+          <property name="placeholderText">
+           <string>输入要发送的消息或使用协议生成器...</string>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="QPushButton" name="pushButton_send">
+          <property name="enabled">
+           <bool>false</bool>
+          </property>
+          <property name="styleSheet">
+           <string notr="true">QPushButton {
+    background-color: #007bff;
+    color: white;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 4px;
+    font-weight: bold;
+    min-width: 60px;
+}
+QPushButton:hover {
+    background-color: #0056b3;
+}
+QPushButton:pressed {
+    background-color: #004085;
+}
+QPushButton:disabled {
+    background-color: #6c757d;
+    color: #adb5bd;
+}</string>
+          </property>
+          <property name="text">
+           <string>发送</string>
+          </property>
+         </widget>
+        </item>
+       </layout>
+      </item>
+      <item>
+       <layout class="QHBoxLayout" name="horizontalLayout_options">
+        <item>
+         <widget class="QCheckBox" name="checkBox_auto_scroll">
+          <property name="text">
+           <string>自动滚动</string>
+          </property>
+          <property name="checked">
+           <bool>true</bool>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="QCheckBox" name="checkBox_show_timestamp">
+          <property name="text">
+           <string>显示时间戳</string>
+          </property>
+          <property name="checked">
+           <bool>true</bool>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="QCheckBox" name="checkBox_hex_mode">
+          <property name="text">
+           <string>十六进制模式</string>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="QCheckBox" name="checkBox_disable_proxy">
+          <property name="toolTip">
+           <string>禁用网络代理以避免连接问题</string>
+          </property>
+          <property name="text">
+           <string>禁用代理</string>
+          </property>
+          <property name="checked">
+           <bool>true</bool>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <spacer name="horizontalSpacer_options">
+          <property name="orientation">
+           <enum>Qt::Orientation::Horizontal</enum>
+          </property>
+          <property name="sizeHint" stdset="0">
+           <size>
+            <width>40</width>
+            <height>20</height>
+           </size>
+          </property>
+         </spacer>
+        </item>
+        <item>
+         <widget class="QLabel" name="label_connection_info">
+          <property name="styleSheet">
+           <string notr="true">QLabel {
+    color: #666;
+    font-size: 11px;
+}</string>
+          </property>
+          <property name="text">
+           <string>连接信息: 无</string>
+          </property>
+         </widget>
+        </item>
+       </layout>
+      </item>
+     </layout>
+    </widget>
+   </item>
+  </layout>
  </widget>
  <resources/>
  <connections/>
