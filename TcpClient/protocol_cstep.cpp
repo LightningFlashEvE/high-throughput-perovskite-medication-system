@@ -8,10 +8,10 @@ REGISTER_PROTOCOL(ProtocolCStep, "CStep");
 QList<ProtocolField> ProtocolCStep::frameFields() const
 {
     return {
-        {"帧头", "(2字符)", "3E", 2, true, {"3E", ">"}},
+        {"帧头", "(2字符)", "3E", 2, true, {"3E"}},
         {"从机地址", "(2字符)", "01", 2, true, {"01", "02", "03", "04", "05", "06", "07", "08"}},
         {"功能代码", "(1字符)", "A", 1, true, getAvailableCommands()},
-        {"命令数据", "(N字符)", "输入命令数据（可选）", -1, true, {}},
+        {"命令数据", "(N字符)", "0002", -1, true, {}},
         {"校验和", "(4字符)", "自动计算", 4, false, {}},
         {"帧尾", "(2字符)", "0D0A", 4, true, {"", "0D0A", "\\r\\n"}}
     };

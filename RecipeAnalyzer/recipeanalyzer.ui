@@ -1,0 +1,465 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>RecipeAnalyzer</class>
+ <widget class="QWidget" name="RecipeAnalyzer">
+  <property name="geometry">
+   <rect>
+    <x>0</x>
+    <y>0</y>
+    <width>848</width>
+    <height>574</height>
+   </rect>
+  </property>
+  <property name="windowTitle">
+   <string>Form</string>
+  </property>
+  <property name="windowIcon">
+   <iconset resource="../picture.qrc">
+    <normaloff>:/main/pic/logo2.png</normaloff>:/main/pic/logo2.png</iconset>
+  </property>
+  <layout class="QGridLayout" name="gridLayout_3">
+   <item row="0" column="0">
+    <layout class="QVBoxLayout" name="verticalLayout_3">
+     <item>
+      <widget class="QGroupBox" name="groupBox_input">
+       <property name="title">
+        <string>输入参数</string>
+       </property>
+       <layout class="QHBoxLayout" name="horizontalLayout" stretch="2,3">
+        <item>
+         <layout class="QVBoxLayout" name="verticalLayout_5">
+          <item>
+           <layout class="QFormLayout" name="formLayout">
+            <property name="horizontalSpacing">
+             <number>4</number>
+            </property>
+            <property name="verticalSpacing">
+             <number>2</number>
+            </property>
+            <property name="leftMargin">
+             <number>6</number>
+            </property>
+            <property name="topMargin">
+             <number>20</number>
+            </property>
+            <property name="rightMargin">
+             <number>8</number>
+            </property>
+            <property name="bottomMargin">
+             <number>0</number>
+            </property>
+            <item row="0" column="0">
+             <widget class="QLabel" name="label_formula">
+              <property name="text">
+               <string>化学式:</string>
+              </property>
+             </widget>
+            </item>
+            <item row="0" column="1">
+             <widget class="QLineEdit" name="lineEdit_formula">
+              <property name="text">
+               <string>Cs0.17FA0.83Pb(I0.8Br0.2)3</string>
+              </property>
+              <property name="placeholderText">
+               <string>例如: Cs0.17FA0.83Pb(I0.8Br0.2)3</string>
+              </property>
+             </widget>
+            </item>
+            <item row="1" column="0">
+             <widget class="QLabel" name="label_molarity">
+              <property name="text">
+               <string>摩尔浓度 (M):</string>
+              </property>
+             </widget>
+            </item>
+            <item row="1" column="1">
+             <widget class="QDoubleSpinBox" name="doubleSpinBox_molarity">
+              <property name="decimals">
+               <number>3</number>
+              </property>
+              <property name="minimum">
+               <double>0.000000000000000</double>
+              </property>
+              <property name="maximum">
+               <double>10.000000000000000</double>
+              </property>
+              <property name="singleStep">
+               <double>0.100000000000000</double>
+              </property>
+              <property name="value">
+               <double>1.000000000000000</double>
+              </property>
+             </widget>
+            </item>
+            <item row="2" column="0">
+             <widget class="QLabel" name="label_volume">
+              <property name="text">
+               <string>体积 (mL):</string>
+              </property>
+             </widget>
+            </item>
+            <item row="2" column="1">
+             <widget class="QDoubleSpinBox" name="doubleSpinBox_volume">
+              <property name="decimals">
+               <number>3</number>
+              </property>
+              <property name="minimum">
+               <double>0.000000000000000</double>
+              </property>
+              <property name="maximum">
+               <double>10000.000000000000000</double>
+              </property>
+              <property name="singleStep">
+               <double>0.100000000000000</double>
+              </property>
+              <property name="value">
+               <double>1000.000000000000000</double>
+              </property>
+             </widget>
+            </item>
+           </layout>
+          </item>
+          <item>
+           <widget class="QPushButton" name="pushButton_calculate">
+            <property name="styleSheet">
+             <string>QPushButton {
+    background-color: #4CAF50;
+    color: white;
+    border: none;
+    padding: 8px 16px;
+    font-size: 14px;
+    border-radius: 4px;
+}
+QPushButton:hover {
+    background-color: #45a049;
+}
+QPushButton:pressed {
+    background-color: #3d8b40;
+}</string>
+            </property>
+            <property name="text">
+             <string>计算前驱体</string>
+            </property>
+           </widget>
+          </item>
+         </layout>
+        </item>
+        <item>
+         <widget class="QGroupBox" name="groupBox_solvent_select">
+          <property name="title">
+           <string>溶剂与体积分配</string>
+          </property>
+          <layout class="QVBoxLayout" name="verticalLayout_4">
+           <item>
+            <layout class="QGridLayout" name="gridLayout_2">
+             <item row="0" column="0">
+              <widget class="QPushButton" name="pushButton_DMSO">
+               <property name="text">
+                <string>DMSO</string>
+               </property>
+               <property name="checkable">
+                <bool>true</bool>
+               </property>
+              </widget>
+             </item>
+             <item row="0" column="1">
+              <widget class="QPushButton" name="pushButton_DMF">
+               <property name="text">
+                <string>DMF</string>
+               </property>
+               <property name="checkable">
+                <bool>true</bool>
+               </property>
+              </widget>
+             </item>
+             <item row="0" column="2">
+              <widget class="QPushButton" name="pushButton_GBL">
+               <property name="text">
+                <string>GBL</string>
+               </property>
+               <property name="checkable">
+                <bool>true</bool>
+               </property>
+              </widget>
+             </item>
+             <item row="0" column="3">
+              <widget class="QPushButton" name="pushButton_NMP">
+               <property name="text">
+                <string>NMP</string>
+               </property>
+               <property name="checkable">
+                <bool>true</bool>
+               </property>
+              </widget>
+             </item>
+             <item row="1" column="0">
+              <widget class="QPushButton" name="pushButton_DMAC">
+               <property name="text">
+                <string>DMAC</string>
+               </property>
+               <property name="checkable">
+                <bool>true</bool>
+               </property>
+              </widget>
+             </item>
+             <item row="1" column="1">
+              <widget class="QPushButton" name="pushButton_THF">
+               <property name="text">
+                <string>THF</string>
+               </property>
+               <property name="checkable">
+                <bool>true</bool>
+               </property>
+              </widget>
+             </item>
+             <item row="1" column="2">
+              <widget class="QPushButton" name="pushButton_Toluene">
+               <property name="text">
+                <string>Toluene</string>
+               </property>
+               <property name="checkable">
+                <bool>true</bool>
+               </property>
+              </widget>
+             </item>
+             <item row="1" column="3">
+              <widget class="QPushButton" name="pushButton_CB">
+               <property name="text">
+                <string>CB</string>
+               </property>
+               <property name="checkable">
+                <bool>true</bool>
+               </property>
+              </widget>
+             </item>
+             <item row="2" column="0">
+              <widget class="QPushButton" name="pushButton_DCB">
+               <property name="text">
+                <string>DCB</string>
+               </property>
+               <property name="checkable">
+                <bool>true</bool>
+               </property>
+              </widget>
+             </item>
+             <item row="2" column="1">
+              <widget class="QPushButton" name="pushButton_Anisole">
+               <property name="text">
+                <string>Anisole</string>
+               </property>
+               <property name="checkable">
+                <bool>true</bool>
+               </property>
+              </widget>
+             </item>
+             <item row="2" column="2">
+              <widget class="QPushButton" name="pushButton_clear_all">
+               <property name="styleSheet">
+                <string>QPushButton { 
+    background-color: #ffcdd2; 
+    color: #d32f2f; 
+    border: 1px solid #f8bbd9; 
+    border-radius: 4px; 
+    padding: 4px 8px; 
+} 
+QPushButton:hover { 
+    background-color: #f44336; 
+    color: white; 
+} 
+QPushButton:pressed { 
+    background-color: #d32f2f; 
+}</string>
+               </property>
+               <property name="text">
+                <string>清空选择</string>
+               </property>
+              </widget>
+             </item>
+            </layout>
+           </item>
+           <item>
+            <widget class="QLabel" name="label_advanced_total">
+             <property name="styleSheet">
+              <string>font-weight: bold; color: #2196F3;</string>
+             </property>
+             <property name="text">
+              <string>高级选择总计：0%</string>
+             </property>
+            </widget>
+           </item>
+          </layout>
+         </widget>
+        </item>
+       </layout>
+      </widget>
+     </item>
+     <item>
+      <widget class="QGroupBox" name="groupBox_results">
+       <property name="title">
+        <string>计算结果</string>
+       </property>
+       <layout class="QGridLayout" name="gridLayout">
+        <item row="0" column="0">
+         <widget class="QSplitter" name="splitter">
+          <property name="orientation">
+           <enum>Qt::Orientation::Vertical</enum>
+          </property>
+          <widget class="QWidget" name="widget_tables">
+           <layout class="QVBoxLayout" name="verticalLayout">
+            <item>
+             <widget class="QLabel" name="label_tables_title">
+              <property name="styleSheet">
+               <string>font-weight: bold; font-size: 14px;</string>
+              </property>
+              <property name="text">
+               <string>前驱体用量 &amp; 溶剂配比:</string>
+              </property>
+             </widget>
+            </item>
+            <item>
+             <widget class="QSplitter" name="splitter_tables">
+              <property name="orientation">
+               <enum>Qt::Orientation::Horizontal</enum>
+              </property>
+              <widget class="QWidget" name="widget_precursors">
+               <layout class="QVBoxLayout" name="verticalLayout_precursors">
+                <item>
+                 <widget class="QLabel" name="label_precursors_subtitle">
+                  <property name="styleSheet">
+                   <string>font-weight: bold; color: #2196F3;</string>
+                  </property>
+                  <property name="text">
+                   <string>前驱体用量</string>
+                  </property>
+                 </widget>
+                </item>
+                <item>
+                 <widget class="QTableWidget" name="tableWidget_precursors">
+                  <property name="alternatingRowColors">
+                   <bool>true</bool>
+                  </property>
+                  <property name="selectionBehavior">
+                   <enum>QAbstractItemView::SelectionBehavior::SelectRows</enum>
+                  </property>
+                  <property name="sortingEnabled">
+                   <bool>true</bool>
+                  </property>
+                  <column>
+                   <property name="text">
+                    <string>前驱体</string>
+                   </property>
+                  </column>
+                  <column>
+                   <property name="text">
+                    <string>摩尔数 (mol)</string>
+                   </property>
+                  </column>
+                  <column>
+                   <property name="text">
+                    <string>质量 (g)</string>
+                   </property>
+                  </column>
+                  <column>
+                   <property name="text">
+                    <string/>
+                   </property>
+                  </column>
+                 </widget>
+                </item>
+               </layout>
+              </widget>
+              <widget class="QWidget" name="widget_solvents">
+               <layout class="QVBoxLayout" name="verticalLayout_solvents">
+                <item>
+                 <widget class="QLabel" name="label_solvents_subtitle">
+                  <property name="styleSheet">
+                   <string>font-weight: bold; color: #4CAF50;</string>
+                  </property>
+                  <property name="text">
+                   <string>溶剂配比</string>
+                  </property>
+                 </widget>
+                </item>
+                <item>
+                 <widget class="QTableWidget" name="tableWidget_solvents">
+                  <property name="alternatingRowColors">
+                   <bool>true</bool>
+                  </property>
+                  <property name="selectionBehavior">
+                   <enum>QAbstractItemView::SelectionBehavior::SelectRows</enum>
+                  </property>
+                  <property name="sortingEnabled">
+                   <bool>false</bool>
+                  </property>
+                  <column>
+                   <property name="text">
+                    <string>溶剂</string>
+                   </property>
+                  </column>
+                  <column>
+                   <property name="text">
+                    <string>比例 (%)</string>
+                   </property>
+                  </column>
+                  <column>
+                   <property name="text">
+                    <string>体积 (mL)</string>
+                   </property>
+                  </column>
+                  <column>
+                   <property name="text">
+                    <string>状态</string>
+                   </property>
+                  </column>
+                 </widget>
+                </item>
+               </layout>
+              </widget>
+             </widget>
+            </item>
+           </layout>
+          </widget>
+          <widget class="QWidget" name="widget_validation">
+           <layout class="QVBoxLayout" name="verticalLayout_2">
+            <item>
+             <widget class="QLabel" name="label_validation_title">
+              <property name="styleSheet">
+               <string>font-weight: bold; font-size: 14px;</string>
+              </property>
+              <property name="text">
+               <string>验证信息:</string>
+              </property>
+             </widget>
+            </item>
+            <item>
+             <widget class="QTextEdit" name="textEdit_validation">
+              <property name="styleSheet">
+               <string>QTextEdit {
+    background-color: #f5f5f5;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    padding: 8px;
+    font-family: 'Courier New', monospace;
+}</string>
+              </property>
+              <property name="readOnly">
+               <bool>true</bool>
+              </property>
+             </widget>
+            </item>
+           </layout>
+          </widget>
+         </widget>
+        </item>
+       </layout>
+      </widget>
+     </item>
+    </layout>
+   </item>
+  </layout>
+ </widget>
+ <resources>
+  <include location="../picture.qrc"/>
+ </resources>
+ <connections/>
+</ui>

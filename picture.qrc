@@ -6,5 +6,6 @@
         <file>pic/ChessPiece.png</file>
         <file>pic/ye.png</file>
         <file>pic/zhua.png</file>
+        <file>pic/logo2.png</file>
     </qresource>
 </RCC>

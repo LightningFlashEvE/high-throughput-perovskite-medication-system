@@ -56,6 +56,12 @@ public:
      * @return QString 拼接后的帧内容
      */
     QString buildFrameContent(const FrameData &frameData);
+    
+    /**
+     * @brief 直接收集数据并构建帧内容（合并版本）
+     * @return QString 拼接后的帧内容
+     */
+    QString buildFrameContentDirect();
 
     /**
      * @brief 计算并格式化CRC
@@ -93,6 +99,13 @@ private:
      * @return bool true为ModBus协议
      */
     bool isModBusProtocol() const;
+
+    /**
+     * @brief 计算 CRC16 (Modbus 多项式 0xA001, 初始值 0xFFFF)
+     * @param data 输入字节数组
+     * @return 16位 CRC 值
+     */
+    static quint16 calculateCRC16(const QByteArray &data);
 };
 
 #endif // TCPCLIENT_CRC_H

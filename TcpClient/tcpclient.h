@@ -42,12 +42,11 @@ private slots:
     void onSocketError(QAbstractSocket::SocketError error);
     void updateLocalIPs();
     
-    // 协议相关槽函数 (仅用于帧结构编辑器)
-    void onProtocolTypeChanged();
+    void onProtocolTypeChanged(); // 更换协议
     
     // 帧结构编辑器槽函数
     void onFrameFieldChanged();
-    void onBuildFrameClicked();
+    //void onBuildFrameClicked();
     void onPreviewModeChanged();
     
     // 数据解析功能已整合到模块化协议系统中
@@ -63,14 +62,14 @@ public:
     void refreshLocalIPs();
     
     // 旧协议管理方法已删除，使用新的模块化系统
-    quint16 calculateCRC16(const QByteArray &data);
+    //quint16 calculateCRC16(const QByteArray &data);
     QString formatFrameForDisplay(const QByteArray &frame, bool hexDisplay = true);
     
     // 帧结构编辑器方法
     void initializeFrameBuilder();
     void syncFrameFields(); // 更新combox值, 初始化会调用，选择协议会调用
     QString buildFrameFromFields();
-    void updateCrcDisplay();
+    //void updateCrcDisplay();
     QString formatFrameASCII(const QString &frame);
     QString formatFrameHex(const QString &frame);
     
@@ -84,9 +83,8 @@ public:
     void clearLineEdit5();
     QString getCurrentProtocolName() const;
     
-    // 协议管理方法 (新的模块化系统)
     void initializeProtocolSystem();
-    void updateProtocolUI(); // 更新眉头
+    void updateProtocolUI();// 更新眉头
     void populateProtocolComboBoxes();
     void applyProtocolFields();
 

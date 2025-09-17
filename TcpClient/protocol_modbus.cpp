@@ -10,8 +10,8 @@ QList<ProtocolField> ProtocolModBus::frameFields() const
     return {
         {"设备ID", "(1字节)", "01", 2, true, {"01", "02", "03", "04", "05", "06", "07", "88"}},
         {"功能码", "(1字节)", "06", 2, true, {"06", "03"}},
-        {"寄存器地址", "(2字节)", "0105", 4, true, {}},
-        {"寄存器数据", "(2字节)", "10进制数值", 4, true, {}},
+        {"寄存器地址", "(2字节)", "0100", 4, true, getAvailableFunctions()},
+        {"寄存器数据", "(2字节)", "1", 4, true, {}},
         {"CRC校验", "(2字节)", "自动计算", 4, false, {}},
         {"操作", "(解析)", "解析数据", -1, false, {}}
     };
@@ -23,7 +23,7 @@ QList<ProtocolField> ProtocolModBus::parseFields() const
         {"设备ID", "(1字节)", "01", 2, false, {}},
         {"功能码", "(1字节)", "06", 2, false, {}},
         {"寄存器地址", "(2字节)", "0100", 4, false, {}},
-        {"寄存器数据", "(2字节)", "0001", 4, false, {}},
+        {"寄存器数据", "(2字节)", "10", 4, false, {}},
         {"CRC校验", "(2字节)", "自动计算", 4, false, {}}
     };
 }
@@ -94,9 +94,7 @@ bool ProtocolModBus::validateFrame(const QString &frame) const
 
 QString ProtocolModBus::getFieldDescription(const QString &fieldName, const QString &value) const
 {
-    if (fieldName == "功能码") {
-        return getFunctionDescription(value);
-    } else if (fieldName == "寄存器地址") {
+    if (fieldName == "功能代码") {
         return getAddressDescription(value);
     }
     return QString("值: %1").arg(value);
@@ -104,7 +102,9 @@ QString ProtocolModBus::getFieldDescription(const QString &fieldName, const QStr
 
 QStringList ProtocolModBus::getAvailableFunctions() const
 {
-    return {"03", "06"};
+    return {"0100", "0101", "0102", "0103", "0104", "0105", "0106", "0107", "0108", "0200", "0201",
+            "0202", "0203", "0204", "0205","0300", "0301", "0302", "0303", "0304", "0305"
+            };
 }
 
 QString ProtocolModBus::getFunctionDescription(const QString &function) const

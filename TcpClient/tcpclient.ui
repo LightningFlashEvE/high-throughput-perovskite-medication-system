@@ -6,12 +6,16 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>765</width>
-    <height>538</height>
+    <width>766</width>
+    <height>536</height>
    </rect>
   </property>
   <property name="windowTitle">
    <string>TCP 通信工具</string>
+  </property>
+  <property name="windowIcon">
+   <iconset resource="../picture.qrc">
+    <normaloff>:/main/pic/logo2.png</normaloff>:/main/pic/logo2.png</iconset>
   </property>
   <layout class="QVBoxLayout" name="verticalLayout_10" stretch="0,1">
    <item>
@@ -284,7 +288,7 @@ QPushButton:pressed {
             <item>
              <layout class="QVBoxLayout" name="verticalLayout_2">
               <item>
-               <layout class="QHBoxLayout" name="horizontalLayout">
+               <layout class="QVBoxLayout" name="verticalLayout_17">
                 <item>
                  <widget class="QLabel" name="label_protocol_type_frame">
                   <property name="styleSheet">
@@ -322,7 +326,7 @@ QPushButton:pressed {
             <item>
              <layout class="QVBoxLayout" name="verticalLayout_3">
               <item>
-               <layout class="QHBoxLayout" name="horizontalLayout_2">
+               <layout class="QVBoxLayout" name="verticalLayout_12">
                 <item>
                  <widget class="QLabel" name="label_frame_header">
                   <property name="styleSheet">
@@ -367,7 +371,7 @@ QPushButton:pressed {
             <item>
              <layout class="QVBoxLayout" name="verticalLayout_4">
               <item>
-               <layout class="QHBoxLayout" name="horizontalLayout_3">
+               <layout class="QVBoxLayout" name="verticalLayout_11">
                 <item>
                  <widget class="QLabel" name="label_slave_address_frame">
                   <property name="styleSheet">
@@ -402,7 +406,7 @@ QPushButton:pressed {
             <item>
              <layout class="QVBoxLayout" name="verticalLayout_5">
               <item>
-               <layout class="QHBoxLayout" name="horizontalLayout_4">
+               <layout class="QVBoxLayout" name="verticalLayout_13">
                 <item>
                  <widget class="QLabel" name="label_function_code_frame">
                   <property name="styleSheet">
@@ -440,7 +444,7 @@ QPushButton:pressed {
             <item>
              <layout class="QVBoxLayout" name="verticalLayout_6">
               <item>
-               <layout class="QHBoxLayout" name="horizontalLayout_5">
+               <layout class="QVBoxLayout" name="verticalLayout_14">
                 <item>
                  <widget class="QLabel" name="label_command_data_frame">
                   <property name="styleSheet">
@@ -475,7 +479,7 @@ QPushButton:pressed {
             <item>
              <layout class="QVBoxLayout" name="verticalLayout_7">
               <item>
-               <layout class="QHBoxLayout" name="horizontalLayout_6">
+               <layout class="QVBoxLayout" name="verticalLayout_15">
                 <item>
                  <widget class="QLabel" name="label_crc_frame">
                   <property name="styleSheet">
@@ -516,7 +520,7 @@ QPushButton:pressed {
             <item>
              <layout class="QVBoxLayout" name="verticalLayout_8">
               <item>
-               <layout class="QHBoxLayout" name="horizontalLayout_7">
+               <layout class="QVBoxLayout" name="verticalLayout_16">
                 <item>
                  <widget class="QLabel" name="label_frame_tail">
                   <property name="styleSheet">
@@ -587,29 +591,6 @@ QPushButton:pressed {
           <item>
            <layout class="QHBoxLayout" name="horizontalLayout_frame_actions">
             <item>
-             <widget class="QPushButton" name="pushButton_build_frame">
-              <property name="styleSheet">
-               <string notr="true">QPushButton {
-    background-color: #17a2b8;
-    color: white;
-    border: none;
-    padding: 8px 16px;
-    border-radius: 4px;
-    font-weight: bold;
-}
-QPushButton:hover {
-    background-color: #138496;
-}
-QPushButton:pressed {
-    background-color: #0f6674;
-}</string>
-              </property>
-              <property name="text">
-               <string>构建帧</string>
-              </property>
-             </widget>
-            </item>
-            <item>
              <widget class="QLabel" name="label_display_mode">
               <property name="styleSheet">
                <string notr="true">QLabel { font-weight: bold; }</string>
@@ -673,15 +654,9 @@ QPushButton:pressed {
      <property name="title">
       <string>消息收发</string>
      </property>
-     <layout class="QVBoxLayout" name="verticalLayout_message">
+     <layout class="QVBoxLayout" name="verticalLayout_message" stretch="1,0,0">
       <item>
        <widget class="QTextEdit" name="textEdit_receive">
-        <property name="maximumSize">
-         <size>
-          <width>16777215</width>
-          <height>200</height>
-         </size>
-        </property>
         <property name="styleSheet">
          <string notr="true">QTextEdit {
     background-color: #f8f9fa;
@@ -832,6 +807,8 @@ QPushButton:disabled {
    </item>
   </layout>
  </widget>
- <resources/>
+ <resources>
+  <include location="../picture.qrc"/>
+ </resources>
  <connections/>
 </ui>

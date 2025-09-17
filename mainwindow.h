@@ -8,6 +8,7 @@
 #include "flowviewmanager.h"
 #include "settingsbutton.h"
 #include "tcpclient.h"
+#include "recipeanalyzer.h"
 
 
 QT_BEGIN_NAMESPACE
@@ -85,6 +86,8 @@ private:
     SettingsButton *settingsPanel = nullptr;
     // TCP客户端调试面板
     TcpClient *tcpClientPanel = nullptr;
+    // 配方解析面板
+    RecipeAnalyzer *recipeAnalyzerPanel = nullptr;
 
     // zhua 当前所在网格（用于方向键移动）
     int zhuaCol = 4;

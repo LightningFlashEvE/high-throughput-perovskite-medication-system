@@ -15,6 +15,7 @@ MainWindow::MainWindow(QWidget *parent)
     , ui(new Ui::MainWindow)
 {
     ui->setupUi(this);
+     
 
     /*** 显示logo ***/
     QPixmap logo(":/main/pic/logo.png");
@@ -168,6 +169,23 @@ MainWindow::MainWindow(QWidget *parent)
             tcpClientPanel->activateWindow();
             qDebug() << "TCP调试窗口已打开";
         });
+
+        QAction *settingsActionPy = new QAction("配方解析", this);
+        ui->menuSettings->addAction(settingsActionPy);
+        connect(settingsActionPy, &QAction::triggered, this, [this] {
+            if (!recipeAnalyzerPanel) {
+                recipeAnalyzerPanel = new RecipeAnalyzer(nullptr);
+                recipeAnalyzerPanel->setAttribute(Qt::WA_DeleteOnClose, true);
+                recipeAnalyzerPanel->setWindowFlag(Qt::Window, true);
+                recipeAnalyzerPanel->setWindowTitle("配方解析工具");
+                connect(recipeAnalyzerPanel, &QObject::destroyed, this, [this] { recipeAnalyzerPanel = nullptr; });
+            }
+            recipeAnalyzerPanel->show();
+            recipeAnalyzerPanel->raise();
+            recipeAnalyzerPanel->activateWindow();
+            qDebug() << "配方解析窗口已打开";
+        });
+
     }
 
     if (ui->menuHistory) {

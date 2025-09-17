@@ -40,6 +40,8 @@ INCLUDEPATH += $$PWD/Modbus485
 include($$PWD/TcpClient/tcpclient.pri)
 INCLUDEPATH += $$PWD/TcpClient
 
+include($$PWD/RecipeAnalyzer/recipeanalyzer.pri)
+INCLUDEPATH += $$PWD/RecipeAnalyzer
 
 RESOURCES += \
     picture.qrc

@@ -26,14 +26,10 @@ TcpClient::TcpClient(QWidget *parent)
     , m_isServerMode(false)
     , m_updateTimer(new QTimer(this))
     , m_currentProtocol(nullptr)
-    , m_crcHelper(nullptr)
+    , m_crcHelper(new TcpClientCrc(this))
 {
     ui->setupUi(this);
-    
-    // 延迟初始化网络对象 - 在第一次连接时才创建
-    // m_tcpSocket = new QTcpSocket(this);
-    // m_tcpServer = new QTcpServer(this);
-    
+
     // 设置connect
     setupConnections();
     
@@ -48,14 +44,11 @@ TcpClient::TcpClient(QWidget *parent)
     // 延迟启动定时器
     QTimer::singleShot(1000, this, [this]() { m_updateTimer->start(); });
     
-    // 初始化新的模块化协议系统
+    // 更新眉头
     initializeProtocolSystem();
     
-    // 初始化帧结构编辑器
+    // 更新comBox2，3默认内容.其他内容默认够用了
     initializeFrameBuilder();
-    
-    // 初始化CRC辅助类
-    m_crcHelper = new TcpClientCrc(this);
     
     // 设置默认模式
     ui->radioButton_client->setChecked(true);
@@ -98,8 +91,7 @@ void TcpClient::setupConnections()
             updateProxySettings();
         }
     });
-    
-    // 协议相关信号连接已移除 - 现在只使用帧结构编辑器
+
     
     // 帧结构编辑器信号连接
     connect(ui->comboBox_protocol_type_frame, QOverload<int>::of(&QComboBox::currentIndexChanged),
@@ -112,25 +104,21 @@ void TcpClient::setupConnections()
             this, &TcpClient::onFrameFieldChanged);
     connect(ui->lineEdit4, &QLineEdit::textChanged,
             this, &TcpClient::onFrameFieldChanged);
-    connect(ui->comboBox6, QOverload<int>::of(&QComboBox::currentIndexChanged),
-            this, &TcpClient::onFrameFieldChanged);
-    connect(ui->pushButton_build_frame, &QPushButton::clicked,
-            this, &TcpClient::onBuildFrameClicked);
+    // connect(ui->comboBox6, QOverload<int>::of(&QComboBox::currentIndexChanged),
+    //         this, &TcpClient::onFrameFieldChanged);
+    // connect(ui->pushButton_build_frame, &QPushButton::clicked,
+    //         this, &TcpClient::onBuildFrameClicked);
     
     // 预览模式切换信号连接
     connect(ui->radioButton_ascii_display, &QRadioButton::toggled, 
             this, &TcpClient::onPreviewModeChanged);
     connect(ui->radioButton_hex_display, &QRadioButton::toggled,
             this, &TcpClient::onPreviewModeChanged);
+
     
-    // 数据解析信号连接已删除 - 使用模块化协议系统
-    
-    // 十六进制显示模式已改为单选按钮，相关连接已在预览模式中处理
-    
-    // 实时构建模式变化时的处理
     connect(ui->checkBox_real_time_build, &QCheckBox::toggled, this, [this](bool enabled) {
         if (enabled) {
-            onFrameFieldChanged(); // 启用时立即更新
+            onFrameFieldChanged();
         }
     });
     
@@ -518,24 +506,24 @@ void TcpClient::onProtocolTypeChanged() // 更换协议
     qDebug() << "协议切换到:" << m_currentProtocolName;
 }
 
-quint16 TcpClient::calculateCRC16(const QByteArray &data)
-{
-    quint16 crc = 0xFFFF;  // 初始值
-    for (int i = 0; i < data.length(); ++i) {
-        crc ^= static_cast<quint8>(data[i]);  // XOR字节到CRC
+// quint16 TcpClient::calculateCRC16(const QByteArray &data)
+// {
+//     quint16 crc = 0xFFFF;  // 初始值
+//     for (int i = 0; i < data.length(); ++i) {
+//         crc ^= static_cast<quint8>(data[i]);  // XOR字节到CRC
 
-        for (int j = 0; j < 8; ++j) {  // 处理8位
-            if (crc & 0x0001) {
-                crc >>= 1;
-                crc ^= 0xA001;  // Modbus多项式（反向）
-            } else {
-                crc >>= 1;
-            }
-        }
-    }
+//         for (int j = 0; j < 8; ++j) {  // 处理8位
+//             if (crc & 0x0001) {
+//                 crc >>= 1;
+//                 crc ^= 0xA001;  // Modbus多项式（反向）
+//             } else {
+//                 crc >>= 1;
+//             }
+//         }
+//     }
 
-    return crc;
-}
+//     return crc;
+// }
 
 QString TcpClient::formatFrameForDisplay(const QByteArray &frame, bool hexDisplay)
 {
@@ -554,11 +542,13 @@ QString TcpClient::formatFrameForDisplay(const QByteArray &frame, bool hexDispla
 void TcpClient::onFrameFieldChanged()
 {
     // 总是更新CRC显示
-    updateCrcDisplay();
+    if (m_crcHelper) {
+        m_crcHelper->updateCrcDisplay(); // 这里会更新crc
+    }
     
     // 如果启用实时构建，更新发送框
     if (ui->checkBox_real_time_build->isChecked()) {
-        QString frame = buildFrameFromFields();
+        QString frame = buildFrameFromFields();  // 这里也会更新crc
         if (!frame.isEmpty()) {
             ui->lineEdit_send->setText(frame);
             
@@ -571,13 +561,6 @@ void TcpClient::onFrameFieldChanged()
     }
 }
 
-// CRC计算已移至 tcpclient_crc.cpp
-void TcpClient::updateCrcDisplay()
-{
-    if (m_crcHelper) {
-        m_crcHelper->updateCrcDisplay();
-    }
-}
 
 QString TcpClient::getCurrentProtocolName() const
 {
@@ -616,13 +599,12 @@ QString TcpClient::formatFrameHex(const QString &frame)
     return hexStr;
 }
 
-
 void TcpClient::initializeProtocolSystem()
 {
     // 协议已通过REGISTER_PROTOCOL宏自动注册
     // 注释：协议类在编译时通过宏自动注册到ProtocolFactory中，无需手动注册
     
-    // 填充协议下拉框
+    // 填充【协议下拉框】
     populateProtocolComboBoxes();
     // 注释：调用函数将已注册的协议添加到UI的下拉框组件中
     
@@ -641,9 +623,8 @@ void TcpClient::initializeProtocolSystem()
         m_currentProtocol = ProtocolFactory::instance().createProtocol(m_currentProtocolName);
         // 注释：通过协议工厂创建协议对象实例，用于实际的协议处理
         
-        // 更新协议相关的UI界面
+        // 更新眉头
         updateProtocolUI();
-        // 注释：根据当前协议更新界面显示，如协议特定的参数设置等
     }
     
     // 输出调试信息，显示初始化结果
@@ -736,6 +717,7 @@ QString TcpClient::getLineEdit4Text() const
 void TcpClient::setLineEdit5Text(const QString &text)
 {
     ui->lineEdit5->setText(text);
+    //qDebug() << "222222222222222" << text;
 }
 
 void TcpClient::clearLineEdit5()
@@ -863,9 +845,9 @@ void TcpClient::applyProtocolFields()
         ui->comboBox3->clear();
         ui->comboBox3->addItems(frameFields[2].options);
 
-        ui->label_command_data_frame->setText(QString("4.%1").arg(frameFields[3].name));
-        ui->label_command_data_desc->setText(frameFields[3].description);
-        ui->lineEdit4->setPlaceholderText(frameFields[3].placeholder);
+        // ui->label_command_data_frame->setText(QString("4.%1").arg(frameFields[3].name));
+        // ui->label_command_data_desc->setText(frameFields[3].description);
+        // ui->lineEdit4->setText(frameFields[3].placeholder);
 
         ui->label_crc_frame->setText(QString("5.%1").arg(frameFields[4].name));
         ui->label_crc_desc->setText(frameFields[4].description);
@@ -879,20 +861,6 @@ void TcpClient::applyProtocolFields()
 
 }
 
-void TcpClient::onBuildFrameClicked()
-{
-    QString frame = buildFrameFromFields();
-    if (!frame.isEmpty()) {
-        // 自动填充到发送框
-        ui->lineEdit_send->setText(frame);
-
-        // 显示构建的帧到消息区域
-        QString displayMode = ui->radioButton_hex_display->isChecked() ? "十六进制" : "ASCII";
-        QString displayFrame = ui->radioButton_hex_display->isChecked() ?
-                                   formatFrameHex(frame) : formatFrameASCII(frame);
-        appendMessage(QString("手动构建[%1]: %2").arg(displayMode).arg(displayFrame), "success");
-    }
-}
 
 void TcpClient::initializeFrameBuilder()
 {
@@ -928,17 +896,14 @@ void TcpClient::syncFrameFields()
 
     // 填充comBox3
     ui->comboBox3->clear();
-    if (frameFields.size() > 2 && !frameFields[2].options.isEmpty()) {
+    if (frameFields.size() > 2)
+    {
         for (const QString &option : std::as_const(frameFields[2].options)) {
             // 获取选项的描述
             QString description = m_currentProtocol->getFieldDescription("功能代码", option);
             QString displayText = QString("%1:%2").arg(option, description);
             ui->comboBox3->addItem(displayText, option);
         }
-    }
-    else // 空就是夹爪
-    {
-        ui->comboBox3->addItem(frameFields[2].placeholder);
     }
 
 
@@ -948,11 +913,12 @@ void TcpClient::syncFrameFields()
     }
 }
 
-QString TcpClient::buildFrameFromFields()
+QString TcpClient::buildFrameFromFields() // 勾选自动的时候调用
 {
     // 1) 获取并处理 data（原帧头）
     const QString dataHeadRaw = ui->comboBox1->currentText();
     const QString dataHead    = (dataHeadRaw == "3E") ? QString(">") : dataHeadRaw;
+
 
     // 2) 获取并处理 data2（原从机地址）
     const QString data1Raw = ui->comboBox2->currentText();
@@ -966,14 +932,26 @@ QString TcpClient::buildFrameFromFields()
         data2 = (sep > -1) ? display.left(sep) : display;
     }
 
-    // 4) 获取并处理 data4（原命令数据：十进制 -> 4位HEX 大写；否则原样）
+    // 4) 获取并处理 data4（原命令数据：十进制 -> 保持前导零个数的HEX大写；否则原样）
     const QString data3Raw = ui->lineEdit4->text();
     QString data3 = data3Raw;
-    if (QRegularExpression("^[0-9]+$").match(data3Raw).hasMatch()) {
+    static const QRegularExpression kOnlyDigitsRe(QStringLiteral("^[0-9]+$"));
+    if (kOnlyDigitsRe.match(data3Raw).hasMatch()) {
         bool ok = false;
         const int dec = data3Raw.toInt(&ok, 10);
         if (ok && dec >= 0) {
-            data3 = QString("%1").arg(dec, 4, 16, QChar('0')).toUpper();
+            // 先转换为基础HEX
+            QString baseHex = QString("%1").arg(dec, 0, 16).toUpper();
+            
+            // 计算原输入的前导零个数：去掉前导零后的长度差
+            QString trimmed = data3Raw;
+            while (trimmed.startsWith('0') && trimmed.length() > 1) {
+                trimmed.remove(0, 1);
+            }
+            const int leadingZeros = data3Raw.length() - trimmed.length();
+            
+            // 在HEX前补上相同数量的前导零
+            data3 = QString("0").repeated(leadingZeros) + baseHex;
         }
     }
 
@@ -981,11 +959,17 @@ QString TcpClient::buildFrameFromFields()
     const QString data4Raw = ui->comboBox6->currentText();
     const QString data4    = (data4Raw == "0D0A") ? QString("\r\n") : data4Raw;
 
-    // 6) 构建内容并计算CRC
+    // 6) 构建内容并获取CRC
     const QString frameContent = dataHead + data1 + data2 + data3;
-    const QByteArray dataForCrc = frameContent.toUtf8();
-    const quint16 crc = calculateCRC16(dataForCrc);
-    const QString crcStr = QString("%1").arg(crc, 4, 16, QChar('0')).toUpper();
+    
+    // 复用已计算的CRC（来自updateCrcDisplay），避免重复计算
+    QString crcStr = ui->lineEdit5->text();
+
+    if (crcStr.isEmpty() && m_crcHelper)
+    {
+        // 如果CRC未计算，则计算一次
+        crcStr = m_crcHelper->calculateAndFormatCrc(frameContent);
+    }
 
     // 7) 拼接完整帧并返回
     return frameContent + crcStr + data4;
