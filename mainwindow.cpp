@@ -37,6 +37,11 @@ MainWindow::MainWindow(QWidget *parent)
     /*** 初始化棋盘视图与棋子（封装为 ChessBoardView） ***/
     if (ui->graphicsView) {
         ui->graphicsView->setMinimumSize(650, 440);
+        // 让 QGraphicsView 背景跟随全局主题（明/暗）
+        ui->graphicsView->setBackgroundBrush(palette().window());
+        if (ui->graphicsView->viewport()) {
+            ui->graphicsView->viewport()->setAutoFillBackground(false);
+        }
     }
     chessBoard = new ChessBoardView(this);
     chessBoard->init(ui->graphicsView);
@@ -44,6 +49,9 @@ MainWindow::MainWindow(QWidget *parent)
     /*** 初始化流程视图（封装到 FlowViewManager，挂载 frame_2） ***/
     if (ui->frame_2) {
         ui->frame_2->setMinimumSize(450, 440);
+        // 让 frame_2 背景随主题，由样式/调色板统一控制
+        ui->frame_2->setAttribute(Qt::WA_StyledBackground, true);
+        ui->frame_2->setStyleSheet("background-color: palette(window);");
     }
     flowManager = new FlowViewManager(this);
     flowManager->init(ui->frame_2);

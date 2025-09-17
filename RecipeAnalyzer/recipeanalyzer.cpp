@@ -84,9 +84,6 @@ void RecipeAnalyzer::setupUI()
     // 设置窗口属性
     setWindowTitle("配方解析器 - 钙钛矿前驱体计算");
     setMinimumSize(500, 700); // 增加最小尺寸以适应双表格
-    
-    // 初始化验证信息
-    ui->textEdit_validation->setPlainText("请输入化学式并点击计算按钮开始分析...");
 
 
 }
@@ -215,6 +212,21 @@ void RecipeAnalyzer::setupAdvancedSolventSystem()
         ui->pushButton_DCB, ui->pushButton_Anisole
     };
     
+    // 仅固定“选中态”颜色；其余态使用系统/主题默认，从而随明暗主题变化
+    const QString kSolventButtonStyle =
+        "QPushButton:checked {"
+        "  background-color: #2aa198;"
+        "  color: #ffffff;"
+        "  border: 1px solid #238b83;"
+        "  border-radius: 6px;"  /* 保持与系统默认一致的圆角 */
+        "  padding: 6px 12px;"    /* 防止选中后尺寸轻微跳变 */
+        "}"
+        "QPushButton:checked:hover { background-color: #238b83; }";
+
+    for (QPushButton* btn : m_solventButtons) {
+        if (btn) btn->setStyleSheet(kSolventButtonStyle);
+    }
+
     // 连接所有溶剂按钮的信号
     for (QPushButton* btn : m_solventButtons) {
         connect(btn, &QPushButton::clicked, this, &RecipeAnalyzer::onSolventButtonClicked);
@@ -275,11 +287,17 @@ void RecipeAnalyzer::addSolventToTable(const QString& solventName)
         }
     }
     
-    // 添加到列表
-    double defaultPercentage = m_dynamicSolvents.isEmpty() ? 100.0 : 0.0;
-    m_dynamicSolvents.append({solventName, defaultPercentage});
-    
-    // 重新计算百分比
+    // 计算当前已使用的百分比，仅根据现有项求和
+    double usedPercent = 0.0;
+    for (int i = 0; i < m_dynamicSolvents.size(); ++i) {
+        usedPercent += m_dynamicSolvents[i].second;
+    }
+
+    // 新增溶剂只分配剩余百分比（不打扰已有设置）
+    double remaining = qMax(0.0, 100.0 - usedPercent);
+    m_dynamicSolvents.append({solventName, remaining});
+
+    // 更新最后一项为只读“剩余”，其它不变
     recalculateAutoPercentages();
     
     // 更新显示
@@ -301,7 +319,7 @@ void RecipeAnalyzer::removeSolventFromTable(int row)
             }
         }
         
-        // 重新计算百分比
+        // 重新计算最后一项为“剩余”，不动其它
         recalculateAutoPercentages();
         
         // 更新显示
@@ -318,20 +336,18 @@ void RecipeAnalyzer::recalculateAutoPercentages()
     if (count == 1) {
         // 只有一个溶剂，设为100%
         m_dynamicSolvents[0].second = 100.0;
-    } else {
-        // 多个溶剂：平均分配，除了最后一个为自动计算
-        double averagePercent = 100.0 / count;
-        double usedPercent = 0.0;
-        
-        // 前 N-1 个设为平均值
-        for (int i = 0; i < count - 1; ++i) {
-            m_dynamicSolvents[i].second = averagePercent;
-            usedPercent += averagePercent;
-        }
-        
-        // 最后一个设为剩余部分
-        m_dynamicSolvents[count - 1].second = 100.0 - usedPercent;
+        return;
     }
+
+    // 多个溶剂：前 N-1 项保持不变，仅将最后一项设为“剩余”
+    double usedPercent = 0.0;
+    for (int i = 0; i < count - 1; ++i) {
+        usedPercent += m_dynamicSolvents[i].second;
+    }
+    double remaining = 100.0 - usedPercent;
+    if (remaining < 0.0) remaining = 0.0;
+    if (remaining > 100.0) remaining = 100.0;
+    m_dynamicSolvents[count - 1].second = remaining;
 }
 
 
@@ -614,8 +630,8 @@ void RecipeAnalyzer::updateSolventsTableDynamic()
         
         // 只有最后一行是只读的（自动计算）
         if (i == m_dynamicSolvents.size() - 1 && m_dynamicSolvents.size() > 1) {
+            // 最后一行只读：不改样式，交由主题控制（避免暗色下变成白块）
             spinBox->setReadOnly(true);
-            spinBox->setStyleSheet("QDoubleSpinBox { background-color: #f0f0f0; }");
         } else {
             connect(spinBox, qOverload<double>(&QDoubleSpinBox::valueChanged), 
                     this, &RecipeAnalyzer::onDynamicPercentageChanged);

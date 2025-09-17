@@ -504,9 +504,6 @@ QPushButton:pressed {
               </item>
               <item>
                <widget class="QLineEdit" name="lineEdit5">
-                <property name="styleSheet">
-                 <string notr="true">QLineEdit { background-color: #f8f9fa; }</string>
-                </property>
                 <property name="readOnly">
                  <bool>true</bool>
                 </property>
@@ -658,14 +655,7 @@ QPushButton:pressed {
       <item>
        <widget class="QTextEdit" name="textEdit_receive">
         <property name="styleSheet">
-         <string notr="true">QTextEdit {
-    background-color: #f8f9fa;
-    border: 1px solid #dee2e6;
-    border-radius: 4px;
-    padding: 8px;
-    font-family: 'Consolas', 'Monaco', monospace;
-    font-size: 12px;
-}</string>
+         <string notr="true"/>
         </property>
         <property name="readOnly">
          <bool>false</bool>

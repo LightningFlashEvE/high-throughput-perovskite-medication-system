@@ -326,7 +326,7 @@ QPushButton:pressed {
                 <item>
                  <widget class="QLabel" name="label_precursors_subtitle">
                   <property name="styleSheet">
-                   <string>font-weight: bold; color: #2196F3;</string>
+                   <string>font-weight: bold; color: #4CAF50;</string>
                   </property>
                   <property name="text">
                    <string>前驱体用量</string>
@@ -373,7 +373,7 @@ QPushButton:pressed {
                 <item>
                  <widget class="QLabel" name="label_solvents_subtitle">
                   <property name="styleSheet">
-                   <string>font-weight: bold; color: #4CAF50;</string>
+                   <string>font-weight: bold; color: #2196F3;</string>
                   </property>
                   <property name="text">
                    <string>溶剂配比</string>
@@ -433,17 +433,11 @@ QPushButton:pressed {
             </item>
             <item>
              <widget class="QTextEdit" name="textEdit_validation">
-              <property name="styleSheet">
-               <string>QTextEdit {
-    background-color: #f5f5f5;
-    border: 1px solid #ddd;
-    border-radius: 4px;
-    padding: 8px;
-    font-family: 'Courier New', monospace;
-}</string>
-              </property>
               <property name="readOnly">
                <bool>true</bool>
+              </property>
+              <property name="placeholderText">
+               <string>请输入化学式并点击计算按钮开始分析...</string>
               </property>
              </widget>
             </item>
