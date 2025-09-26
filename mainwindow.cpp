@@ -9,13 +9,16 @@
 #include <algorithm> // for std::clamp
 #include <QMenu>
 #include <QPushButton>
+#include <QPixmap>
+#include <QPalette>
+#include "rtspplayer.h"
 
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
     , ui(new Ui::MainWindow)
 {
     ui->setupUi(this);
-     
+
 
     /*** 显示logo ***/
     QPixmap logo(":/main/pic/logo.png");
@@ -27,13 +30,13 @@ MainWindow::MainWindow(QWidget *parent)
         // 可选：设置标签大小适应缩放后的图片
         ui->labelLogo->setFixedSize(scaledLogo.size());
     }
-    
+
     /*** 初始化时间更新定时器 ***/
     timer = new QTimer(this);
     connect(timer, &QTimer::timeout, this, &MainWindow::updateTime);
     updateTime();
     timer->start(1000);
-    
+
     /*** 初始化棋盘视图与棋子（封装为 ChessBoardView） ***/
     if (ui->graphicsView) {
         ui->graphicsView->setMinimumSize(650, 440);
@@ -63,7 +66,7 @@ MainWindow::MainWindow(QWidget *parent)
         QAction *statusAction2 = new QAction("状态", this);
         ui->menuStatus->addAction(statusAction);
         ui->menuStatus->addAction(statusAction2);
-        
+
         // 连接菜单项的点击事件
         connect(statusAction, &QAction::triggered, this, []{
             qDebug() << "哈哈哈";
@@ -194,6 +197,21 @@ MainWindow::MainWindow(QWidget *parent)
             qDebug() << "配方解析窗口已打开";
         });
 
+        // RTSP播放器菜单项
+        QAction *settingsActionRtsp = new QAction("RTSP 播放器", this);
+        ui->menuSettings->addAction(settingsActionRtsp);
+        connect(settingsActionRtsp, &QAction::triggered, this, [this] {
+            if (!rtspPlayerPanel) {
+                rtspPlayerPanel = new RtspPlayer(nullptr);
+                rtspPlayerPanel->setAttribute(Qt::WA_DeleteOnClose, true);
+                rtspPlayerPanel->setWindowFlag(Qt::Window, true);
+                rtspPlayerPanel->setWindowTitle("RTSP 播放器");
+                connect(rtspPlayerPanel, &QObject::destroyed, this, [this] { rtspPlayerPanel = nullptr; });
+            }
+            rtspPlayerPanel->show();
+            rtspPlayerPanel->raise();
+            rtspPlayerPanel->activateWindow();
+        });
     }
 
     if (ui->menuHistory) {
@@ -210,6 +228,13 @@ MainWindow::MainWindow(QWidget *parent)
 
 MainWindow::~MainWindow()
 {
+    // // 清理RTSP播放器面板
+    // if (rtspPlayerPanel) {
+    //     rtspPlayerPanel->close();
+    //     rtspPlayerPanel->deleteLater();
+    //     rtspPlayerPanel = nullptr;
+    // }
+
     delete ui;
 }
 
@@ -217,11 +242,11 @@ MainWindow::~MainWindow()
 void MainWindow::updateTime()
 {
     QDateTime currentDateTime = QDateTime::currentDateTime();
-    
+
     // 更新日期显示 (格式: 2025.10.1)DD
     QString dateStr = currentDateTime.toString("yyyy.M.d");
     ui->labelDate->setText(dateStr);
-    
+
     // 更新时间显示 (格式: 12:33:21)
     QString timeStr = currentDateTime.toString("hh:mm:ss");
     ui->labelTime->setText(timeStr);

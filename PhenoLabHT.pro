@@ -1,7 +1,10 @@
 QT       += core gui
 QT += widgets
+QT += qml quick quickwidgets
 QT += serialport
 QT += network
+QT += multimedia
+QT += multimediawidgets
 
 greaterThan(QT_MAJOR_VERSION, 4): QT += widgets
 
@@ -42,6 +45,9 @@ INCLUDEPATH += $$PWD/TcpClient
 
 include($$PWD/RecipeAnalyzer/recipeanalyzer.pri)
 INCLUDEPATH += $$PWD/RecipeAnalyzer
+
+include($$PWD/RtspPlayer/rtspplayer.pri)
+INCLUDEPATH += $$PWD/RtspPlayer
 
 RESOURCES += \
     picture.qrc

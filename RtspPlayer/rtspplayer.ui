@@ -1,0 +1,232 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>RtspPlayer</class>
+ <widget class="QWidget" name="RtspPlayer">
+  <property name="geometry">
+   <rect>
+    <x>0</x>
+    <y>0</y>
+    <width>1000</width>
+    <height>720</height>
+   </rect>
+  </property>
+  <property name="windowTitle">
+   <string>RTSP视频流播放器</string>
+  </property>
+  <layout class="QVBoxLayout" name="mainLayout">
+   <property name="spacing">
+    <number>10</number>
+   </property>
+   <property name="leftMargin">
+    <number>15</number>
+   </property>
+   <property name="topMargin">
+    <number>15</number>
+   </property>
+   <property name="rightMargin">
+    <number>15</number>
+   </property>
+   <property name="bottomMargin">
+    <number>15</number>
+   </property>
+
+   <!-- 标题 -->
+   <item>
+    <widget class="QLabel" name="titleLabel">
+     <property name="text">
+      <string>📹 RTSP视频流播放器</string>
+     </property>
+     <property name="alignment">
+      <set>Qt::AlignHCenter|Qt::AlignVCenter</set>
+     </property>
+    </widget>
+   </item>
+
+   <!-- URL与测试 -->
+   <item>
+    <layout class="QHBoxLayout" name="urlLayout">
+     <item>
+      <widget class="QLabel" name="urlLabel">
+       <property name="text">
+        <string>RTSP地址:</string>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <widget class="QComboBox" name="urlComboBox">
+       <property name="editable">
+        <bool>true</bool>
+       </property>
+       <item>
+        <property name="text">
+         <string>rtsp://admin:123456@192.168.5.36:554/Streaming/Channels/101</string>
+        </property>
+       </item>
+       <item>
+        <property name="text">
+         <string>rtsp://admin:123456@192.168.5.36:554/stream</string>
+        </property>
+       </item>
+       <item>
+        <property name="text">
+         <string>rtsp://admin:123456@192.168.5.36:554/cam/realmonitor?channel=1&amp;subtype=0</string>
+        </property>
+       </item>
+       <item>
+        <property name="text">
+         <string>rtsp://admin:123456@192.168.5.36:554/h265/ch1/main/av_stream</string>
+        </property>
+       </item>
+       <item>
+        <property name="text">
+         <string>rtsp://admin:123456@192.168.5.36:554/onvif1</string>
+        </property>
+       </item>
+       <item>
+        <property name="text">
+         <string>rtsp://admin:123456@192.168.5.36:554/user=admin&amp;password=123456&amp;channel=1&amp;stream=0.sdp?real_stream</string>
+        </property>
+       </item>
+      </widget>
+     </item>
+     <item>
+      <widget class="QPushButton" name="testAllButton">
+       <property name="text">
+        <string>🧪 测试所有</string>
+       </property>
+      </widget>
+     </item>
+    </layout>
+   </item>
+
+   <!-- 控制与状态行 -->
+   <item>
+    <layout class="QHBoxLayout" name="controlLayout">
+     <item>
+      <widget class="QPushButton" name="connectButton">
+       <property name="text">
+        <string>🔗 连接</string>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <widget class="QPushButton" name="disconnectButton">
+       <property name="enabled">
+        <bool>false</bool>
+       </property>
+       <property name="text">
+        <string>🔌 断开连接</string>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <widget class="QPushButton" name="fullscreenButton">
+       <property name="enabled">
+        <bool>false</bool>
+       </property>
+       <property name="text">
+        <string>📺 全屏</string>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <spacer name="controlSpacer">
+       <property name="orientation">
+        <enum>Qt::Horizontal</enum>
+       </property>
+       <property name="sizeHint" stdset="0">
+        <size>
+         <width>40</width>
+         <height>20</height>
+        </size>
+       </property>
+      </spacer>
+     </item>
+     <item>
+      <widget class="QCheckBox" name="autoReconnectCheckBox">
+       <property name="text">
+        <string>🔄 自动重连</string>
+       </property>
+       <property name="checked">
+        <bool>true</bool>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <widget class="QPushButton" name="diagnoseButton">
+       <property name="text">
+        <string>🔍 诊断</string>
+       </property>
+      </widget>
+     </item>
+    </layout>
+   </item>
+
+   <!-- 状态行文本 -->
+   <item>
+    <layout class="QHBoxLayout" name="statusLayout">
+     <item>
+      <widget class="QLabel" name="statusLabel">
+       <property name="text">
+        <string>📊 状态: 未连接</string>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <widget class="QLabel" name="disconnectHintLabel">
+       <property name="text">
+        <string/>
+       </property>
+      </widget>
+     </item>
+    </layout>
+   </item>
+
+   <!-- 视频显示 -->
+   <item>
+    <widget class="QVideoWidget" name="videoWidget" native="true">
+     <property name="minimumSize">
+      <size>
+       <width>800</width>
+       <height>400</height>
+      </size>
+     </property>
+    </widget>
+   </item>
+
+   <!-- 流信息 -->
+   <item>
+    <widget class="QLabel" name="infoLabel">
+     <property name="text">
+      <string>📐 分辨率: -- | 📊 帧率: -- | 📈 比特率: -- | 🎬 编码器: 未知</string>
+     </property>
+    </widget>
+   </item>
+
+   <!-- 测试结果 -->
+   <item>
+    <widget class="QTextEdit" name="testResultTextEdit">
+     <property name="maximumSize">
+      <size>
+       <width>16777215</width>
+       <height>100</height>
+      </size>
+     </property>
+     <property name="placeholderText">
+      <string>RTSP地址测试结果将显示在这里...</string>
+     </property>
+    </widget>
+   </item>
+
+  </layout>
+ </widget>
+ <customwidgets>
+  <customwidget>
+   <class>QVideoWidget</class>
+   <extends>QWidget</extends>
+   <header>qvideowidget.h</header>
+  </customwidget>
+ </customwidgets>
+ <resources/>
+ <connections/>
+</ui>

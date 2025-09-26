@@ -22,6 +22,7 @@ class QGraphicsScene;
 class QGraphicsPixmapItem;
 class QResizeEvent;
 class QShowEvent;
+class RtspPlayer;
 
 /**
  * MainWindow
@@ -88,6 +89,8 @@ private:
     TcpClient *tcpClientPanel = nullptr;
     // 配方解析面板
     RecipeAnalyzer *recipeAnalyzerPanel = nullptr;
+    // RTSP播放器面板
+    RtspPlayer *rtspPlayerPanel = nullptr;
 
     // zhua 当前所在网格（用于方向键移动）
     int zhuaCol = 4;
