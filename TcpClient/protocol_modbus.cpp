@@ -8,7 +8,7 @@ REGISTER_PROTOCOL(ProtocolModBus, "ModBus-RTU");
 QList<ProtocolField> ProtocolModBus::frameFields() const
 {
     return {
-        {"设备ID", "(1字节)", "01", 2, true, {"01", "02", "03", "04", "05", "06", "07", "88"}},
+        {"设备ID", "(1字节)", "01", 2, true, {"01", "02", "03", "04", "05", "06", "07", "08", "9", "10", "11", "12", "13", "14", "15", "16", "17", "18", "19", "20"}},
         {"功能码", "(1字节)", "06", 2, true, {"06", "03"}},
         {"寄存器地址", "(2字节)", "0100", 4, true, getAvailableFunctions()},
         {"寄存器数据", "(2字节)", "1", 4, true, {}},

@@ -35,6 +35,8 @@ TcpClient::TcpClient(QWidget *parent)
     
     // 初始化UI
     updateUI();
+
+
     
     // 延迟加载网络信息 - 使用定时器延迟执行
     QTimer::singleShot(200, this, &TcpClient::refreshLocalIPs);

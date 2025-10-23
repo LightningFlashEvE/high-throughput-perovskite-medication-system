@@ -76,6 +76,12 @@ protected:
 private:
     Ui::MainWindow *ui;
     QTimer *timer;
+    
+    /**
+     * 初始化data.ini文件
+     * 检查文件是否存在，如果不存在则创建文件并设置默认值
+     */
+    void initializeDataIni();
 
     // 棋盘封装类
     ChessBoardView *chessBoard = nullptr;

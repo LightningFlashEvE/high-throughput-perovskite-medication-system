@@ -11,6 +11,9 @@
 #include <QPushButton>
 #include <QPixmap>
 #include <QPalette>
+#include <QSettings>
+#include <QFileInfo>
+#include <QDebug>
 #include "rtspplayer.h"
 
 MainWindow::MainWindow(QWidget *parent)
@@ -19,6 +22,8 @@ MainWindow::MainWindow(QWidget *parent)
 {
     ui->setupUi(this);
 
+    // 初始化data.ini文件。1.检查是否存在文件，不存在则创建文件并且提供默认值。
+    initializeDataIni();
 
     /*** 显示logo ***/
     QPixmap logo(":/main/pic/logo.png");
@@ -270,4 +275,116 @@ void MainWindow::showEvent(QShowEvent *event)
     QMainWindow::showEvent(event);
     // 首次显示后再次自适应
     if (chessBoard) chessBoard->relayout();
+}
+
+// 初始化data.ini文件G
+void MainWindow::initializeDataIni()
+{
+    QString iniFilePath = "BoxData.ini";
+    QFileInfo fileInfo(iniFilePath);
+    
+    // 检查文件是否存在
+    if (!fileInfo.exists()) {
+        qDebug() << "BoxData.ini文件不存在，正在创建默认配置文件...";
+        
+        // 创建QSettings对象来写入INI文件
+        QSettings settings(iniFilePath, QSettings::IniFormat);
+        
+        // 设置默认配置值
+        settings.beginGroup("Box-Solid-Top"); // 盒子-固体-上面
+        settings.setValue("axisX", "0");
+        settings.setValue("axisY", "0");
+        settings.setValue("axisZ", "0");
+        settings.setValue("gripperDepth", "0"); // 夹爪深度 /ˈɡrɪpər/
+        settings.setValue("liquidExtractionDepth", "0"); // 取液深度 /ɪkˈstrækʃ(ə)n/
+        settings.setValue("solidDepth", "0"); // 固体深度 /ˈsɑːlɪd/
+        settings.endGroup();
+        
+        settings.beginGroup("Box-Solid-Bottom"); // 盒子-固体-下面
+        settings.setValue("axisX", "0");
+        settings.setValue("axisY", "0");
+        settings.setValue("axisZ", "0");
+        settings.setValue("gripperDepth", "0"); // 夹爪深度
+        settings.setValue("liquidExtractionDepth", "0"); // 取液深度
+        settings.setValue("solidDepth", "0"); // 固体深度
+        settings.endGroup();
+        
+        settings.beginGroup("Box-Tips-Left"); // 盒子-tips左边
+        settings.setValue("axisX", "0");
+        settings.setValue("axisY", "0");
+        settings.setValue("axisZ", "0");
+        settings.setValue("gripperDepth", "0"); // 夹爪深度
+        settings.setValue("liquidExtractionDepth", "0"); // 取液深度
+        settings.setValue("solidDepth", "0"); // 固体深度
+        settings.endGroup();
+        
+        settings.beginGroup("Box-Tips-Right"); // 盒子-tips右边
+        settings.setValue("axisX", "0");
+        settings.setValue("axisY", "0");
+        settings.setValue("axisZ", "0");
+        settings.setValue("gripperDepth", "0"); // 夹爪深度
+        settings.setValue("liquidExtractionDepth", "0"); // 取液深度
+        settings.setValue("solidDepth", "0"); // 固体深度
+        settings.endGroup();
+        
+        settings.beginGroup("Box-Shake-Bed"); // 盒子-摇床 /ʃeɪk/
+        settings.setValue("axisX", "0");
+        settings.setValue("axisY", "0");
+        settings.setValue("axisZ", "0");
+        settings.setValue("gripperDepth", "0"); // 夹爪深度
+        settings.setValue("liquidExtractionDepth", "0"); // 取液深度
+        settings.setValue("solidDepth", "0"); // 固体深度
+        settings.endGroup();
+        
+        settings.beginGroup("Box-Liquid-Material"); // 盒子-液体材料
+        settings.setValue("axisX", "0");
+        settings.setValue("axisY", "0");
+        settings.setValue("axisZ", "0");
+        settings.setValue("gripperDepth", "0"); // 夹爪深度
+        settings.setValue("liquidExtractionDepth", "0"); // 取液深度
+        settings.setValue("solidDepth", "0"); // 固体深度
+        settings.endGroup();
+        
+        settings.beginGroup("Box-Empty-Bottle"); // 盒子-空瓶
+        settings.setValue("axisX", "0");
+        settings.setValue("axisY", "0");
+        settings.setValue("axisZ", "0");
+        settings.setValue("gripperDepth", "0"); // 夹爪深度
+        settings.setValue("liquidExtractionDepth", "0"); // 取液深度
+        settings.setValue("solidDepth", "0"); // 固体深度
+        settings.endGroup();
+        
+        settings.beginGroup("Box-Transfer-Area-Left"); // 盒子-转移区左边
+        settings.setValue("axisX", "0");
+        settings.setValue("axisY", "0");
+        settings.setValue("axisZ", "0");
+        settings.setValue("gripperDepth", "0"); // 夹爪深度
+        settings.setValue("liquidExtractionDepth", "0"); // 取液深度
+        settings.setValue("solidDepth", "0"); // 固体深度
+        settings.endGroup();
+        
+        settings.beginGroup("Box-Transfer-Area-Right"); // 盒子-转移区右边
+        settings.setValue("axisX", "0");
+        settings.setValue("axisY", "0");
+        settings.setValue("axisZ", "0");
+        settings.setValue("gripperDepth", "0"); // 夹爪深度
+        settings.setValue("liquidExtractionDepth", "0"); // 取液深度
+        settings.setValue("solidDepth", "0"); // 固体深度
+        settings.endGroup();
+        
+        settings.beginGroup("Box-Hold-Region");  // 夹持区域 /ˈriːdʒən/
+        settings.setValue("axisX", "0");
+        settings.setValue("axisY", "0");
+        settings.setValue("gripperDepth", "0"); // 夹爪深度
+        settings.setValue("liquidExtractionDepth", "0"); // 取液深度
+        settings.setValue("solidDepth", "0"); // 固体深度
+        settings.endGroup();
+
+        // 确保文件被写入磁盘
+        settings.sync();
+        
+        qDebug() << "data.ini文件创建成功，默认配置已写入";
+    } else {
+        qDebug() << "data.ini文件已存在，跳过初始化";
+    }
 }
