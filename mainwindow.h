@@ -108,6 +108,11 @@ public:
      * 该方法会转发给 `ChessBoardView`
      */
     void moveChessPiece(int pieceIndex, int col, int row);
+
+
+public: // 测试用 For temporary testing
+    void ForTempTest();
+
 };
 #endif // MAINWINDOW_H
 

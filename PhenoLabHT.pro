@@ -16,10 +16,11 @@ CONFIG += c++17
 
 SOURCES += \
     main.cpp \
-    mainwindow.cpp 
+    mainwindow.cpp \
+    mainwindow_Test.cpp
 
 HEADERS += \
-    mainwindow.h 
+    mainwindow.h
 
 FORMS += \
     mainwindow.ui
@@ -48,6 +49,9 @@ INCLUDEPATH += $$PWD/RecipeAnalyzer
 
 include($$PWD/RtspPlayer/rtspplayer.pri)
 INCLUDEPATH += $$PWD/RtspPlayer
+
+include($$PWD/BoxInfo/BoxInfo.pri)
+INCLUDEPATH += $$PWD/BoxInfo
 
 RESOURCES += \
     picture.qrc

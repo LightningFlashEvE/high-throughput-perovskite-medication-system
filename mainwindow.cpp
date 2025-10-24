@@ -22,6 +22,9 @@ MainWindow::MainWindow(QWidget *parent)
 {
     ui->setupUi(this);
 
+    // 代码测试
+    ForTempTest();
+
     // 初始化data.ini文件。1.检查是否存在文件，不存在则创建文件并且提供默认值。
     initializeDataIni();
 
