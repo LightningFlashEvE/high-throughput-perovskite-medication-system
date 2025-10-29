@@ -22,13 +22,13 @@ class Box : public QObject
     Q_OBJECT
 public:
     /**
-     * @brief 默认构造函数 - 创建15个插槽的盒子
+     * @brief 默认构造函数 - 创建15个插槽的盒子，会初始化槽的数量m_slots
      * @param parent 父对象
      */
     explicit Box(QObject *parent = nullptr);
     
     /**
-     * @brief 带参数构造函数 - 创建指定数量插槽的盒子
+     * @brief 带参数构造函数 - 创建指定数量插槽的盒子，会初始化槽的数量m_slots
      * @param numSlots 插槽数量
      * @param parent 父对象
      */
@@ -55,7 +55,7 @@ public:
     bool hasBottle(int position1Based) const;
     
     /**
-     * @brief 获取指定位置的试剂瓶
+     * @brief 获取指定位置的试剂瓶  return m_slots[i];    QVector<Slot*> m_slots;
      * @param position1Based 基于1的位置编号
      * @return 试剂瓶指针，无瓶或位置无效返回nullptr
      */

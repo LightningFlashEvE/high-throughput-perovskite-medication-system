@@ -285,9 +285,9 @@ void TcpClient::onSendClicked()
         
         QByteArray data;
         if (ui->checkBox_hex_mode->isChecked()) {
-            data = QByteArray::fromHex(message.toUtf8());
+            data = QByteArray::fromHex(message.toUtf8()); // 十六进制转换为字节数组
         } else {
-            data = message.toUtf8();
+            data = message.toUtf8(); // 字符串转换为字节数组
         }
         
         for (QTcpSocket *client : m_clientSockets) {

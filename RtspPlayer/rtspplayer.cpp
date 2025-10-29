@@ -436,45 +436,45 @@ void RtspPlayer::updateStreamInfo()
     QMediaMetaData metaData = m_mediaPlayer->metaData();
 
     QList<QMediaMetaData::Key> availableKeys = metaData.keys();
-    qDebug() << "可用的元数据键数量:" << availableKeys.size();
+    // qDebug() << "可用的元数据键数量:" << availableKeys.size();
 
-    qDebug() << "=== 元数据信息 ===";
-    for (const auto& key : availableKeys) {
-        QVariant value = metaData.value(key);
-        QString keyName;
-        switch (key) {
-        case QMediaMetaData::Title: keyName = "Title"; break;
-        case QMediaMetaData::Author: keyName = "Author"; break;
-        case QMediaMetaData::Comment: keyName = "Comment"; break;
-        case QMediaMetaData::Description: keyName = "Description"; break;
-        case QMediaMetaData::Genre: keyName = "Genre"; break;
-        case QMediaMetaData::Date: keyName = "Date"; break;
-        case QMediaMetaData::Language: keyName = "Language"; break;
-        case QMediaMetaData::Publisher: keyName = "Publisher"; break;
-        case QMediaMetaData::Copyright: keyName = "Copyright"; break;
-        case QMediaMetaData::Url: keyName = "Url"; break;
-        case QMediaMetaData::MediaType: keyName = "MediaType"; break;
-        case QMediaMetaData::FileFormat: keyName = "FileFormat"; break;
-        case QMediaMetaData::Duration: keyName = "Duration"; break;
-        case QMediaMetaData::AudioBitRate: keyName = "AudioBitRate"; break;
-        case QMediaMetaData::AudioCodec: keyName = "AudioCodec"; break;
-        case QMediaMetaData::VideoFrameRate: keyName = "VideoFrameRate"; break;
-        case QMediaMetaData::VideoBitRate: keyName = "VideoBitRate"; break;
-        case QMediaMetaData::VideoCodec: keyName = "VideoCodec"; break;
-        case QMediaMetaData::Resolution: keyName = "Resolution"; break;
-        case QMediaMetaData::Orientation: keyName = "Orientation"; break;
-        default: keyName = QString("Unknown(%1)").arg(static_cast<int>(key)); break;
-        }
-        qDebug() << keyName << ":" << value;
-    }
-    qDebug() << "=== 元数据信息结束 ===";
+    // qDebug() << "=== 元数据信息 ===";
+    // for (const auto& key : availableKeys) {
+    //     QVariant value = metaData.value(key);
+    //     QString keyName;
+    //     switch (key) {
+    //     case QMediaMetaData::Title: keyName = "Title"; break;
+    //     case QMediaMetaData::Author: keyName = "Author"; break;
+    //     case QMediaMetaData::Comment: keyName = "Comment"; break;
+    //     case QMediaMetaData::Description: keyName = "Description"; break;
+    //     case QMediaMetaData::Genre: keyName = "Genre"; break;
+    //     case QMediaMetaData::Date: keyName = "Date"; break;
+    //     case QMediaMetaData::Language: keyName = "Language"; break;
+    //     case QMediaMetaData::Publisher: keyName = "Publisher"; break;
+    //     case QMediaMetaData::Copyright: keyName = "Copyright"; break;
+    //     case QMediaMetaData::Url: keyName = "Url"; break;
+    //     case QMediaMetaData::MediaType: keyName = "MediaType"; break;
+    //     case QMediaMetaData::FileFormat: keyName = "FileFormat"; break;
+    //     case QMediaMetaData::Duration: keyName = "Duration"; break;
+    //     case QMediaMetaData::AudioBitRate: keyName = "AudioBitRate"; break;
+    //     case QMediaMetaData::AudioCodec: keyName = "AudioCodec"; break;
+    //     case QMediaMetaData::VideoFrameRate: keyName = "VideoFrameRate"; break;
+    //     case QMediaMetaData::VideoBitRate: keyName = "VideoBitRate"; break;
+    //     case QMediaMetaData::VideoCodec: keyName = "VideoCodec"; break;
+    //     case QMediaMetaData::Resolution: keyName = "Resolution"; break;
+    //     case QMediaMetaData::Orientation: keyName = "Orientation"; break;
+    //     default: keyName = QString("Unknown(%1)").arg(static_cast<int>(key)); break;
+    //     }
+    //     qDebug() << keyName << ":" << value;
+    // }
+    // qDebug() << "=== 元数据信息结束 ===";
 
     if (metaData.value(QMediaMetaData::Resolution).isValid()) {
         QSize videoResolution = metaData.value(QMediaMetaData::Resolution).toSize();
         if (videoResolution.isValid()) {
             m_frameWidth = videoResolution.width();
             m_frameHeight = videoResolution.height();
-            qDebug() << "从元数据获取分辨率:" << m_frameWidth << "x" << m_frameHeight;
+            //qDebug() << "从元数据获取分辨率:" << m_frameWidth << "x" << m_frameHeight;
         }
     }
 

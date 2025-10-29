@@ -6,8 +6,7 @@ ReagentBottle::ReagentBottle(QObject *parent)
 
 void ReagentBottle::setName(const QString &v) {
     if (m_name == v) return;
-    m_name = v;
-    emit nameChanged(m_name); // nameChanged 信号用于通知界面等相关联的对象瓶名被修改，通常会与界面上对应label或text控件的槽函数关联，如 setText 或自定义刷新函数，实现界面同步更新
+    m_name = v; emit nameChanged(m_name); // nameChanged 信号用于通知界面等相关联的对象瓶名被修改，通常会与界面上对应label或text控件的槽函数关联，如 setText 或自定义刷新函数，实现界面同步更新
 }
 void ReagentBottle::setInitial(double v) {
     if (m_initial == v) return;

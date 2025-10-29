@@ -23,6 +23,9 @@ class QGraphicsPixmapItem;
 class QResizeEvent;
 class QShowEvent;
 class RtspPlayer;
+class Box;
+class ReagentBottle;
+class TcpClientCore;
 
 /**
  * MainWindow
@@ -101,6 +104,15 @@ private:
     // zhua 当前所在网格（用于方向键移动）
     int zhuaCol = 4;
     int zhuaRow = 5;
+    
+    // 转移区域和试剂管理
+    Box *transferAreaBox = nullptr;          // 转移区左边区域（15槽位）
+    ReagentBottle *reagentA = nullptr;       // A试剂
+    ReagentBottle *reagentB = nullptr;       // B试剂
+    ReagentBottle *reagentC = nullptr;       // C试剂
+    
+    // TCP客户端核心
+    TcpClientCore *tcpCore = nullptr;        // TCP通信核心对象
 
 public:
     /**
@@ -112,6 +124,10 @@ public:
 
 public: // 测试用 For temporary testing
     void ForTempTest();
+    
+public slots:
+    // 测试配方发送功能
+    void testRecipeSend(const QJsonObject& recipePacket);
 
 };
 #endif // MAINWINDOW_H

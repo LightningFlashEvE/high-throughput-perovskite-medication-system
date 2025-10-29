@@ -46,9 +46,14 @@ public:
     explicit RecipeAnalyzer(QWidget *parent = nullptr);
     ~RecipeAnalyzer();
 
+signals:
+    // 发送配方信号，传递配方数据包
+    void recipeReadyToSend(const QJsonObject& recipePacket);
+
 private slots:
     void onCalculateClicked();
     void onFormulaChanged();
+    void onSendRecipeClicked(); // 新增：发送配方按钮点击槽函数
     
     // 新增：高级溶剂选择功能
     void onSolventButtonClicked();

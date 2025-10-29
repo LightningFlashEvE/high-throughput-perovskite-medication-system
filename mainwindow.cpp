@@ -191,13 +191,16 @@ MainWindow::MainWindow(QWidget *parent)
 
         QAction *settingsActionPy = new QAction("配方解析", this);
         ui->menuSettings->addAction(settingsActionPy);
-        connect(settingsActionPy, &QAction::triggered, this, [this] {
+        connect(settingsActionPy, &QAction::triggered, this, [this] { // 配方解析菜单项点击事件
             if (!recipeAnalyzerPanel) {
                 recipeAnalyzerPanel = new RecipeAnalyzer(nullptr);
                 recipeAnalyzerPanel->setAttribute(Qt::WA_DeleteOnClose, true);
                 recipeAnalyzerPanel->setWindowFlag(Qt::Window, true);
                 recipeAnalyzerPanel->setWindowTitle("配方解析工具");
                 connect(recipeAnalyzerPanel, &QObject::destroyed, this, [this] { recipeAnalyzerPanel = nullptr; });
+                
+                // 连接配方发送信号到测试槽函数
+                connect(recipeAnalyzerPanel, &RecipeAnalyzer::recipeReadyToSend, this, &MainWindow::testRecipeSend);
             }
             recipeAnalyzerPanel->show();
             recipeAnalyzerPanel->raise();
@@ -358,9 +361,9 @@ void MainWindow::initializeDataIni()
         settings.endGroup();
         
         settings.beginGroup("Box-Transfer-Area-Left"); // 盒子-转移区左边
-        settings.setValue("axisX", "0");
-        settings.setValue("axisY", "0");
-        settings.setValue("axisZ", "0");
+        settings.setValue("axisX", "00003A99");
+        settings.setValue("axisY", "00005B53");
+        settings.setValue("axisZ", "00041AC7");
         settings.setValue("gripperDepth", "0"); // 夹爪深度
         settings.setValue("liquidExtractionDepth", "0"); // 取液深度
         settings.setValue("solidDepth", "0"); // 固体深度
@@ -381,6 +384,13 @@ void MainWindow::initializeDataIni()
         settings.setValue("gripperDepth", "0"); // 夹爪深度
         settings.setValue("liquidExtractionDepth", "0"); // 取液深度
         settings.setValue("solidDepth", "0"); // 固体深度
+        settings.endGroup();
+
+        settings.beginGroup("TCP-Info");
+        settings.setValue("LocalIP", "192.168.5.22");        // 本机IP
+        settings.setValue("RemoteIP", "192.168.5.201");      // 远端IP
+        settings.setValue("RemotePort", "4196");      // 远端端口
+        settings.setValue("ProxyDisabled", true); // 是否禁用代理
         settings.endGroup();
 
         // 确保文件被写入磁盘

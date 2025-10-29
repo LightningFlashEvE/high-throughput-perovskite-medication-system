@@ -19,11 +19,11 @@ void Slot::setIndex(int idx) {
 }
 
 void Slot::setBottle(ReagentBottle *b) {
-    if (b == m_bottle) return;
+    if (b == m_bottle) return; // 如果瓶子已经存在，则返回
 
     // 先清理旧瓶
-    const bool had = hasBottle();
-    if (m_bottle) { m_bottle->deleteLater(); m_bottle = nullptr; }
+    const bool had = hasBottle(); // 先检查是否已经有瓶子
+    if (m_bottle) { m_bottle->deleteLater(); m_bottle = nullptr; } // 如果瓶子存在，则删除
 
     // 接管新瓶
     m_bottle = b;

@@ -53,5 +53,8 @@ INCLUDEPATH += $$PWD/RtspPlayer
 include($$PWD/BoxInfo/BoxInfo.pri)
 INCLUDEPATH += $$PWD/BoxInfo
 
+include($$PWD/TcpClientCore/tcpclientcore.pri)
+INCLUDEPATH += $$PWD/TcpClientCore
+
 RESOURCES += \
     picture.qrc

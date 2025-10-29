@@ -51,6 +51,7 @@ RecipeAnalyzer::RecipeAnalyzer(QWidget *parent)
     
     // 连接信号槽
     connect(ui->pushButton_calculate, &QPushButton::clicked, this, &RecipeAnalyzer::onCalculateClicked);
+    connect(ui->pushButton_send_recipe, &QPushButton::clicked, this, &RecipeAnalyzer::onSendRecipeClicked);
     connect(ui->lineEdit_formula, &QLineEdit::textChanged, this, &RecipeAnalyzer::onFormulaChanged);
     
     // 新增：初始化高级溶剂选择系统
@@ -159,41 +160,42 @@ QJsonObject RecipeAnalyzer::buildRecipePacket(const QString& formula,
                                               const ValidationInfo& info) const
 {
     QJsonObject obj;
-    obj["timestamp"] = QDateTime::currentDateTimeUtc().toString(Qt::ISODate);
-    obj["formula"] = formula;
-    obj["molarity_M"] = molarity;
-    obj["volume_mL"] = volume;
+    obj["时间戳"] = QDateTime::currentDateTimeUtc().toString(Qt::ISODate);
+    obj["化学式"] = formula;
+    obj["摩尔浓度"] = molarity;
+    obj["体积"] = volume;
 
     // 前驱体列表
     QJsonArray arr;
     for (const auto &r : results) {
         QJsonObject x;
-        x["name"] = r.name;
-        x["moles"] = r.moles;
-        x["grams"] = r.grams;
+        x["名称"] = r.name;
+        x["摩尔数"] = r.moles;
+        x["质量"] = r.grams;
         arr.append(x);
     }
-    obj["precursors"] = arr;
+    obj["前驱体"] = arr;
 
     // 溶剂与比例（仅使用高级溶剂系统）
     QJsonArray solvents;
     QList<QPair<QString,double>> advancedSolvents = collectAdvancedSolvents();
     for (const auto& pair : advancedSolvents) {
         QJsonObject s;
-        s["name"] = pair.first;
-        s["ratio_percent"] = pair.second;
+        s["名称"] = pair.first;
+        s["比例"] = pair.second;
+        s["体积"] = volume * pair.second / 100.0; // 计算实际体积
         solvents.append(s);
     }
-    obj["solvents"] = solvents;
+    obj["溶剂"] = solvents;
 
-    // 校验信息
+    // 验证信息
     QJsonObject ck;
-    ck["fu_mol"] = info.formulaUnits_mol;
-    ck["mw_per_fu_g"] = info.molecularWeight_g;
-    ck["A_site_total_mol"] = info.A_site_total_mol;
-    ck["Pb_mol"] = info.Pb_mol;
-    ck["Pb_from_PbX2_mol"] = info.Pb_from_PbX2_mol;
-    obj["checks"] = ck;
+    ck["分子式单元摩尔数"] = info.formulaUnits_mol;
+    ck["分子量"] = info.molecularWeight_g;
+    ck["A位总摩尔数"] = info.A_site_total_mol;
+    ck["Pb总摩尔数"] = info.Pb_mol;
+    ck["PbX2提供的Pb摩尔数"] = info.Pb_from_PbX2_mol;
+    obj["验证信息"] = ck;
 
     return obj;
 }
@@ -732,4 +734,40 @@ double RecipeAnalyzer::getAtomicWeight(const QString& element)
 QString RecipeAnalyzer::formatNumber(double value, int decimals)
 {
     return QString::number(value, 'f', decimals);
+}
+
+void RecipeAnalyzer::onSendRecipeClicked()
+{
+    // 检查是否有有效的配方数据
+    if (m_lastPacket.isEmpty()) {
+        QMessageBox::warning(this, "发送失败", "请先计算配方，然后再发送！");
+        return;
+    }
+    
+    // 确认发送
+    QString formula = m_lastPacket.value("化学式").toString();
+    double molarity = m_lastPacket.value("摩尔浓度").toDouble();
+    double volume = m_lastPacket.value("体积").toDouble();
+    
+    QString confirmMsg = QString("确认发送配方？\n\n"
+                                "化学式：%1\n"
+                                "摩尔浓度：%2 M\n"
+                                "体积：%3 mL")
+                                .arg(formula)
+                                .arg(molarity)
+                                .arg(volume);
+    
+    int ret = QMessageBox::question(this, "确认发送", confirmMsg, 
+                                   QMessageBox::Yes | QMessageBox::No, 
+                                   QMessageBox::No);
+    
+    if (ret == QMessageBox::Yes) {
+        // 发射信号，传递配方数据包
+        emit recipeReadyToSend(m_lastPacket);
+        
+        // 显示成功消息
+        QMessageBox::information(this, "发送成功", "配方已发送！");
+        
+        qDebug() << "配方发送成功：" << formula;
+    }
 }

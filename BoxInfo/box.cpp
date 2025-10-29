@@ -15,10 +15,6 @@ Box::Box(int numSlots, QObject *parent)
     resizeSlots(numSlots);
 }
 
-// void Box::clearAll() {
-//     for (auto *s : m_slots) if (s) s->deleteLater();
-//     m_slots.clear();
-// }
 void Box::clearAll() {
     for (int i = 0; i < m_slots.size(); ++i) {
         auto *s = m_slots[i];
@@ -30,10 +26,10 @@ void Box::clearAll() {
 void Box::resizeSlots(int numSlots) {
     if (numSlots < 1) numSlots = 1;
     clearAll();
-    m_slots.reserve(numSlots);
+    m_slots.reserve(numSlots); // 预留空间
     for (int i = 0; i < numSlots; ++i) {
         auto *s = new Slot(i + 1, this);
-        m_slots.push_back(s);
+        m_slots.push_back(s); // 添加到槽列表
     }
     emit structureReset();
 }
@@ -54,11 +50,11 @@ ReagentBottle* Box::bottleAt(int position1Based) const {
     return s ? s->bottle() : nullptr;
 }
 
-void Box::addReagentBottleToSlot(int position1Based, ReagentBottle *bottle) {
-    auto *s = slotAt(position1Based);
+void Box::addReagentBottleToSlot(int position1Based, ReagentBottle *bottle) { // 将瓶子添加到槽中
+    auto *s = slotAt(position1Based); // 获取槽
     if (!s) return;
     s->setBottle(bottle); // parent 将设为 slot
-    emit slotChanged(position1Based);
+    emit slotChanged(position1Based); // 发射槽变化信号 告诉外界槽中有了瓶子
 }
 
 void Box::removeBottleFromSlot(int position1Based) {
