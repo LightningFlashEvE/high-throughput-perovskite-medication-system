@@ -5,6 +5,8 @@ QT += serialport
 QT += network
 QT += multimedia
 QT += multimediawidgets
+QT += sql
+
 
 greaterThan(QT_MAJOR_VERSION, 4): QT += widgets
 
@@ -17,7 +19,8 @@ CONFIG += c++17
 SOURCES += \
     main.cpp \
     mainwindow.cpp \
-    mainwindow_Test.cpp
+    mainwindow_Test.cpp \
+    mainwindow_xyz.cpp
 
 HEADERS += \
     mainwindow.h
@@ -55,6 +58,13 @@ INCLUDEPATH += $$PWD/BoxInfo
 
 include($$PWD/TcpClientCore/tcpclientcore.pri)
 INCLUDEPATH += $$PWD/TcpClientCore
+
+include($$PWD/RecipeQueue/recipequeue.pri)
+INCLUDEPATH += $$PWD/RecipeQueue
+
+include($$PWD/QSqlDatabase/qsqldatabase.pri)
+INCLUDEPATH += $$PWD/QSqlDatabase
+
 
 RESOURCES += \
     picture.qrc

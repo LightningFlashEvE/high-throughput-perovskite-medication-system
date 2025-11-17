@@ -5,6 +5,7 @@
 #include <QGraphicsView>
 #include <QResizeEvent>
 #include <QShowEvent>
+#include <QCloseEvent>
 #include <QPainter>
 #include <algorithm> // for std::clamp
 #include <QMenu>
@@ -14,7 +15,10 @@
 #include <QSettings>
 #include <QFileInfo>
 #include <QDebug>
+#include <QApplication>
 #include "rtspplayer.h"
+#include "tcpclientcore.h"
+#include "qsqldatabase.h"
 
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
@@ -22,8 +26,11 @@ MainWindow::MainWindow(QWidget *parent)
 {
     ui->setupUi(this);
 
-    // 代码测试
-    ForTempTest();
+    // 初始化系统组件（转移区域、试剂、TCP通信等）
+    initializeSystemComponents();
+
+    // 初始化tcpBalanceCore串口组件
+    
 
     // 初始化data.ini文件。1.检查是否存在文件，不存在则创建文件并且提供默认值。
     initializeDataIni();
@@ -239,14 +246,112 @@ MainWindow::MainWindow(QWidget *parent)
 
 MainWindow::~MainWindow()
 {
-    // // 清理RTSP播放器面板
-    // if (rtspPlayerPanel) {
-    //     rtspPlayerPanel->close();
-    //     rtspPlayerPanel->deleteLater();
-    //     rtspPlayerPanel = nullptr;
-    // }
-
+    // 清理资源（在 closeEvent 中已经处理，这里作为保险）
+    cleanupResources();
+    
     delete ui;
+}
+
+void MainWindow::closeEvent(QCloseEvent *event)
+{
+    qDebug() << "主窗口正在关闭，开始清理资源...";
+    
+    // 清理所有资源
+    cleanupResources();
+    
+    // 接受关闭事件
+    event->accept();
+    qDebug() << "主窗口关闭完成";
+}
+
+void MainWindow::cleanupResources()
+{
+    // 停止定时器
+    if (timer) {
+        timer->stop();
+        timer->disconnect(); // 断开所有信号连接
+    }
+    
+    // 断开TCP连接（首先断开，避免阻塞）
+    if (tcpCore) {
+        qDebug() << "开始清理TCP连接...";
+        tcpCore->disconnectFromTcp();
+        // 处理事件，让断开操作完成（增加等待时间确保完全断开）
+        QApplication::processEvents(QEventLoop::ExcludeUserInputEvents, 500);
+        qDebug() << "TCP连接清理完成";
+        // 显式销毁，确保析构中完全清理内部资源
+        tcpCore->disconnect();
+        delete tcpCore;
+        tcpCore = nullptr;
+        QApplication::processEvents(QEventLoop::ExcludeUserInputEvents, 50);
+    }
+    
+    // 关闭数据库连接
+    if (dbm) {
+        qDebug() << "开始关闭数据库连接...";
+        dbm->close();
+        qDebug() << "数据库连接已关闭";
+        delete dbm;
+        dbm = nullptr;
+        QApplication::processEvents(QEventLoop::ExcludeUserInputEvents, 50);
+    }
+    
+    // 清理RTSP播放器面板（直接删除，不使用deleteLater）
+    if (rtspPlayerPanel) {
+        // 先断开所有信号连接，避免在删除时触发回调
+        rtspPlayerPanel->disconnect();
+        rtspPlayerPanel->close();
+        rtspPlayerPanel->hide(); // 先隐藏，避免闪烁
+        delete rtspPlayerPanel;
+        rtspPlayerPanel = nullptr;
+        // 处理事件，让删除操作完成
+        QApplication::processEvents(QEventLoop::ExcludeUserInputEvents, 50);
+    }
+    
+    // 清理TCP客户端面板（直接删除）
+    if (tcpClientPanel) {
+        tcpClientPanel->disconnect();
+        tcpClientPanel->close();
+        tcpClientPanel->hide();
+        delete tcpClientPanel;
+        tcpClientPanel = nullptr;
+        QApplication::processEvents(QEventLoop::ExcludeUserInputEvents, 50);
+    }
+    
+    // 清理配方解析面板（直接删除）
+    if (recipeAnalyzerPanel) {
+        recipeAnalyzerPanel->disconnect();
+        recipeAnalyzerPanel->close();
+        recipeAnalyzerPanel->hide();
+        delete recipeAnalyzerPanel;
+        recipeAnalyzerPanel = nullptr;
+        QApplication::processEvents(QEventLoop::ExcludeUserInputEvents, 50);
+    }
+    
+    // 清理设置面板（直接删除）
+    if (settingsPanel) {
+        settingsPanel->disconnect();
+        settingsPanel->close();
+        settingsPanel->hide();
+        delete settingsPanel;
+        settingsPanel = nullptr;
+        QApplication::processEvents(QEventLoop::ExcludeUserInputEvents, 50);
+    }
+    
+    // 清理棋盘和流程图（它们是 this 的子对象，会自动清理）
+    // 但为了确保，我们可以显式停止它们
+    if (chessBoard) {
+        chessBoard = nullptr; // 是 this 的子对象，会在析构时自动删除
+    }
+    
+    if (flowManager) {
+        flowManager = nullptr; // 是 this 的子对象，会在析构时自动删除
+    }
+    
+    // 最后处理一次事件，确保所有删除操作完成
+    QApplication::processEvents(QEventLoop::ExcludeUserInputEvents, 100);
+    
+    qDebug() << "资源清理完成";
 }
 
 // 每秒刷新日期与时间显示
@@ -300,7 +405,6 @@ void MainWindow::initializeDataIni()
         settings.beginGroup("Box-Solid-Top"); // 盒子-固体-上面
         settings.setValue("axisX", "0");
         settings.setValue("axisY", "0");
-        settings.setValue("axisZ", "0");
         settings.setValue("gripperDepth", "0"); // 夹爪深度 /ˈɡrɪpər/
         settings.setValue("liquidExtractionDepth", "0"); // 取液深度 /ɪkˈstrækʃ(ə)n/
         settings.setValue("solidDepth", "0"); // 固体深度 /ˈsɑːlɪd/
@@ -309,7 +413,6 @@ void MainWindow::initializeDataIni()
         settings.beginGroup("Box-Solid-Bottom"); // 盒子-固体-下面
         settings.setValue("axisX", "0");
         settings.setValue("axisY", "0");
-        settings.setValue("axisZ", "0");
         settings.setValue("gripperDepth", "0"); // 夹爪深度
         settings.setValue("liquidExtractionDepth", "0"); // 取液深度
         settings.setValue("solidDepth", "0"); // 固体深度
@@ -318,7 +421,6 @@ void MainWindow::initializeDataIni()
         settings.beginGroup("Box-Tips-Left"); // 盒子-tips左边
         settings.setValue("axisX", "0");
         settings.setValue("axisY", "0");
-        settings.setValue("axisZ", "0");
         settings.setValue("gripperDepth", "0"); // 夹爪深度
         settings.setValue("liquidExtractionDepth", "0"); // 取液深度
         settings.setValue("solidDepth", "0"); // 固体深度
@@ -327,7 +429,6 @@ void MainWindow::initializeDataIni()
         settings.beginGroup("Box-Tips-Right"); // 盒子-tips右边
         settings.setValue("axisX", "0");
         settings.setValue("axisY", "0");
-        settings.setValue("axisZ", "0");
         settings.setValue("gripperDepth", "0"); // 夹爪深度
         settings.setValue("liquidExtractionDepth", "0"); // 取液深度
         settings.setValue("solidDepth", "0"); // 固体深度
@@ -336,7 +437,6 @@ void MainWindow::initializeDataIni()
         settings.beginGroup("Box-Shake-Bed"); // 盒子-摇床 /ʃeɪk/
         settings.setValue("axisX", "0");
         settings.setValue("axisY", "0");
-        settings.setValue("axisZ", "0");
         settings.setValue("gripperDepth", "0"); // 夹爪深度
         settings.setValue("liquidExtractionDepth", "0"); // 取液深度
         settings.setValue("solidDepth", "0"); // 固体深度
@@ -345,7 +445,6 @@ void MainWindow::initializeDataIni()
         settings.beginGroup("Box-Liquid-Material"); // 盒子-液体材料
         settings.setValue("axisX", "0");
         settings.setValue("axisY", "0");
-        settings.setValue("axisZ", "0");
         settings.setValue("gripperDepth", "0"); // 夹爪深度
         settings.setValue("liquidExtractionDepth", "0"); // 取液深度
         settings.setValue("solidDepth", "0"); // 固体深度
@@ -354,7 +453,6 @@ void MainWindow::initializeDataIni()
         settings.beginGroup("Box-Empty-Bottle"); // 盒子-空瓶
         settings.setValue("axisX", "0");
         settings.setValue("axisY", "0");
-        settings.setValue("axisZ", "0");
         settings.setValue("gripperDepth", "0"); // 夹爪深度
         settings.setValue("liquidExtractionDepth", "0"); // 取液深度
         settings.setValue("solidDepth", "0"); // 固体深度
@@ -362,9 +460,8 @@ void MainWindow::initializeDataIni()
         
         settings.beginGroup("Box-Transfer-Area-Left"); // 盒子-转移区左边
         settings.setValue("axisX", "00003A99");
-        settings.setValue("axisY", "00005B53");
-        settings.setValue("axisZ", "00041AC7");
-        settings.setValue("gripperDepth", "0"); // 夹爪深度
+        settings.setValue("axisY", "000058DF");
+        settings.setValue("gripperDepth", "00041AC7"); // 夹爪深度
         settings.setValue("liquidExtractionDepth", "0"); // 取液深度
         settings.setValue("solidDepth", "0"); // 固体深度
         settings.endGroup();
@@ -372,16 +469,15 @@ void MainWindow::initializeDataIni()
         settings.beginGroup("Box-Transfer-Area-Right"); // 盒子-转移区右边
         settings.setValue("axisX", "0");
         settings.setValue("axisY", "0");
-        settings.setValue("axisZ", "0");
         settings.setValue("gripperDepth", "0"); // 夹爪深度
         settings.setValue("liquidExtractionDepth", "0"); // 取液深度
         settings.setValue("solidDepth", "0"); // 固体深度
         settings.endGroup();
         
         settings.beginGroup("Box-Hold-Region");  // 夹持区域 /ˈriːdʒən/
-        settings.setValue("axisX", "0");
-        settings.setValue("axisY", "0");
-        settings.setValue("gripperDepth", "0"); // 夹爪深度
+        settings.setValue("axisX", "20326");
+        settings.setValue("axisY", "35517");
+        settings.setValue("gripperDepth", "265192"); // 夹爪深度
         settings.setValue("liquidExtractionDepth", "0"); // 取液深度
         settings.setValue("solidDepth", "0"); // 固体深度
         settings.endGroup();
@@ -390,6 +486,13 @@ void MainWindow::initializeDataIni()
         settings.setValue("LocalIP", "192.168.5.22");        // 本机IP
         settings.setValue("RemoteIP", "192.168.5.201");      // 远端IP
         settings.setValue("RemotePort", "4196");      // 远端端口
+        settings.setValue("ProxyDisabled", true); // 是否禁用代理
+        settings.endGroup();
+
+        settings.beginGroup("Liquid-Info");
+        settings.setValue("LocalIP", "192.168.5.22");
+        settings.setValue("RemoteIP", "192.168.5.201");
+        settings.setValue("RemotePort", "4196");
         settings.setValue("ProxyDisabled", true); // 是否禁用代理
         settings.endGroup();
 

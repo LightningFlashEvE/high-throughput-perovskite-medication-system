@@ -6,8 +6,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>848</width>
-    <height>574</height>
+    <width>747</width>
+    <height>543</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -58,7 +58,7 @@
             <item row="0" column="1">
              <widget class="QLineEdit" name="lineEdit_formula">
               <property name="text">
-               <string>Cs0.17FA0.83Pb(I0.8Br0.2)3</string>
+               <string>Cs0.05FA0.95PbI3</string>
               </property>
               <property name="placeholderText">
                <string>例如: Cs0.17FA0.83Pb(I0.8Br0.2)3</string>
@@ -68,7 +68,7 @@
             <item row="1" column="0">
              <widget class="QLabel" name="label_molarity">
               <property name="text">
-               <string>摩尔浓度 (M):</string>
+               <string>摩尔浓度 (mol/mL):</string>
               </property>
              </widget>
             </item>
@@ -87,7 +87,7 @@
                <double>0.100000000000000</double>
               </property>
               <property name="value">
-               <double>1.000000000000000</double>
+               <double>3.000000000000000</double>
               </property>
              </widget>
             </item>
@@ -113,7 +113,7 @@
                <double>0.100000000000000</double>
               </property>
               <property name="value">
-               <double>1000.000000000000000</double>
+               <double>5.000000000000000</double>
               </property>
              </widget>
             </item>
@@ -379,7 +379,7 @@ QPushButton:pressed {
                   </column>
                   <column>
                    <property name="text">
-                    <string>质量 (g)</string>
+                    <string>质量 (mg)</string>
                    </property>
                   </column>
                   <column>

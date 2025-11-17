@@ -4,6 +4,7 @@
 
 #include <QObject>
 #include <QVector>
+#include <QString>
 
 class Slot;
 class ReagentBottle;
@@ -33,6 +34,14 @@ public:
      * @param parent 父对象
      */
     explicit Box(int numSlots, QObject *parent = nullptr);
+    
+    /**
+     * @brief 带名称构造函数 - 创建指定数量插槽的盒子，并从配置文件加载坐标信息
+     * @param numSlots 插槽数量
+     * @param boxName 盒子名称（用于配置文件中的组名，如 "Box-Transfer-Area-Left"）
+     * @param parent 父对象
+     */
+    explicit Box(int numSlots, const QString& boxName, QObject *parent = nullptr);
 
     /**
      * @brief 获取插槽总数
@@ -60,6 +69,49 @@ public:
      * @return 试剂瓶指针，无瓶或位置无效返回nullptr
      */
     ReagentBottle* bottleAt(int position1Based) const;
+    
+    // ========== 坐标信息相关 ==========
+    /**
+     * @brief 获取盒子名称
+     * @return 盒子名称
+     */
+    QString getBoxName() const { return m_boxName; }
+    
+    /**
+     * @brief 获取X轴坐标
+     * @return X轴坐标（十六进制字符串）
+     */
+    QString getAxisX() const { return m_axisX; }
+    
+    /**
+     * @brief 获取Y轴坐标
+     * @return Y轴坐标（十六进制字符串）
+     */
+    QString getAxisY() const { return m_axisY; }
+    
+    /**
+     * @brief 获取Z轴坐标
+     * @return Z轴坐标（十六进制字符串）
+     */
+    QString getAxisZ() const { return m_axisZ; }
+    
+    /**
+     * @brief 获取夹爪深度
+     * @return 夹爪深度
+     */
+    QString getGripperDepth() const { return m_gripperDepth; }
+    
+    /**
+     * @brief 获取取液深度
+     * @return 取液深度
+     */
+    QString getLiquidExtractionDepth() const { return m_liquidExtractionDepth; }
+    
+    /**
+     * @brief 获取固体深度
+     * @return 固体深度
+     */
+    QString getSolidDepth() const { return m_solidDepth; }
 
 public slots:
     /**
@@ -105,6 +157,15 @@ signals:
 
 private:
     QVector<Slot*> m_slots;  // 插槽对象数组
+    
+    // 盒子标识和坐标信息
+    QString m_boxName;                  // 盒子名称（如 "Box-Transfer-Area-Left"）
+    QString m_axisX;                    // X轴坐标
+    QString m_axisY;                    // Y轴坐标
+    QString m_axisZ;                    // Z轴坐标
+    QString m_gripperDepth;             // 夹爪深度
+    QString m_liquidExtractionDepth;    // 取液深度
+    QString m_solidDepth;               // 固体深度
 
     /**
      * @brief 将基于1的位置编号转换为基于0的数组索引
@@ -122,6 +183,12 @@ private:
      * 删除所有插槽对象并清空数组
      */
     void clearAll();
+    
+    /**
+     * @brief 从配置文件加载坐标信息
+     * 根据 m_boxName 从 BoxData.ini 文件中加载对应的坐标数据
+     */
+    void loadCoordinatesFromConfig();
 };
 
 #endif // BOX_H

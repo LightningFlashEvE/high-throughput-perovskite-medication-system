@@ -4,6 +4,24 @@
 #include <QObject>
 #include <QTcpSocket>
 #include <QNetworkProxy>
+#include <QTimer>
+#include <QEventLoop>
+#include <QQueue>
+#include <QStringList>
+
+// 消息队列项
+struct MessageQueueItem {
+    QByteArray content;          // 发送内容
+    bool asciiOrHex;             // 是否为ASCII模式
+    bool shouldWaitForResponse;  // 是否需要等待响应
+    QString expectedSignature;   // 期望接收值（设备+指令+数据，数据可空；如 "09D" / "09d01" / HEX模式传如 "050302000001"）
+    
+    MessageQueueItem() : asciiOrHex(true), shouldWaitForResponse(false) {}
+    MessageQueueItem(const QByteArray& c, bool aoh) 
+        : content(c), asciiOrHex(aoh), shouldWaitForResponse(false) {}
+    MessageQueueItem(const QByteArray& c, bool aoh, const QString& expected)
+        : content(c), asciiOrHex(aoh), shouldWaitForResponse(!expected.isEmpty() && expected != "-----"), expectedSignature(expected) {}
+};
 
 class TcpClientCore : public QObject
 {
@@ -18,15 +36,36 @@ public:
     // 调用TcpClientCrc类计算crc16
     quint16 calculateCrc16(const QByteArray& data);
 
-    // tcp发送信息-接口
+    // tcp发送信息-接口（旧版本，保留兼容）
     // asciiOrHex: true 表示ascii，false表示16进制发送
+    // 如果是 'd' 命令（查询到位），会自动轮询直到收到到位信号
     bool sendMessage(const QByteArray& content, bool asciiOrHex);
+    
+    // tcp发送信息-接口（新版队列方式）
+    // 统一：第三个参数为期望接收值（设备+指令+数据；未知可传 "-----" 表示不等待）
+    void sendMessageAsync(const QByteArray& content, bool asciiOrHex);
+    void sendMessageAsync(const QByteArray& content, bool asciiOrHex, const QString& expectedSignature);
 
     // 断开连接
     void disconnectFromTcp();
+    // 仅复位内部状态（不主动断开连接）
+    void resetState();
 
     // 检查连接状态
     bool isConnected() const;
+
+    /**
+     * 将整数转换为十六进制字符串（支持负数处理）
+     * @param value 整数值（正数或负数）
+     * @param width 十六进制字符串的位数
+     * @return 转换后的十六进制字符串（负数会先-1再取反）
+     * 
+     * 负数处理：绝对值-1，然后取反，保持指定位数
+     * 示例：
+     *   int2hex(540, 4) -> "021C"
+     *   int2hex(-540, 4) -> "FDE4"  (540-1=539=0x21B, 取反=0xFDE4)
+     */
+    static QString int2hex(qint64 value, int width);
 
     /**
      * 构建带CRC的消息
@@ -43,17 +82,18 @@ public:
     QString buildGripperMessageWithCrc(const QString& data);
 
     /**
-     * 构建设备命令（自动添加CRC）
-     * @param deviceNum 设备编号字符串（如 "0A", "01", "07"）
-     * @param functionCode 功能码字符串（如 "A" 表示获取版本信息）
-     * @param commandData 命令数据（可选，默认为空）
-     * @return 完整的带CRC的命令（如 ">0AAA3FD"）
+     * 构建设备命令（重载版本，接受数字和位数）
+     * @param deviceNum 设备编号字符串（如 "04", "03", "02"）
+     * @param functionCode 功能码字符串（如 "D" 表示移动）
+     * @param commandData 命令数据（整数，支持负数）
+     * @param width 十六进制数据的位数（如 8 表示8位十六进制）
+     * @return 完整的带CRC的命令
      * 
      * 示例：
-     *   buildDeviceCommand("0A", "A", "") -> ">0AAA3FD"
-     *   buildDeviceCommand("0A", "G", "") -> ">0AGA17D"
+     *   buildDeviceCommand("04", "D", 123456, 8) -> ">04D0001E240XXXX"
+     *   buildDeviceCommand("04", "D", -123456, 8) -> ">04DFFFE1DC0XXXX"
      */
-    QString buildDeviceCommand(const QString& deviceNum, const QString& functionCode, const QString& commandData = "");
+    QString buildDeviceCommand(const QString& deviceNum, const QString& functionCode, qint64 commandData, int width);
     
     /**
      * 构建设备命令（重载版本，4个参数）
@@ -96,20 +136,103 @@ public:
                               qint64 decimalData,
                               int dataWidth = 4);
 
+    /**
+     * @brief 初始化信号槽连接和定时器（按需调用）
+     * 将信号槽连接和定时器创建从构造函数中分离出来，因为并不是每次新建对象都会用到
+     */
+    void initializeConnectionsAndTimers();
+
+    void initializeConnectionsForBalance();
+
+
 signals:
     void connected();
     void disconnected();
     void errorOccurred(const QString& errorMsg);
     void dataReceived(const QByteArray& data);
+    
+    // 电机到位信号
+    void motorReachedPosition(const QString& deviceNum);
 
 private slots:
     void onConnected();
     void onDisconnected();
     void onReadyRead();
     void onSocketError(QAbstractSocket::SocketError error);
+    
+    // 天平专用槽函数
+    void onBalanceConnected();
+    void onBalanceDisconnected();
+    void onBalanceReadyRead();
+    void onBalanceSocketError(QAbstractSocket::SocketError error);
+    
+    // 轮询检查电机是否到位
+    void pollMotorPosition();
 
 private:
     QTcpSocket* m_tcpSocket;
+    
+    // 轮询机制相关
+    QTimer* m_pollTimer;              // 轮询定时器
+    bool m_isPolling;                 // 是否正在轮询
+    QString m_pollingDeviceNum;       // 正在轮询的设备编号
+    QString m_pollingCommand;         // 轮询命令（完整的带CRC的命令）
+    QEventLoop* m_pollEventLoop;      // 用于阻塞等待的事件循环
+    
+    // 消息队列相关
+    QQueue<MessageQueueItem> m_messageQueue;  // 消息队列
+    bool m_isProcessingQueue;                  // 是否正在处理队列
+    QTimer* m_queueTimer;                     // 队列处理定时器
+    bool m_isWaitingForResponse;              // 是否正在等待响应
+    QString m_currentExpectedNormalized;      // 当前等待的标准化期望前缀
+    bool m_currentAsciiMode;                  // 当前等待是否ASCII模式
+    
+    /**
+     * @brief 检查收到的数据是否是到位响应（XYZ电机）
+     * @param data 收到的数据
+     * @return true 表示已到位
+     */
+    bool checkIfReachedPosition(const QByteArray& data);
+    
+    /**
+     * @brief 检查收到的数据是否是电爪初始化完成响应（ModBus RTU）
+     * @param data 收到的数据
+     * @return true 表示初始化完成
+     */
+    bool checkIfGripperInitialized(const QByteArray& data);
+    
+    /**
+     * @brief 启动轮询机制
+     * @param deviceNum 设备编号
+     * @param command 查询命令
+     */
+    void startPolling(const QString& deviceNum, const QString& command);
+    
+    /**
+     * @brief 停止轮询机制
+     */
+    void stopPolling();
+    
+    /**
+     * @brief 处理消息队列
+     */
+    void processMessageQueue();
+    
+    /**
+     * @brief 检查消息是否需要等待响应（通过分析命令内容）
+     * @param content 消息内容
+     * @return true 表示需要等待响应
+     */
+    bool needsWaitForResponse(const QByteArray& content, bool asciiOrHex);
+    
+    /**
+     * @brief 发送消息内部实现（非阻塞版本，供队列使用）
+     * @param content 消息内容
+     * @param asciiOrHex 是否ASCII模式
+     * @param shouldWait 是否应该启动轮询等待
+     */
+    void sendMessageInternal(const QByteArray& content, bool asciiOrHex, bool shouldWait);
+
 };
 
 #endif // TCPCLIENTCORE_H

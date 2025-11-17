@@ -67,7 +67,7 @@ void RecipeAnalyzer::setupUI()
 {
     // 设置前驱体表格属性
     ui->tableWidget_precursors->setColumnCount(3);
-    ui->tableWidget_precursors->setHorizontalHeaderLabels({"前驱体", "摩尔数 (mol)", "质量 (g)"});
+    ui->tableWidget_precursors->setHorizontalHeaderLabels({"前驱体", "摩尔数 (mol)", "质量 (mg)"});
     ui->tableWidget_precursors->horizontalHeader()->setStretchLastSection(true);
     ui->tableWidget_precursors->setAlternatingRowColors(true);
     ui->tableWidget_precursors->setSelectionBehavior(QAbstractItemView::SelectRows);
@@ -128,8 +128,14 @@ void RecipeAnalyzer::onCalculateClicked()
 
         // 收集溶剂配置并打包数据
         m_lastPacket = buildRecipePacket(formula, molarity, volume, results, validation);
-        // 可选：调试输出
-        qDebug().noquote() << QJsonDocument(m_lastPacket).toJson(QJsonDocument::Compact);
+        
+        // 同时生成JSON字符串格式（紧凑）并存储到成员变量
+        m_lastPacketJsonString = QString::fromUtf8(
+            QJsonDocument(m_lastPacket).toJson(QJsonDocument::Compact)
+        );
+        
+        // 调试输出：显示简化后的配方JSON
+        qDebug().noquote() << "配方JSON:" << m_lastPacketJsonString;
         
         qDebug() << "配方解析完成，共计算" << results.size() << "种前驱体";
         
@@ -154,48 +160,42 @@ void RecipeAnalyzer::onFormulaChanged()
 
 
 QJsonObject RecipeAnalyzer::buildRecipePacket(const QString& formula,
-                                              double molarity,
-                                              double volume,
-                                              const QList<PrecursorResult>& results,
-                                              const ValidationInfo& info) const
+                                             double molarity,
+                                             double volume,
+                                             const QList<PrecursorResult>& results,
+                                             const ValidationInfo& info) const
 {
+    Q_UNUSED(info);
+    // 标准配方数据包：包含化学方程式、溶质、溶剂三部分，附带基本参数
     QJsonObject obj;
-    obj["时间戳"] = QDateTime::currentDateTimeUtc().toString(Qt::ISODate);
-    obj["化学式"] = formula;
+
+    // 基本信息
+    obj["化学方程式"] = formula;
     obj["摩尔浓度"] = molarity;
-    obj["体积"] = volume;
+    obj["体积"] = volume; // mL
 
-    // 前驱体列表
-    QJsonArray arr;
+    // 溶质（前驱体固体/溶质，单位mg）
+    QJsonArray solutes;
     for (const auto &r : results) {
-        QJsonObject x;
-        x["名称"] = r.name;
-        x["摩尔数"] = r.moles;
-        x["质量"] = r.grams;
-        arr.append(x);
+        QJsonObject item;
+        item["名称"] = r.name;
+        item["用量"] = r.grams * 1000; // mg
+        item["单位"] = "mg";
+        solutes.append(item);
     }
-    obj["前驱体"] = arr;
+    obj["溶质"] = solutes;
 
-    // 溶剂与比例（仅使用高级溶剂系统）
+    // 溶剂（体积分配，单位mL）
     QJsonArray solvents;
     QList<QPair<QString,double>> advancedSolvents = collectAdvancedSolvents();
-    for (const auto& pair : advancedSolvents) {
-        QJsonObject s;
-        s["名称"] = pair.first;
-        s["比例"] = pair.second;
-        s["体积"] = volume * pair.second / 100.0; // 计算实际体积
-        solvents.append(s);
+    for (const auto& pair : std::as_const(advancedSolvents)) {
+        QJsonObject item;
+        item["名称"] = pair.first;
+        item["用量"] = volume * pair.second / 100.0; // mL
+        item["单位"] = "ml";
+        solvents.append(item);
     }
     obj["溶剂"] = solvents;
-
-    // 验证信息
-    QJsonObject ck;
-    ck["分子式单元摩尔数"] = info.formulaUnits_mol;
-    ck["分子量"] = info.molecularWeight_g;
-    ck["A位总摩尔数"] = info.A_site_total_mol;
-    ck["Pb总摩尔数"] = info.Pb_mol;
-    ck["PbX2提供的Pb摩尔数"] = info.Pb_from_PbX2_mol;
-    obj["验证信息"] = ck;
 
     return obj;
 }
@@ -745,12 +745,17 @@ void RecipeAnalyzer::onSendRecipeClicked()
     }
     
     // 确认发送
-    QString formula = m_lastPacket.value("化学式").toString();
+    QString formula = m_lastPacket.value("化学方程式").toString();
+    if (formula.isEmpty()) {
+        // 兼容旧键名
+        formula = m_lastPacket.value("化学式").toString();
+        if (formula.isEmpty()) formula = m_lastPacket.value("配方").toString();
+    }
     double molarity = m_lastPacket.value("摩尔浓度").toDouble();
     double volume = m_lastPacket.value("体积").toDouble();
     
     QString confirmMsg = QString("确认发送配方？\n\n"
-                                "化学式：%1\n"
+                                "化学方程式：%1\n"
                                 "摩尔浓度：%2 M\n"
                                 "体积：%3 mL")
                                 .arg(formula)
@@ -767,7 +772,5 @@ void RecipeAnalyzer::onSendRecipeClicked()
         
         // 显示成功消息
         QMessageBox::information(this, "发送成功", "配方已发送！");
-        
-        qDebug() << "配方发送成功：" << formula;
     }
 }

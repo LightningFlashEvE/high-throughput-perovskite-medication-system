@@ -47,8 +47,11 @@ public:
     ~RecipeAnalyzer();
 
 signals:
-    // 发送配方信号，传递配方数据包
+    // 发送配方信号，传递配方数据包（JSON对象格式）
     void recipeReadyToSend(const QJsonObject& recipePacket);
+    
+    // 发送配方信号，传递配方数据包（同时包含JSON对象和JSON字符串）
+    void recipeReadyToSendWithString(const QJsonObject& recipePacket, const QString& jsonString);
 
 private slots:
     void onCalculateClicked();
@@ -98,12 +101,26 @@ private:
     static const QMap<QString, double> PRECURSOR_WEIGHTS;
     
     Ui::RecipeAnalyzer *ui;
-    QJsonObject m_lastPacket;
+    QJsonObject m_lastPacket;           // 最后生成的配方数据包（JSON对象格式）
+    QString m_lastPacketJsonString;     // 最后生成的配方数据包（JSON字符串格式，紧凑）
     
     // 新增：高级溶剂选择数据
     QStringList m_availableSolvents;
     QList<QPair<QString,double>> m_dynamicSolvents; // name, percentage
     QList<QPushButton*> m_solventButtons;
+
+public:
+    /**
+     * @brief 获取最后生成的配方JSON字符串
+     * @return JSON格式的配方字符串（紧凑格式）
+     */
+    QString getLastPacketJsonString() const { return m_lastPacketJsonString; }
+    
+    /**
+     * @brief 获取最后生成的配方对象
+     * @return QJsonObject格式的配方数据
+     */
+    QJsonObject getLastPacket() const { return m_lastPacket; }
 };
 
 #endif // RECIPEANALYZER_H

@@ -22,10 +22,12 @@ class QGraphicsScene;
 class QGraphicsPixmapItem;
 class QResizeEvent;
 class QShowEvent;
+class QCloseEvent;
 class RtspPlayer;
 class Box;
 class ReagentBottle;
 class TcpClientCore;
+class AppSqlDatabase;
 
 /**
  * MainWindow
@@ -75,6 +77,11 @@ protected:
      * 作用：在界面完成布局后再次触发一次自适应缩放，避免初次显示过小
      */
     void showEvent(QShowEvent *event) override;
+    /**
+     * 窗口关闭事件
+     * 作用：在窗口关闭前清理所有资源，确保程序正常退出
+     */
+    void closeEvent(QCloseEvent *event) override;
 
 private:
     Ui::MainWindow *ui;
@@ -85,6 +92,12 @@ private:
      * 检查文件是否存在，如果不存在则创建文件并设置默认值
      */
     void initializeDataIni();
+    
+    /**
+     * 清理所有资源
+     * 在窗口关闭时调用，确保所有资源正确释放
+     */
+    void cleanupResources();
 
     // 棋盘封装类
     ChessBoardView *chessBoard = nullptr;
@@ -113,6 +126,24 @@ private:
     
     // TCP客户端核心
     TcpClientCore *tcpCore = nullptr;        // TCP通信核心对象
+    // TCP负责接收天平的串口信息
+    TcpClientCore *tcpBalanceCore = nullptr;        // 天平TCP通信核心对象
+    
+    // 数据库管理
+    AppSqlDatabase *dbm = nullptr;           // 数据库管理对象
+
+    // 取空瓶（盘名称）
+    bool takeEmptyBottle(const QString& trayName);
+    // 取液体（液体名称 + 体积）
+    bool getLiquid(const QString& liquidName, double volumeMl);
+    // 取固体（固体名称 + 质量）
+    bool getSolid(const QString& solidName, double mass);
+    // 拧紧瓶子
+    void tightenBottle();
+    // 初始化所有设备（TCP连接和设备初始化）
+    void initializeAllDevices();
+    // xyz轴恢复到零点（06，08，09，0A号电机恢复到零点）
+    void resetXYZMotorsToZero();
 
 public:
     /**
@@ -122,12 +153,19 @@ public:
     void moveChessPiece(int pieceIndex, int col, int row);
 
 
-public: // 测试用 For temporary testing
-    void ForTempTest();
+public: // 系统初始化
+    /**
+     * 初始化系统组件
+     * 包括：转移区域、ABC试剂、TCP通信、按钮连接
+     */
+    void initializeSystemComponents();
     
 public slots:
-    // 测试配方发送功能
+    // 测试配方发送功能（接收JSON对象）
     void testRecipeSend(const QJsonObject& recipePacket);
+    
+    // 测试配方发送功能（接收JSON对象和JSON字符串）
+    void testRecipeSendWithString(const QJsonObject& recipePacket, const QString& jsonString);
 
 };
 #endif // MAINWINDOW_H
