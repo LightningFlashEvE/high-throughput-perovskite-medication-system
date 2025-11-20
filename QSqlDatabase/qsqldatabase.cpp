@@ -14,9 +14,9 @@ namespace {
 // 使用一个连接名，避免重复 addDatabase 警告
 const char* kConnName = "app_sqlite_conn";
 
-constexpr auto kTableTransferLeft = "Box_Transfer_Area_Left";
-constexpr auto kTableTransferRight = "Box_Transfer_Area_Right";
+constexpr auto kTableTransferLeft = "LiquidMaterialArea";
 constexpr auto kTableOther = "other";
+constexpr auto kTableShakeBedArea = "shakeBedArea";
 }
 
 AppSqlDatabase::AppSqlDatabase(const QString &dbFilePath, QObject *parent)
@@ -51,15 +51,21 @@ AppSqlDatabase::~AppSqlDatabase()
 
 void AppSqlDatabase::close()
 {
-    if (QSqlDatabase::contains(kConnName)) {
+    if (!QSqlDatabase::contains(kConnName)) {
+        return;
+    }
+
+    {
         QSqlDatabase db = QSqlDatabase::database(kConnName);
         if (db.isOpen()) {
             qDebug() << "关闭数据库连接:" << db.databaseName();
             db.close();
         }
-        QSqlDatabase::removeDatabase(kConnName);
-        qDebug() << "数据库连接已移除";
+        // 作用域结束后，db 会被销毁，避免 removeDatabase 时仍有引用
     }
+
+    QSqlDatabase::removeDatabase(kConnName);
+    qDebug() << "数据库连接已移除";
 }
 
 QString AppSqlDatabase::normalizeTableName(const QString &name)
@@ -116,29 +122,20 @@ void AppSqlDatabase::createDefaultTables()
 
     const QString createTransferLeft = QStringLiteral(
         "CREATE TABLE IF NOT EXISTS %1 ("
-        "  id INTEGER PRIMARY KEY AUTOINCREMENT,"
+        "  selfLocation INTEGER PRIMARY KEY,"
         "  liquidName TEXT NOT NULL,"
         "  originX INTEGER NOT NULL,"
         "  originY INTEGER NOT NULL,"
         "  pipetteZ INTEGER NOT NULL,"
         "  gripperZ INTEGER NOT NULL,"
         "  solidZ INTEGER NOT NULL,"
-        "  neighborRightMm REAL NOT NULL,"
-        "  neighborBottomMm REAL NOT NULL,"
-        "  currentIndex INTEGER NOT NULL,"
-        "  selfLocation INTEGER NOT NULL DEFAULT 0"
+        "  rightSpacing REAL NOT NULL DEFAULT 0,"
+        "  bottomSpacing REAL NOT NULL DEFAULT 0,"
+        "  cols INTEGER NOT NULL DEFAULT 0,"
+        "  rows INTEGER NOT NULL DEFAULT 0,"
+        "  currentIndex INTEGER NOT NULL"
         ")"
     ).arg(QString::fromLatin1(kTableTransferLeft));
-
-    const QString createTransferRight = QStringLiteral(
-        "CREATE TABLE IF NOT EXISTS %1 ("
-        "  id INTEGER PRIMARY KEY AUTOINCREMENT,"
-        "  currentIndex INTEGER NOT NULL,"
-        "  originX INTEGER NOT NULL,"
-        "  originY INTEGER NOT NULL,"
-        "  gripperZ INTEGER NOT NULL"
-        ")"
-    ).arg(QString::fromLatin1(kTableTransferRight));
 
     const QString createOther = QStringLiteral(
         "CREATE TABLE IF NOT EXISTS %1 ("
@@ -148,12 +145,25 @@ void AppSqlDatabase::createDefaultTables()
         "  originY INTEGER NOT NULL,"
         "  gripperZ INTEGER NOT NULL,"
         "  tipsZ INTEGER NOT NULL DEFAULT 0,"
-        "  solidZ INTEGER NOT NULL DEFAULT 0"
+        "  solidZ INTEGER NOT NULL DEFAULT 0,"
+        "  rightSpacing REAL NOT NULL DEFAULT 0,"
+        "  bottomSpacing REAL NOT NULL DEFAULT 0,"
+        "  cols INTEGER NOT NULL DEFAULT 0,"
+        "  rows INTEGER NOT NULL DEFAULT 0"
         ")"
     ).arg(QString::fromLatin1(kTableOther));
 
+    const QString createShakeBedArea = QStringLiteral(
+        "CREATE TABLE IF NOT EXISTS %1 ("
+        "  selfLocation INTEGER PRIMARY KEY,"
+        "  isEmpty INTEGER NOT NULL DEFAULT 0,"
+        "  startTime INTEGER NOT NULL DEFAULT 0,"
+        "  endTime INTEGER NOT NULL DEFAULT 0"
+        ")"
+    ).arg(QString::fromLatin1(kTableShakeBedArea));
+
     QSqlQuery query(db);
-    const QList<QString> statements{createTransferLeft, createTransferRight, createOther};
+    const QList<QString> statements{createTransferLeft, createOther, createShakeBedArea};
     for (const QString &sql : statements) {
         if (!query.exec(sql)) {
             qWarning() << "创建默认表失败:" << query.lastError().text() << "SQL:" << sql;
@@ -166,36 +176,62 @@ void AppSqlDatabase::seedDefaultData()
 {
     if (isTableEmpty(QString::fromLatin1(kTableTransferLeft))) {
         insertRow(QString::fromLatin1(kTableTransferLeft), {
+            {"selfLocation", 0},
             {"liquidName", "DMF"},
             {"originX", 15050},
             {"originY", 23094},
             {"pipetteZ", 0},
             {"gripperZ", 272187},
             {"solidZ", 0},
-            {"neighborRightMm", 39.0},
-            {"neighborBottomMm", 39.0},
-            {"currentIndex", 1},
-            {"selfLocation", 0}
+            {"rightSpacing", 1732.75},
+            {"bottomSpacing", 4355.0},
+            {"cols", 5},
+            {"rows", 3},
+            {"currentIndex", 0}
+        });
+        insertRow(QString::fromLatin1(kTableTransferLeft), {
+            {"selfLocation", 1},
+            {"liquidName", "GBL"},
+            {"originX", 15050},
+            {"originY", 23094},
+            {"pipetteZ", 0},
+            {"gripperZ", 272187},
+            {"solidZ", 0},
+            {"rightSpacing", 1732.75},
+            {"bottomSpacing", 4355.0},
+            {"cols", 5},
+            {"rows", 3},
+            {"currentIndex", 1}
         });
     }
 
-    if (isTableEmpty(QString::fromLatin1(kTableTransferRight))) {
-        insertRow(QString::fromLatin1(kTableTransferRight), {
-            {"currentIndex", 0},
-            {"originX", 5513},
-            {"originY", 23458},
-            {"gripperZ", 269232}
-        });
-    }
+
+    ensureNamedRecord(QString::fromLatin1(kTableOther), QStringLiteral("name"), QStringLiteral("emptyBottleArea"), {
+        {"currentIndex", 0},
+        {"name", "emptyBottleArea"},
+        {"originX", 5478},
+        {"originY", 23420},
+        {"gripperZ", 269232},
+        {"tipsZ", 0},
+        {"solidZ", 0},
+        {"rightSpacing", 1732.75},
+        {"bottomSpacing", 4355.0},
+        {"cols", 5},
+        {"rows", 3}
+    });
 
     ensureNamedRecord(QString::fromLatin1(kTableOther), QStringLiteral("name"), QStringLiteral("gripArea"), {
         {"currentIndex", 0},
         {"name", "gripArea"},
-        {"originX", 20377},
-        {"originY", 35493},
+        {"originX", 20383},
+        {"originY", 35699},
         {"gripperZ", 265192},
         {"tipsZ", 0},
-        {"solidZ", 0}
+        {"solidZ", 0},
+        {"rightSpacing", 0},
+        {"bottomSpacing", 0},
+        {"cols", 0},
+        {"rows", 0}
     });
 
     ensureNamedRecord(QString::fromLatin1(kTableOther), QStringLiteral("name"), QStringLiteral("balanceArea"), {
@@ -203,9 +239,13 @@ void AppSqlDatabase::seedDefaultData()
         {"name", "balanceArea"},
         {"originX", 21499},
         {"originY", 8439},
-        {"gripperZ", 276000},
+        {"gripperZ", 270545},
         {"tipsZ", 0}, // 为0  59970
-        {"solidZ", 0}
+        {"solidZ", 0},
+        {"rightSpacing", 0},
+        {"bottomSpacing", 0},
+        {"cols", 0},
+        {"rows", 0}
     });
 
     ensureNamedRecord(QString::fromLatin1(kTableOther), QStringLiteral("name"), QStringLiteral("balanceAreaForSolid"), {
@@ -215,7 +255,11 @@ void AppSqlDatabase::seedDefaultData()
        {"originY", 14108},
        {"gripperZ", 0},
        {"tipsZ", 0},
-       {"solidZ", 28822}
+       {"solidZ", 28822},
+       {"rightSpacing", 0},
+       {"bottomSpacing", 0},
+       {"cols", 0},
+       {"rows", 0}
    });
 
 
@@ -227,7 +271,11 @@ void AppSqlDatabase::seedDefaultData()
        {"originY", 14685},
        {"gripperZ", 0},
        {"tipsZ", 60828},
-       {"solidZ", 0}
+       {"solidZ", 0},
+       {"rightSpacing", 0},
+       {"bottomSpacing", 0},
+       {"cols", 0},
+       {"rows", 0}
     });
 
     // 插入第三条记录：tipsHeadArea
@@ -238,7 +286,11 @@ void AppSqlDatabase::seedDefaultData()
         {"originY", 10110},
         {"gripperZ", 0},
         {"tipsZ", 0},
-        {"solidZ", 0}
+        {"solidZ", 0},
+        {"rightSpacing", 412.86},
+        {"bottomSpacing", 1135.55},
+        {"cols", 8},
+        {"rows", 12}
     });
 
     // 插入第四条记录：gripLiquidArea
@@ -249,7 +301,11 @@ void AppSqlDatabase::seedDefaultData()
         {"originY", 41753},
         {"gripperZ", 40000},
         {"tipsZ", 0},
-        {"solidZ", 0}
+        {"solidZ", 0},
+        {"rightSpacing", 0},
+        {"bottomSpacing", 0},
+        {"cols", 0},
+        {"rows", 0}
     });
 
     // 插入第五条记录：wasteArea
@@ -260,7 +316,11 @@ void AppSqlDatabase::seedDefaultData()
         {"originY", 49976},
         {"gripperZ", 0},
         {"tipsZ", 126526},
-        {"solidZ", 0}
+        {"solidZ", 0},
+        {"rightSpacing", 0},
+        {"bottomSpacing", 0},
+        {"cols", 0},
+        {"rows", 0}
     });
 
     // 插入第六条记录：solidArea
@@ -271,7 +331,11 @@ void AppSqlDatabase::seedDefaultData()
         {"originY", 3472},
         {"gripperZ", 0},
         {"tipsZ", 0},
-        {"solidZ", 241838}
+        {"solidZ", 241838},
+        {"rightSpacing", 0},
+        {"bottomSpacing", 0},
+        {"cols", 0},
+        {"rows", 0}
     });
 
     // 插入第七条记录，Hat区域：帽子区域
@@ -282,18 +346,53 @@ void AppSqlDatabase::seedDefaultData()
         {"originY", 35572},
         {"gripperZ", 257246},
         {"tipsZ", 0},
-        {"solidZ", 0}
+        {"solidZ", 0},
+        {"rightSpacing", 0},
+        {"bottomSpacing", 0},
+        {"cols", 0},
+        {"rows", 0}
     });
 
     // 插入第八条记录，摇床区：shakeBedArea
     ensureNamedRecord(QString::fromLatin1(kTableOther), QStringLiteral("name"), QStringLiteral("shakeBedArea"), {
         {"currentIndex", 0},
         {"name", "shakeBedArea"},
-        {"originX", 15088},
-        {"originY", 4691},
+        {"originX", 14970},
+        {"originY", 3726},
         {"gripperZ", 276999},
         {"tipsZ", 0},
-        {"solidZ", 0}
+        {"solidZ", 0},
+        {"rightSpacing", 1732.75},
+        {"bottomSpacing", 4355.0},
+        {"cols", 5},
+        {"rows", 3}
+    });
+
+    // 插入第十条记录，transferRightArea
+    // 初始化 shakeBedArea 表，创建15条默认记录（selfLocation从0到14）
+    if (isTableEmpty(QString::fromLatin1(kTableShakeBedArea))) {
+        for (int i = 0; i < 15; ++i) {
+            insertRow(QString::fromLatin1(kTableShakeBedArea), {
+                {"selfLocation", i},
+                {"isEmpty", 1},
+                {"startTime", 0},
+                {"endTime", 0}
+            });
+        }
+    }
+
+    ensureNamedRecord(QString::fromLatin1(kTableOther), QStringLiteral("name"), QStringLiteral("transferRightArea"), {
+        {"currentIndex", 0},
+        {"name", "transferRightArea"},
+        {"originX", 5434},
+        {"originY", 42388},
+        {"gripperZ", 266175},
+        {"tipsZ", 0},
+        {"solidZ", 0},
+        {"rightSpacing", 0},
+        {"bottomSpacing", 0},
+        {"cols", 0},
+        {"rows", 0}
     });
 
 

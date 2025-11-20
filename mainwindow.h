@@ -17,6 +17,20 @@ class MainWindow;
 }
 QT_END_NAMESPACE
 
+// 槽位坐标计算配置结构体
+struct SlotPositionConfig {
+    double sourceX;     // 原点X坐标（左上角）
+    double sourceY;     // 原点Y坐标（左上角）
+    int cols;           // 盘的列数（横向数量）
+    int rows;           // 盘的行数（纵向数量）
+    double spacingX;    // 横向间距（往左为负方向）
+    double spacingY;   // 纵向间距（往下为正方向）
+    
+    SlotPositionConfig() : sourceX(0), sourceY(0), cols(0), rows(0), spacingX(0), spacingY(0) {}
+    SlotPositionConfig(double x, double y, int c, int r, double sx, double sy) 
+        : sourceX(x), sourceY(y), cols(c), rows(r), spacingX(sx), spacingY(sy) {}
+};
+
 class QTimer;
 class QGraphicsScene;
 class QGraphicsPixmapItem;
@@ -65,6 +79,12 @@ private slots:
      * - 时间：hh:mm:ss
      */
     void updateTime();
+
+    void on_pushButton_6_clicked();
+
+    void on_pushButton_7_clicked();
+
+    void on_pushButton_8_clicked();
 
 protected:
     /**
@@ -131,6 +151,9 @@ private:
     
     // 数据库管理
     AppSqlDatabase *dbm = nullptr;           // 数据库管理对象
+    
+    // 摇床初始化连接（用于监听启动回复）
+    QMetaObject::Connection m_shakeBedInitConnection;
 
     // 取空瓶（盘名称）
     bool takeEmptyBottle(const QString& trayName);
@@ -140,6 +163,12 @@ private:
     bool getSolid(const QString& solidName, double mass);
     // 拧紧瓶子
     void tightenBottle();
+    // 摇床（参数：时间或次数等）
+    void shakeBed(int parameter);
+    // 摇床初始化（摇3秒后停止）
+    void initializeShakeBed();
+    // 摇床完成后放置试剂瓶
+    void placeShakenReagentBottle();
     // 初始化所有设备（TCP连接和设备初始化）
     void initializeAllDevices();
     // xyz轴恢复到零点（06，08，09，0A号电机恢复到零点）
@@ -152,8 +181,41 @@ public:
      */
     void moveChessPiece(int pieceIndex, int col, int row);
 
+    /**
+     * 计算槽位坐标
+     * @param config 槽位配置（原点、行列数、间距）
+     * @param index 目标索引（从0开始）
+     * @return 计算后的坐标点
+     */
+    QPoint calculateSlotPosition(const SlotPositionConfig& config, int index);
 
-public: // 系统初始化
+    /**
+     * 将数据库表中指定字段的值自动加1
+     * @param tableName 表名
+     * @param fieldName 字段名
+     * @param whereClause WHERE条件子句（例如："name = 'transferRightArea'"），如果为空则更新所有记录
+     * @return 成功返回true，失败返回false
+     */
+    bool incrementDatabaseField(const QString& tableName, const QString& fieldName, const QString& whereClause = QString());
+
+    /**
+     * 将数据库表中指定字段的值自动减1
+     * @param tableName 表名
+     * @param fieldName 字段名
+     * @param whereClause WHERE条件子句（例如："name = 'transferRightArea'"），如果为空则更新所有记录
+     * @return 成功返回true，失败返回false
+     */
+    bool decrementDatabaseField(const QString& tableName, const QString& fieldName, const QString& whereClause = QString());
+
+    /**
+     * 记录摇床区域的时间信息
+     * 更新other表的currentIndex，并更新shakeBedArea表的startTime、endTime和isEmpty
+     * @param selfLocation 摇床位置编号
+     * @param shakeDurationSeconds 摇床持续时间（秒），默认10秒
+     * @return 成功返回true，失败返回false
+     */
+    bool recordShakeBedTime(int selfLocation, int shakeDurationSeconds = 10);
+
     /**
      * 初始化系统组件
      * 包括：转移区域、ABC试剂、TCP通信、按钮连接
@@ -169,6 +231,7 @@ public slots:
 
 };
 #endif // MAINWINDOW_H
+
 
 
 

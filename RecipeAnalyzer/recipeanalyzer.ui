@@ -58,7 +58,7 @@
             <item row="0" column="1">
              <widget class="QLineEdit" name="lineEdit_formula">
               <property name="text">
-               <string>Cs0.05FA0.95PbI3</string>
+               <string>FAI</string>
               </property>
               <property name="placeholderText">
                <string>例如: Cs0.17FA0.83Pb(I0.8Br0.2)3</string>
@@ -113,7 +113,7 @@
                <double>0.100000000000000</double>
               </property>
               <property name="value">
-               <double>5.000000000000000</double>
+               <double>0.900000000000000</double>
               </property>
              </widget>
             </item>

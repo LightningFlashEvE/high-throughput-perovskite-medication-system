@@ -67,8 +67,40 @@ void MainWindow::initializeSystemComponents()
 
     // ==========     初始化TCP用来收取485信息     ==========
     tcpCore = new TcpClientCore(this);
+    tcpCore->initializeConnectionsAndTimers();
     // ========== 初始化TCP用来收取来自天平的串口信息 ==========
     tcpBalanceCore = new TcpClientCore(this);
+    tcpBalanceCore->initializeConnectionsForBalance();
+
+    // connetct tcpBalanceCore发出weightReached信号时，tcpCore发送停止命令
+    connect(tcpBalanceCore, &TcpClientCore::weightReached, this, [=](double weight) {
+        qDebug() << "connect获取到重量值:" << weight << "g";
+        tcpCore->writeBalanceTareCommand(">01K0EE65", TcpClientCore::AsciiMode);
+        tcpBalanceCore->clearExpectedWeight();
+        tcpBalanceCore->disconnectReceiveForBalance();
+
+    });
+    
+    // 连接 tcpCore 的 balancePrintOffRequested 信号，让 tcpBalanceCore 【【【断开接收】】】
+    connect(tcpCore, &TcpClientCore::balancePrintOffRequested, this, [=]() {
+        qDebug() << "收到AA0命令，关闭天平打印，断开接收";
+        tcpBalanceCore->disconnectReceiveForBalance();
+    });
+    
+    // 连接 tcpCore 的 balancePrintOnRequested 信号，让 tcpBalanceCore 【【【连接接收】】】
+    connect(tcpCore, &TcpClientCore::balancePrintOnRequested, this, [=]() {
+        qDebug() << "收到AA1命令，打开天平打印，连接接收";
+        tcpBalanceCore->connectReceiveForBalance();
+    });
+    
+
+
+    // 连接 tcpCore 的 balanceTareRequested 信号，让 tcpBalanceCore 【【执行去皮命令】】
+    connect(tcpCore, &TcpClientCore::balanceTareRequested, this, [=]() {
+        qDebug() << "发送去皮命令（十六进制：540D0A = T\\r\\n）";
+        tcpBalanceCore->writeBalanceTareCommand("540D0A", TcpClientCore::HexMode);
+        tcpBalanceCore->setExpectedWeight(tcpCore->getExpectedWeight());
+    });
 
 
 
@@ -78,10 +110,7 @@ void MainWindow::initializeSystemComponents()
 
         // 连接到TCP服务器
         tcpCore->connectToTcp("192.168.5.22", "192.168.5.201", 4196, true);
-        tcpCore->initializeConnectionsAndTimers();
-
         tcpBalanceCore->connectToTcp("192.168.5.22", "192.168.5.202", 4196, true);
-        tcpBalanceCore->initializeConnectionsForBalance();
         
         initializeAllDevices();
 
@@ -89,9 +118,12 @@ void MainWindow::initializeSystemComponents()
     
     // 按钮2：断开连接
     connect(ui->pushButton_2, &QPushButton::clicked, this, [=] {
+
         qDebug() << "断开TCP连接";
         tcpCore->disconnectFromTcp();
         tcpBalanceCore->disconnectFromTcp();
+
+
     });
 
     // 按钮3：获取坐标
@@ -164,59 +196,70 @@ void MainWindow::initializeSystemComponents()
      * 移动回A盘1号坐标，下降，释放盖子，上升。
      */
 
-    // 打开空瓶
-    // takeEmptyBottle("Box_Transfer_Area_Right");
+    // // 打开空瓶
+    //takeEmptyBottle("Box_Transfer_Area_Right");
 
-    // // 取液体，参数为液体名称，液体量
-    // getLiquid("DMF", 0.1);
+    // // // 取液体，参数为液体名称，液体量
+    //getLiquid("DMF", 0.01);
 
-    // // 取固体
-    // getSolid("Na2CO3", 0.1);
+    // // // 取固体
+    //getSolid("Na2CO3", 2);
 
-    // 拧紧瓶子
+    // // 拧紧瓶子放置去摇床
     tightenBottle();
 
 
+    // 摇床启动
+    //shakeBed(10);
+
+
     });
-
-
-
-
-
-    
-    // // ========== Y轴测试滑块：拖动释放后发送移动命令 ==========
-    // // 设置滑块范围：0-57500（十进制）
-    // ui->verticalSliderY->setRange(0, 57500);
-    // ui->verticalSliderY->setValue(0);  // 初始值为0
-    // ui->verticalSliderY->setInvertedAppearance(true); // 反转显示：最大在上，最小在下
-    // if (ui->lineEdit_y) ui->lineEdit_y->setText(QString::number(ui->verticalSliderY->value()));
-
-    // // 同步显示：滑块移动时，lineEdit_y 显示当前值（十进制）
-    // connect(ui->verticalSliderY, &QSlider::valueChanged, this, [=](int v) {
-    //     if (ui->lineEdit_y) ui->lineEdit_y->setText(QString::number(v));
-    // });
-    
-    // // ========== X轴测试滑块：拖动释放后发送移动命令 ==========
-    // // 设置滑块范围：0-57500（十进制）
-    // ui->horizontalSliderX->setRange(0, 30000);
-    // ui->horizontalSliderX->setValue(0);  // 初始值为0
-    // ui->horizontalSliderX->setInvertedAppearance(true);
-    // if (ui->lineEdit_x) ui->lineEdit_x->setText(QString::number(ui->horizontalSliderX->value()));
-
-    // // 同步显示：滑块移动时，lineEdit_x 显示当前值（十进制）
-    // connect(ui->horizontalSliderX, &QSlider::valueChanged, this, [=](int v) {
-    //     if (ui->lineEdit_x) ui->lineEdit_x->setText(QString::number(v));
-    // });
-
-    // // 连接滑块的sliderReleased信号：只在鼠标释放后才发送命令
-    // connect(ui->horizontalSliderX, &QSlider::sliderReleased, this, [=]() {
-
-    // });
-    // // 连接滑块的sliderReleased信号：只在鼠标释放后才发送命令
-    // connect(ui->verticalSliderY, &QSlider::sliderReleased, this, [=]() {
-
-    // });
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 // 测试配方发送功能（接收JSON对象）
@@ -231,25 +274,63 @@ void MainWindow::testRecipeSend(const QJsonObject& recipePacket)
     QJsonArray solutes = recipePacket.value("溶质").toArray();
     qDebug() << "溶质条目数:" << solutes.size();
     for (const auto &v : std::as_const(solutes)) {
-        QJsonObject o = v.toObject();
-        qDebug() << "溶质-名称:" << o.value("名称").toString()
-                 << "用量:" << o.value("用量").toDouble()
-                 << o.value("单位").toString();
+        const QJsonObject o = v.toObject();
+        const QString name = o.value("名称").toString();
+        const double amount = o.value("用量").toDouble();
+        const QString unit = o.value("单位").toString();
+        qDebug() << "溶质-名称:" << name
+                 << "用量:" << amount
+                 << unit;
     }
 
     // 溶剂
     QJsonArray solvents = recipePacket.value("溶剂").toArray();
     qDebug() << "溶剂条目数:" << solvents.size();
     for (const auto &v : std::as_const(solvents)) {
-        QJsonObject o = v.toObject();
-        qDebug() << "溶剂-名称:" << o.value("名称").toString()
-                 << "用量:" << o.value("用量").toDouble()
-                 << o.value("单位").toString();
+        const QJsonObject o = v.toObject();
+        const QString name = o.value("名称").toString();
+        const double amount = o.value("用量").toDouble();
+        const QString unit = o.value("单位").toString();
+        qDebug() << "溶剂-名称:" << name
+                 << "用量:" << amount
+                 << unit;
     }
 
+
+
+
     // TODO: 在此处开始排打顺序执行（按溶质/溶剂分别处理）
-    // 取空瓶（盘名称）
-    //takeEmptyBottle("A盘");
+    // // 打开空瓶
+    takeEmptyBottle("Box_Transfer_Area_Right");
+
+    // 取液体：遍历溶剂，传入名称与体积（ml）
+    for (const auto &v : std::as_const(solvents)) {
+        const QJsonObject o = v.toObject();
+        const QString name = o.value("名称").toString();
+        const double volume = o.value("用量").toDouble();
+        if (name.isEmpty() || qFuzzyIsNull(volume)) {
+            qWarning() << "溶剂参数不完整，跳过：" << o;
+            continue;
+        }
+        qDebug() << "准备取液体:" << name << "目标体积(ml):" << volume;
+        getLiquid(name, volume);
+    }
+
+    // 取固体：遍历溶质，传入名称与质量（g）
+    for (const auto &v : std::as_const(solutes)) {
+        const QJsonObject o = v.toObject();
+        const QString name = o.value("名称").toString();
+        const double mass = o.value("用量").toDouble();
+        if (name.isEmpty() || qFuzzyIsNull(mass)) {
+            qWarning() << "溶质参数不完整，跳过：" << o;
+            continue;
+        }
+        qDebug() << "准备取固体:" << name << "目标质量(g):" << mass;
+        getSolid(name, mass);
+    }
+
+    // // 拧紧瓶子放置去摇床
+    tightenBottle();
 
 }
 
@@ -269,6 +350,10 @@ void MainWindow::testRecipeSendWithString(const QJsonObject& recipePacket, const
 
 void MainWindow::initializeAllDevices()
 {
+    QString stopCommand = tcpCore->buildMessageWithCrc(QStringLiteral(">0Cxi30100000000"));
+    tcpCore->writeBalanceTareCommand(stopCommand, TcpClientCore::StringMode);
+
+
     qDebug() << "消磁开始";
     QString closeElectromagnetCommand = tcpCore->buildDeviceCommand("0D", "05", "00000000", 0, 0);
     tcpCore->sendMessageAsync(closeElectromagnetCommand.toUtf8(), false);
@@ -309,7 +394,7 @@ void MainWindow::initializeAllDevices()
     QString waitZPumpInitializedCommand = tcpCore->buildDeviceCommand("08", "d", 0, 0);
     tcpCore->sendMessageAsync(waitZPumpInitializedCommand.toUtf8(), true);
     // 08移动到4的位置
-    QString moveToZ4Command = tcpCore->buildDeviceCommand("08", "D", 4, 8); // 00000004
+    QString moveToZ4Command = tcpCore->buildDeviceCommand("08", "D", 100, 8); // 00000004
     tcpCore->sendMessageAsync(moveToZ4Command.toUtf8(), true);
     QString waitZ4Command = tcpCore->buildDeviceCommand("08", "d", 0, 0);
     tcpCore->sendMessageAsync(waitZ4Command.toUtf8(), true);
@@ -330,6 +415,9 @@ void MainWindow::initializeAllDevices()
     QString waitZAxisInitializedCommand = tcpCore->buildDeviceCommand("06", "d", 0, 0);
     tcpCore->sendMessageAsync(waitZAxisInitializedCommand.toUtf8(), true);
 
+    // 摇床摇3s后停止，作为已经初始化。
+    initializeShakeBed();
+
     qDebug() << "\n\n初始化X"; // 10号电机
     QString initializeXAxisCommand = tcpCore->buildDeviceCommand("0A", "G", 0, 0);
     tcpCore->sendMessageAsync(initializeXAxisCommand.toUtf8(), true);
@@ -349,3 +437,378 @@ void MainWindow::initializeAllDevices()
     tcpCore->sendMessageAsync(waitGripAreaInitializedCommand.toUtf8(), false);
 }
 
+
+// 用于tcpBalanceCore，发送T\r\n（十六进制：54 0D 0A），这是天平去皮命令。单纯发送就行->write(dataToSend); 
+void MainWindow::on_pushButton_6_clicked()
+{
+    // 使用十六进制模式发送：54 0D 0A (T\r\n)
+    // tcpBalanceCore->writeBalanceTareCommand("540D0A", TcpClientCore::HexMode);
+    // tcpCore->writeBalanceTareCommand(">01K0EE65", TcpClientCore::AsciiMode);
+    tcpBalanceCore->disconnectReceiveForBalance();
+}
+
+
+
+// 摇床初始化（摇3秒后停止）
+void MainWindow::initializeShakeBed()
+{
+    // 摇床是C，12号机器
+    // 初始化：启动摇床，摇3秒后停止
+
+    // 1. 初始化摇匀设备
+    QString initCommand = tcpCore->buildMessageWithCrc(QStringLiteral(">0CG"));
+    tcpCore->sendMessageAsync(initCommand.toUtf8(), true, "0CG");
+
+    // 2. 查询初始化状态
+    QString queryInitCommand = tcpCore->buildMessageWithCrc(QStringLiteral(">0cg"));
+    tcpCore->sendMessageAsync(queryInitCommand.toUtf8(), true, "0Cg01");
+
+    // 3. 启动摇匀（速度300rpm，加速度300）
+    QString startCommand = tcpCore->buildMessageWithCrc(QStringLiteral(">0Cxi3000000012c0000012c"));
+    qDebug() << "摇床初始化启动命令:" << startCommand;
+
+    // 断开之前的连接（如果存在）
+    if (m_shakeBedInitConnection) {
+        disconnect(m_shakeBedInitConnection);
+        m_shakeBedInitConnection = QMetaObject::Connection();
+    }
+
+    // 使用一次性连接，等待启动命令的回复后再开始3秒倒计时
+    m_shakeBedInitConnection = connect(tcpCore, &TcpClientCore::dataReceived, this, [this](const QByteArray& data) {
+        QString dataStr = QString::fromUtf8(data);
+        // 检查是否是摇床启动命令的回复（包含 "0Cxi300" 但不包含 "0Cxi301"）
+        if (dataStr.contains("0Cxi300") && !dataStr.contains("0Cxi301")) {
+            qDebug() << "收到摇床启动回复，开始3秒倒计时";
+            // 断开这个一次性连接
+            if (m_shakeBedInitConnection) {
+                disconnect(m_shakeBedInitConnection);
+                m_shakeBedInitConnection = QMetaObject::Connection();
+            }
+
+            // 等待3秒后停止（作为初始化完成）
+            QTimer::singleShot(3000, this, [this]() {
+                QString stopCommand = tcpCore->buildMessageWithCrc(QStringLiteral(">0Cxi30100000000"));
+                qDebug() << "摇床初始化停止命令:" << stopCommand;
+                // 直接发送，不加入队列（使用writeBalanceTareCommand函数）
+                tcpCore->writeBalanceTareCommand(stopCommand, TcpClientCore::StringMode);
+                qDebug() << "摇床初始化完成（已摇3秒）";
+            });
+        }
+    }, Qt::QueuedConnection);
+
+    // 发送启动命令
+    tcpCore->sendMessageAsync(startCommand.toUtf8(), true, "0Cxi300");
+}
+
+// 摇床
+void MainWindow::shakeBed(int parameter)
+{
+    // 摇床是C，12号机器
+    // parameter: 摇匀时间（秒），如果为0或负数则只停止
+
+    if (parameter <= 0) {
+        // 只停止摇匀
+        // 自定义协议格式：>0Cxi30100000000 + CRC
+        QString stopCommand = tcpCore->buildMessageWithCrc(QStringLiteral(">0Cxi30100000000"));
+        tcpCore->sendMessageAsync(stopCommand.toUtf8(), true, "0Cxi301"); // 等待回复：>0Cxi300
+
+        return;
+    }
+
+    // // 1. 初始化摇匀设备
+    // QString initCommand = tcpCore->buildMessageWithCrc(QStringLiteral(">0CG"));
+    // tcpCore->sendMessageAsync(initCommand.toUtf8(), true, "0CG");
+
+    // // 2. 查询初始化状态
+    // QString queryInitCommand = tcpCore->buildMessageWithCrc(QStringLiteral(">0cg"));
+    // tcpCore->sendMessageAsync(queryInitCommand.toUtf8(), true, "0Cg01");
+
+    // 3. 启动摇匀（速度300rpm，加速度300）
+    // 速度：0000012c = 300 (十进制) = 0x12C
+    // 加速度：0000012c = 300 (十进制) = 0x12C
+    // 发送：>0Cxi3000000012c0000012c + CRC，回复：>0Cxi300
+    QString startCommand = tcpCore->buildMessageWithCrc(QStringLiteral(">0Cxi3000000012c0000012c"));
+    qDebug() << "startCommand " << startCommand;
+    tcpCore->sendMessageAsync(startCommand.toUtf8(), true, "0Cxi300");
+
+    // // 4. 等待指定时间（parameter秒）
+    // QTimer::singleShot(parameter * 1000, this, [this, parameter]() {
+    //     // 5. 停止摇匀
+    //     // 发送：>0Cxi30100000000 + CRC，回复：>0Cxi300
+    //     QString stopCommand = tcpCore->buildMessageWithCrc(QStringLiteral(">0Cxi30100000000"));
+    //     qDebug() << "stopCommand" << stopCommand;
+    //     tcpCore->sendMessageAsync(stopCommand.toUtf8(), true, "0Cxi301");
+    //     qDebug() << "摇床完成，摇匀时间：" << parameter << "秒";
+
+    //     // 摇床完成后放置试剂瓶
+    //     placeShakenReagentBottle();
+
+    // });
+
+
+
+}
+
+/**
+ * xyz轴恢复到零点
+ * 将06，08，09，0A号电机恢复到零点
+ */
+void MainWindow::resetXYZMotorsToZero()
+{
+    // 复位时停止天平打印
+    if (tcpBalanceCore) {
+        tcpBalanceCore->disconnectReceiveForBalance();
+    }
+    tcpCore->sendMessageAsync("AA0", true); // 关闭天平打印
+
+    // 06号电机恢复到零点
+    QString zeroMotorCommand = tcpCore->buildDeviceCommand("06", "D", 0, 8);
+    tcpCore->sendMessageAsync(zeroMotorCommand.toUtf8(), true);
+    QString waitZeroMotorCommand = tcpCore->buildDeviceCommand("06", "d", 0, 0);
+    tcpCore->sendMessageAsync(waitZeroMotorCommand.toUtf8(), true, "06d01");
+
+    // 08号电机恢复到零点
+    zeroMotorCommand = tcpCore->buildDeviceCommand("08", "D", 3, 8);
+    tcpCore->sendMessageAsync(zeroMotorCommand.toUtf8(), true);
+    waitZeroMotorCommand = tcpCore->buildDeviceCommand("08", "d", 0, 0);
+    tcpCore->sendMessageAsync(waitZeroMotorCommand.toUtf8(), true, "08d01");
+
+    // 09号电机恢复到零点
+    zeroMotorCommand = tcpCore->buildDeviceCommand("09", "D", 0, 8);
+    tcpCore->sendMessageAsync(zeroMotorCommand.toUtf8(), true);
+    waitZeroMotorCommand = tcpCore->buildDeviceCommand("09", "d", 0, 0);
+    tcpCore->sendMessageAsync(waitZeroMotorCommand.toUtf8(), true, "09d01");
+
+    // 0A号电机恢复到零点
+    zeroMotorCommand = tcpCore->buildDeviceCommand("0A", "D", 0, 8);
+    tcpCore->sendMessageAsync(zeroMotorCommand.toUtf8(), true);
+    waitZeroMotorCommand = tcpCore->buildDeviceCommand("0A", "d", 0, 0);
+    tcpCore->sendMessageAsync(waitZeroMotorCommand.toUtf8(), true, "0Ad01");
+}
+
+void MainWindow::placeShakenReagentBottle()
+{
+    // TODO: 实现摇床完成后将试剂瓶放置到指定位置的逻辑
+    qDebug() << "摇床完成，准备放置试剂瓶";
+
+    /**
+    * 读取摇床区
+    *
+    * 数据库获取 shakeBedArea 的xyz
+    *
+    * 数据库获取 shakeBedArea 的rightSpacing, bottomSpacing, cols, rows
+    * 计算槽位坐标
+    * 0A, 09, 06电机移动到shakeBedArea的xyz  currentIndex
+    */
+    QString shakeBedAreaSql = "SELECT originX, originY, gripperZ, rightSpacing, bottomSpacing, cols, rows, currentIndex FROM other WHERE name = 'shakeBedArea'";
+    QSqlQuery shakeBedAreaQuery = dbm->query(shakeBedAreaSql);
+    int shakeBedAreaRightSpacing=0, shakeBedAreaBottomSpacing=0, shakeBedAreaCols=0, shakeBedAreaRows=0, shakeBedAreaSlotIndex=0;
+    int shakeBedAreaX=0, shakeBedAreaY=0, shakeBedAreaZ=0;
+    if (shakeBedAreaQuery.next()) {
+        shakeBedAreaX = shakeBedAreaQuery.value("originX").toInt();
+        shakeBedAreaY = shakeBedAreaQuery.value("originY").toInt();
+        shakeBedAreaZ = shakeBedAreaQuery.value("gripperZ").toInt();
+        shakeBedAreaRightSpacing = shakeBedAreaQuery.value("rightSpacing").toDouble();
+        shakeBedAreaBottomSpacing = shakeBedAreaQuery.value("bottomSpacing").toDouble();
+        shakeBedAreaCols = shakeBedAreaQuery.value("cols").toInt();
+        shakeBedAreaRows = shakeBedAreaQuery.value("rows").toInt();
+        shakeBedAreaSlotIndex = shakeBedAreaQuery.value("currentIndex").toInt();
+    }
+
+
+    SlotPositionConfig config(shakeBedAreaX, shakeBedAreaY, shakeBedAreaCols, shakeBedAreaRows, shakeBedAreaRightSpacing, shakeBedAreaBottomSpacing);
+    QPoint targetPos = calculateSlotPosition(config, shakeBedAreaSlotIndex);
+    int shakeBedAreaTargetX = targetPos.x();
+    int shakeBedAreaTargetY = targetPos.y();
+
+    QString moveToShakeBedAreaZCommand = tcpCore->buildDeviceCommand("0A", "D", shakeBedAreaTargetX, 8);
+    tcpCore->sendMessageAsync(moveToShakeBedAreaZCommand.toUtf8(), true);
+    QString waitShakeBedAreaZCommand = tcpCore->buildDeviceCommand("0A", "d", 0, 0);
+    tcpCore->sendMessageAsync(waitShakeBedAreaZCommand.toUtf8(), true, "0Ad01");
+
+    QString moveToShakeBedAreaYCommand = tcpCore->buildDeviceCommand("09", "D", shakeBedAreaTargetY, 8);
+    tcpCore->sendMessageAsync(moveToShakeBedAreaYCommand.toUtf8(), true);
+    QString waitShakeBedAreaYCommand = tcpCore->buildDeviceCommand("09", "d", 0, 0);
+    tcpCore->sendMessageAsync(waitShakeBedAreaYCommand.toUtf8(), true, "09d01");
+
+    QString moveToShakeBedAreaXCommand = tcpCore->buildDeviceCommand("06", "D", shakeBedAreaZ, 8);
+    tcpCore->sendMessageAsync(moveToShakeBedAreaXCommand.toUtf8(), true);
+    QString waitShakeBedAreaXCommand = tcpCore->buildDeviceCommand("06", "d", 0, 0);
+    tcpCore->sendMessageAsync(waitShakeBedAreaXCommand.toUtf8(), true, "06d01");
+
+
+    /**
+     * 夹住瓶子，上移
+     *
+     * 5号电机夹住瓶子
+     * 6号电机上移
+     */
+    QString enableGripperCommand = tcpCore->buildDeviceCommand("05", "06", "0105", 100, 4);
+    tcpCore->sendMessageAsync(enableGripperCommand.toUtf8(), false);
+    QString waitGripperEnableCommand = tcpCore->buildDeviceCommand("05", "03", "0202", 1, 4);
+    tcpCore->sendMessageAsync(waitGripperEnableCommand.toUtf8(), false, "0503020002");
+
+    QString raiseTransferZCommand = tcpCore->buildDeviceCommand("06", "D", 100, 8);
+    tcpCore->sendMessageAsync(raiseTransferZCommand.toUtf8(), true);
+    QString waitTransferZRaisedCommand = tcpCore->buildDeviceCommand("06", "d", 0, 0);
+    tcpCore->sendMessageAsync(waitTransferZRaisedCommand.toUtf8(), true, "06d01");
+
+    /**
+     * 去到成品放置区域
+     *
+     * 数据库获取 transferRightArea 的xyz
+     * 0A, 09, 06电机移动到transferRightArea的xyz
+     *
+     */
+    QString transferRightAreaSql = "SELECT originX, originY, gripperZ FROM other WHERE name = 'transferRightArea'";
+    QSqlQuery transferRightAreaQuery = dbm->query(transferRightAreaSql);
+    int transferRightAreaX=0, transferRightAreaY=0, transferRightAreaZ=0, transferRightAreaRightSpacing=0, transferRightAreaBottomSpacing=0, transferRightAreaCols=0, transferRightAreaRows=0, transferRightAreaSlotIndex=0;
+    if (transferRightAreaQuery.next()) {
+        transferRightAreaX = transferRightAreaQuery.value("originX").toInt();
+        transferRightAreaY = transferRightAreaQuery.value("originY").toInt();
+        transferRightAreaZ = transferRightAreaQuery.value("gripperZ").toInt();
+        transferRightAreaRightSpacing = transferRightAreaQuery.value("rightSpacing").toDouble();
+        transferRightAreaBottomSpacing = transferRightAreaQuery.value("bottomSpacing").toDouble();
+        transferRightAreaCols = transferRightAreaQuery.value("cols").toInt();
+        transferRightAreaRows = transferRightAreaQuery.value("rows").toInt();
+        transferRightAreaSlotIndex = transferRightAreaQuery.value("currentIndex").toInt();
+    }
+    // 计算xy
+    SlotPositionConfig transferRightAreaConfig(transferRightAreaX, transferRightAreaY, transferRightAreaCols, transferRightAreaRows, transferRightAreaRightSpacing, transferRightAreaBottomSpacing);
+    QPoint transferRightAreaTargetPos = calculateSlotPosition(transferRightAreaConfig, transferRightAreaSlotIndex);
+    int transferRightAreaTargetX = transferRightAreaTargetPos.x();
+    int transferRightAreaTargetY = transferRightAreaTargetPos.y();
+
+    QString moveToTransferRightAreaXCommand = tcpCore->buildDeviceCommand("0A", "D", transferRightAreaTargetX, 8);
+    tcpCore->sendMessageAsync(moveToTransferRightAreaXCommand.toUtf8(), true);
+    QString waitTransferRightAreaXCommand = tcpCore->buildDeviceCommand("0A", "d", 0, 0);
+    tcpCore->sendMessageAsync(waitTransferRightAreaXCommand.toUtf8(), true, "0Ad01");
+
+    QString moveToTransferRightAreaYCommand = tcpCore->buildDeviceCommand("09", "D", transferRightAreaTargetY, 8);
+    tcpCore->sendMessageAsync(moveToTransferRightAreaYCommand.toUtf8(), true);
+    QString waitTransferRightAreaYCommand = tcpCore->buildDeviceCommand("09", "d", 0, 0);
+    tcpCore->sendMessageAsync(waitTransferRightAreaYCommand.toUtf8(), true, "09d01");
+
+    QString moveToTransferRightAreaZCommand = tcpCore->buildDeviceCommand("06", "D", transferRightAreaZ, 8);
+    tcpCore->sendMessageAsync(moveToTransferRightAreaZCommand.toUtf8(), true);
+    QString waitTransferRightAreaZCommand = tcpCore->buildDeviceCommand("06", "d", 0, 0);
+    tcpCore->sendMessageAsync(waitTransferRightAreaZCommand.toUtf8(), true, "06d01");
+
+    /**
+     * 松夹爪
+     *
+     * 5号电机松夹爪
+     */
+    QString releaseGripperCommand = tcpCore->buildDeviceCommand("05", "06", "0105", 0, 4);
+    tcpCore->sendMessageAsync(releaseGripperCommand.toUtf8(), false);
+    QString waitGripperReleaseCommand = tcpCore->buildDeviceCommand("05", "03", "0202", 1, 4);
+    tcpCore->sendMessageAsync(waitGripperReleaseCommand.toUtf8(), false, "0503020001");
+
+    // 去other表把currentIndex值+1，并更新到数据库
+    incrementDatabaseField("other", "currentIndex", "name = 'transferRightArea'");
+
+    /**
+     * 上移
+     *
+     * 6号电机上移
+     */
+    tcpCore->sendMessageAsync(raiseTransferZCommand.toUtf8(), true);
+    tcpCore->sendMessageAsync(waitTransferZRaisedCommand.toUtf8(), true, "06d01");
+
+}
+
+// 计算槽位坐标
+QPoint MainWindow::calculateSlotPosition(const SlotPositionConfig& config, int index)
+{
+    if (config.cols <= 0) {
+        qWarning() << "列数必须大于0";
+        return QPoint(static_cast<int>(config.sourceX), static_cast<int>(config.sourceY));
+    }
+
+    // 计算行号和列号（从0开始）
+    int rowIndex = index / config.cols;
+    int colIndex = index % config.cols;
+
+    // 计算目标坐标
+    // X = 原点X - 列号 * 横向间距（往左移动，所以是减法）
+    // Y = 原点Y + 行号 * 纵向间距（往下移动，所以是加法）
+    double targetX = config.sourceX - colIndex * config.spacingX;
+    double targetY = config.sourceY + rowIndex * config.spacingY;
+
+    // 抹除小数点后面的部分（直接截断，不四舍五入）
+    int resultX = static_cast<int>(targetX);
+    int resultY = static_cast<int>(targetY);
+
+    return QPoint(resultX, resultY);
+}
+
+bool MainWindow::incrementDatabaseField(const QString& tableName, const QString& fieldName, const QString& whereClause)
+{
+    if (!dbm) {
+        qWarning() << "数据库对象未初始化";
+        return false;
+    }
+
+    // 构建UPDATE SQL语句
+    QString updateSql;
+    if (whereClause.isEmpty()) {
+        // 如果没有WHERE条件，更新所有记录（通常不推荐，但保留此功能）
+        updateSql = QString("UPDATE %1 SET %2 = %2 + 1").arg(tableName, fieldName);
+    } else {
+        // 有WHERE条件，只更新匹配的记录
+        updateSql = QString("UPDATE %1 SET %2 = %2 + 1 WHERE %3").arg(tableName, fieldName, whereClause);
+    }
+
+    QSqlQuery updateQuery = dbm->query(updateSql);
+
+    if (updateQuery.lastError().isValid()) {
+        qWarning() << "更新数据库字段失败:" << updateQuery.lastError().text() << "SQL:" << updateSql;
+        return false;
+    }
+
+    // 检查是否有记录被更新
+    int rowsAffected = updateQuery.numRowsAffected();
+    if (rowsAffected > 0) {
+        qDebug() << QString("成功更新表 %1 的字段 %2，影响 %3 条记录").arg(tableName, fieldName).arg(rowsAffected);
+        return true;
+    } else {
+        qWarning() << QString("更新表 %1 的字段 %2 时没有记录被影响，可能WHERE条件不匹配").arg(tableName, fieldName);
+        return false;
+    }
+}
+
+// 将数据库表中指定字段的值自动减1
+bool MainWindow::decrementDatabaseField(const QString& tableName, const QString& fieldName, const QString& whereClause)
+{
+    if (!dbm) {
+        qWarning() << "数据库对象未初始化";
+        return false;
+    }
+
+    // 构建UPDATE SQL语句
+    QString updateSql;
+    if (whereClause.isEmpty()) {
+        // 如果没有WHERE条件，更新所有记录（通常不推荐，但保留此功能）
+        updateSql = QString("UPDATE %1 SET %2 = %2 - 1").arg(tableName, fieldName);
+    } else {
+        // 有WHERE条件，只更新匹配的记录
+        updateSql = QString("UPDATE %1 SET %2 = %2 - 1 WHERE %3").arg(tableName, fieldName, whereClause);
+    }
+
+    QSqlQuery updateQuery = dbm->query(updateSql);
+
+    if (updateQuery.lastError().isValid()) {
+        qWarning() << "更新数据库字段失败:" << updateQuery.lastError().text() << "SQL:" << updateSql;
+        return false;
+    }
+
+    // 检查是否有记录被更新
+    int rowsAffected = updateQuery.numRowsAffected();
+    if (rowsAffected > 0) {
+        qDebug() << QString("成功更新表 %1 的字段 %2，影响 %3 条记录").arg(tableName, fieldName).arg(rowsAffected);
+        return true;
+    } else {
+        qWarning() << QString("更新表 %1 的字段 %2 时没有记录被影响，可能WHERE条件不匹配").arg(tableName, fieldName);
+        return false;
+    }
+}

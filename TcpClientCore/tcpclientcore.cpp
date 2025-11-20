@@ -1,6 +1,9 @@
 #include "tcpclientcore.h"
 #include <QHostAddress>
 #include <QDebug>
+#include <QRegularExpression>
+#include <QRegularExpressionMatch>
+
 
 TcpClientCore::TcpClientCore(QObject *parent)
     : QObject{parent}
@@ -11,6 +14,8 @@ TcpClientCore::TcpClientCore(QObject *parent)
     , m_isProcessingQueue(false)
     , m_queueTimer(nullptr)
     , m_isWaitingForResponse(false)
+    , m_expectedWeight(0.0)
+
 {
     // 创建 TCP Socket
     m_tcpSocket = new QTcpSocket(this);
@@ -42,6 +47,15 @@ void TcpClientCore::initializeConnectionsAndTimers()
     connect(m_queueTimer, &QTimer::timeout, this, &TcpClientCore::processMessageQueue);
 }
 
+
+
+
+
+
+
+
+
+
 void TcpClientCore::initializeConnectionsForBalance()
 {
     // 连接信号和槽（天平专用版本）
@@ -56,6 +70,44 @@ void TcpClientCore::initializeConnectionsForBalance()
     connect(m_tcpSocket, static_cast<void(QAbstractSocket::*)(QAbstractSocket::SocketError)>(&QAbstractSocket::error),
             this, &TcpClientCore::onBalanceSocketError);
     #endif
+}
+
+void TcpClientCore::disconnectConnectionsForBalance()
+{
+    if (!m_tcpSocket) {
+        return;
+    }
+    
+    // 断开信号和槽（天平专用版本）
+    disconnect(m_tcpSocket, &QTcpSocket::connected, this, &TcpClientCore::onBalanceConnected);
+    disconnect(m_tcpSocket, &QTcpSocket::disconnected, this, &TcpClientCore::onBalanceDisconnected);
+    disconnect(m_tcpSocket, &QTcpSocket::readyRead, this, &TcpClientCore::onBalanceReadyRead);
+
+    // 兼容不同Qt版本的错误信号
+    #if QT_VERSION >= QT_VERSION_CHECK(5, 15, 0)
+    disconnect(m_tcpSocket, &QAbstractSocket::errorOccurred, this, &TcpClientCore::onBalanceSocketError);
+    #else
+    disconnect(m_tcpSocket, static_cast<void(QAbstractSocket::*)(QAbstractSocket::SocketError)>(&QAbstractSocket::error),
+               this, &TcpClientCore::onBalanceSocketError);
+    #endif
+}
+
+void TcpClientCore::connectReceiveForBalance()
+{
+    if (m_balancePrintEnabled) {
+        return;
+    }
+    m_balancePrintEnabled = true;
+    qDebug() << "Balance receive print enabled";
+}
+
+void TcpClientCore::disconnectReceiveForBalance()
+{
+    if (!m_balancePrintEnabled) {
+        return;
+    }
+    m_balancePrintEnabled = false;
+    qDebug() << "Balance receive print disabled";
 }
 
 
@@ -96,10 +148,21 @@ bool TcpClientCore::connectToTcp(const QString& localIP, const QString& remoteIP
     }
     
     // 如果已经连接，先断开
-    if (m_tcpSocket->state() == QAbstractSocket::ConnectedState) {
+    const QAbstractSocket::SocketState currentState = m_tcpSocket->state();
+    if (currentState == QAbstractSocket::ConnectedState || currentState == QAbstractSocket::ClosingState) {
         qDebug() << "已经连接，先断开";
         m_tcpSocket->disconnectFromHost();
-        m_tcpSocket->waitForDisconnected(1000);
+
+        if (m_tcpSocket->state() != QAbstractSocket::UnconnectedState) {
+            if (!m_tcpSocket->waitForDisconnected(1000)) {
+                qWarning() << "等待上一次连接断开超时，强制中止";
+                m_tcpSocket->abort();
+            }
+        }
+    } else if (currentState != QAbstractSocket::UnconnectedState) {
+        // 处于其他状态（比如 Connecting），直接强制中止，避免 waitForDisconnected 警告
+        qWarning() << "检测到异常状态" << currentState << "，强制中止";
+        m_tcpSocket->abort();
     }
     
     // 设置代理
@@ -153,6 +216,74 @@ quint16 TcpClientCore::calculateCrc16(const QByteArray& data)
     }
     
     return crc;
+}
+
+// 直接发送命令，不经过队列
+void TcpClientCore::writeBalanceTareCommand(const QString& data, int mode)
+{
+    if (!m_tcpSocket) {
+        qWarning() << "TCP Socket 未初始化";
+        return;
+    }
+    
+    if (m_tcpSocket->state() != QAbstractSocket::ConnectedState) {
+        qWarning() << "未连接到服务器，无法发送命令";
+        return;
+    }
+    
+    if (data.isEmpty()) {
+        qWarning() << "发送内容为空";
+        return;
+    }
+    
+    // 数据格式转换
+    QByteArray dataToSend;
+    switch (mode) {
+        case StringMode:  // 字符串模式（默认）：将 QString 转换为 UTF-8 字节数组
+            dataToSend = data.toUtf8();
+            break;
+        case AsciiMode:  // ASCII模式：将 QString 转换为 Latin-1 字节数组
+            dataToSend = data.toLatin1();
+            break;
+        case HexMode:    // 十六进制模式：从十六进制字符串转换为字节
+            dataToSend = QByteArray::fromHex(data.toUtf8());
+            break;
+        default:
+            qWarning() << "未知的发送模式，使用默认字符串模式";
+            dataToSend = data.toUtf8();
+            break;
+    }
+    
+    // 通过TCP发送数据，检查发送结果
+    qint64 bytesWritten = m_tcpSocket->write(dataToSend);
+    
+    if (bytesWritten == -1) {
+        qWarning() << "发送失败:" << m_tcpSocket->errorString();
+        return;
+    }
+    
+    m_tcpSocket->flush();
+    qDebug() << "发送成功，字节数:" << bytesWritten;
+}
+
+// 设置期望重量值（用于称重对比）
+void TcpClientCore::setExpectedWeight(double weight)
+{
+    m_expectedWeight = weight;
+    qDebug() << QString("设置期望重量值：%1g").arg(weight);
+}
+
+// 获取期望重量值
+double TcpClientCore::getExpectedWeight() const
+{
+    return m_expectedWeight;
+}
+
+// 清除期望重量值（恢复为0）
+void TcpClientCore::clearExpectedWeight()
+{
+    m_expectedWeight = 0.0;
+    qDebug() << "已清除期望重量值";
 }
 
 // 发送消息接口
@@ -374,13 +505,20 @@ void TcpClientCore::disconnectFromTcp()
     m_isWaitingForResponse = false;
     
     // 6. 断开TCP连接
-    if (m_tcpSocket && m_tcpSocket->state() == QAbstractSocket::ConnectedState) {
-        m_tcpSocket->disconnectFromHost();
-        qDebug() << "正在断开TCP连接...";
-        
-        // 等待最多1秒让断开操作完成
-        if (!m_tcpSocket->waitForDisconnected(1000)) {
-            qWarning() << "TCP断开超时，强制中止连接";
+    if (m_tcpSocket) {
+        const QAbstractSocket::SocketState state = m_tcpSocket->state();
+        if (state == QAbstractSocket::ConnectedState || state == QAbstractSocket::ClosingState) {
+            qDebug() << "正在断开TCP连接...";
+            m_tcpSocket->disconnectFromHost();
+
+            if (m_tcpSocket->state() != QAbstractSocket::UnconnectedState) {
+                if (!m_tcpSocket->waitForDisconnected(1000)) {
+                    qWarning() << "TCP断开超时，强制中止连接";
+                    m_tcpSocket->abort();
+                }
+            }
+        } else if (state != QAbstractSocket::UnconnectedState) {
+            qWarning() << "TCP处于状态" << state << "，直接强制中止连接";
             m_tcpSocket->abort();
         }
     }
@@ -445,8 +583,8 @@ void TcpClientCore::onReadyRead()
     }
     
     QByteArray data = m_tcpSocket->readAll();
-    qDebug() << "收到数据:" << QString::fromUtf8(data) << QString(data.toHex().toUpper());
 
+    qDebug() << "                               收到数据:" << QString::fromUtf8(data) << " " << QString(data.toHex().toUpper());
     
     // 如果正在轮询，检查是否收到目标响应
     if (m_isPolling) {
@@ -539,12 +677,64 @@ void TcpClientCore::onBalanceReadyRead()
     if (!m_tcpSocket) {
         return;
     }
-    
+
     QByteArray data = m_tcpSocket->readAll();
-    qDebug() << "天平收到数据:" << QString::fromUtf8(data) << QString(data.toHex().toUpper());
-    
-    // // 直接发出数据接收信号，不进行复杂的轮询处理
-    // emit dataReceived(data);
+    QString dataStr = QString::fromUtf8(data);
+    //qDebug() << "天平收到数据:" << dataStr << QString(data.toHex().toUpper());
+
+    // 正则表达式：匹配数字（包括负数、浮动点数字）
+    // 支持格式：22.1074 g、-22.1074 g、N     -  22.1074 g 等
+    // 允许符号和数字之间有空格
+    QRegularExpression regex("([+-]?)\\s*(\\d+\\.?\\d*)\\s*"); // g已经删除，后期需要保留
+    QRegularExpressionMatchIterator iter = regex.globalMatch(dataStr);
+
+    while (iter.hasNext()) {
+        QRegularExpressionMatch match = iter.next();
+        QString sign = match.captured(1);      // 获取符号（+、- 或空）
+        QString numberStr = match.captured(2); // 获取数字部分
+        QString weightStr = sign + numberStr;   // 组合符号和数字
+        
+        bool ok;
+        double weight = weightStr.toDouble(&ok);
+
+        if (ok) {
+            if (m_balancePrintEnabled) {
+                qDebug() << QString("----- %1g / %2g -----").arg(weight).arg(m_expectedWeight);
+            }
+            
+            // 如果设置了期望重量值（不为0），进行对比
+            if (m_expectedWeight != 0.0) {
+                if (m_balancePrintEnabled) {
+                    //qDebug() << "当前重量：" << weight << "期望重量：" << m_expectedWeight;
+                }
+                
+                // 判断当前值是否大于等于期望值
+                if (weight >= m_expectedWeight) {
+                    if (m_balancePrintEnabled) {
+                        qDebug() << "重量达标！！！！发送命令 >01K0EE65" << "当前重量：" << weight << "期望重量：" << m_expectedWeight;
+                    }
+                    // 发送信号 重量达标带重量值 重量值
+                    emit weightReached(weight);
+
+                } else {
+                    if (m_balancePrintEnabled) {
+                        //qDebug() << QString("重量未达标，当前值 %1g 小于期望值 %2g").arg(weight).arg(m_expectedWeight);
+                    }
+                }
+
+            }
+            else
+            {
+                // if (m_balancePrintEnabled) {
+                //     qDebug() << "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx";
+                // }
+            }
+        } else {
+            if (m_balancePrintEnabled) {
+                qDebug() << "天平无法解析的重量值：" << weightStr;
+            }
+        }
+    }
 }
 
 void TcpClientCore::onBalanceSocketError(QAbstractSocket::SocketError error)
@@ -952,6 +1142,36 @@ void TcpClientCore::processMessageQueue()
     // 取出队列中的第一条消息
     MessageQueueItem item = m_messageQueue.dequeue();
     
+    // 检查是否是AA0、AA1或AA2命令（天平命令）
+    QString contentStr = QString::fromUtf8(item.content);
+    if (item.asciiOrHex && contentStr == "AA0") {
+        // 检测到AA0命令（关闭天平打印），不发送，而是发出信号
+        qDebug() << "检测到AA0命令，发出天平打印关闭信号";
+        emit balancePrintOffRequested();
+        // 继续处理下一条消息
+        m_isProcessingQueue = false;
+        QTimer::singleShot(0, this, &TcpClientCore::processMessageQueue);
+        return;
+    }
+    if (item.asciiOrHex && contentStr == "AA1") {
+        // 检测到AA1命令（打开天平打印），不发送，而是发出信号
+        qDebug() << "检测到AA1命令，发出天平打印打开信号";
+        emit balancePrintOnRequested();
+        // 继续处理下一条消息
+        m_isProcessingQueue = false;
+        QTimer::singleShot(0, this, &TcpClientCore::processMessageQueue);
+        return;
+    }
+    if (item.asciiOrHex && contentStr == "AA2") {
+        // 检测到AA2命令（天平去皮），不发送，而是发出信号
+        qDebug() << "检测到AA2命令，发出天平去皮信号";
+        emit balanceTareRequested();
+        // 继续处理下一条消息
+        m_isProcessingQueue = false;
+        QTimer::singleShot(0, this, &TcpClientCore::processMessageQueue);
+        return;
+    }
+
     // 检查是否需要等待响应（优先依据期望接收值，"-----" 或 空 表示不等待）
     bool needsWait = (!item.expectedSignature.isEmpty() && item.expectedSignature != "-----")
                      ? true
@@ -1073,3 +1293,4 @@ void TcpClientCore::sendMessageInternal(const QByteArray& content, bool asciiOrH
         startPolling(deviceNum, contentStr);
     }
 }
+

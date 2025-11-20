@@ -54,6 +54,36 @@ public:
     // 检查连接状态
     bool isConnected() const;
 
+    // 发送模式枚举
+    enum SendMode {
+        StringMode = 0,  // 字符串模式（默认）：直接发送字符串内容
+        AsciiMode = 1,   // ASCII模式：直接发送字节
+        HexMode = 2      // 十六进制模式：从十六进制字符串转换为字节
+    };
+    
+    // 天平命令枚举
+    enum BalanceCommand {
+        BalancePrintOff = 0,  // 关闭天平打印
+        BalancePrintOn = 1,   // 打开天平打印
+        BalanceTare = 2        // 去皮
+    };
+    
+    // 直接发送命令，不经过队列
+    // data: 要发送的数据（QString 或 QByteArray 都可以，内部统一处理）
+    // mode: 0=字符串模式（默认），1=ASCII模式，2=十六进制模式
+    void writeBalanceTareCommand(const QString& data, int mode = StringMode);
+    
+    // 发送天平命令（使用枚举）
+    // command: 0=关闭打印，1=打开打印，2=去皮
+    void sendBalanceCommand(BalanceCommand command);
+    
+    // 设置期望重量值（用于称重对比）
+    void setExpectedWeight(double weight);
+    // 获取期望重量值
+    double getExpectedWeight() const;
+    // 清除期望重量值（恢复为0）
+    void clearExpectedWeight();
+
     /**
      * 将整数转换为十六进制字符串（支持负数处理）
      * @param value 整数值（正数或负数）
@@ -143,8 +173,12 @@ public:
     void initializeConnectionsAndTimers();
 
     void initializeConnectionsForBalance();
+    void disconnectConnectionsForBalance();
 
 
+public slots:
+    void connectReceiveForBalance();
+    void disconnectReceiveForBalance();
 signals:
     void connected();
     void disconnected();
@@ -153,6 +187,18 @@ signals:
     
     // 电机到位信号
     void motorReachedPosition(const QString& deviceNum);
+    
+    // 天平重量达标信号
+    void weightReached(double weight);
+    
+    // 天平去皮请求信号（当检测到AA2命令时发出）
+    void balanceTareRequested();
+    
+    // 天平打印打开请求信号（当检测到AA1命令时发出）
+    void balancePrintOnRequested();
+    
+    // 天平打印关闭请求信号（当检测到AA0命令时发出）
+    void balancePrintOffRequested();
 
 private slots:
     void onConnected();
@@ -169,7 +215,7 @@ private slots:
     // 轮询检查电机是否到位
     void pollMotorPosition();
 
-private:
+public:
     QTcpSocket* m_tcpSocket;
     
     // 轮询机制相关
@@ -186,6 +232,10 @@ private:
     bool m_isWaitingForResponse;              // 是否正在等待响应
     QString m_currentExpectedNormalized;      // 当前等待的标准化期望前缀
     bool m_currentAsciiMode;                  // 当前等待是否ASCII模式
+    
+    // 天平称重相关
+    double m_expectedWeight;                  // 期望重量值（用于对比，默认为0）
+    bool m_balancePrintEnabled = false;       // 是否打印天平接收数据（默认关闭）
     
     /**
      * @brief 检查收到的数据是否是到位响应（XYZ电机）

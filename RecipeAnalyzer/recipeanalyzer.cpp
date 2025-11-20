@@ -179,7 +179,7 @@ QJsonObject RecipeAnalyzer::buildRecipePacket(const QString& formula,
     for (const auto &r : results) {
         QJsonObject item;
         item["名称"] = r.name;
-        item["用量"] = r.grams * 1000; // mg
+        item["用量"] = r.grams; // mg
         item["单位"] = "mg";
         solutes.append(item);
     }
