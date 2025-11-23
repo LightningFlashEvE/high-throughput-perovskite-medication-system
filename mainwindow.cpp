@@ -19,6 +19,8 @@
 #include "rtspplayer.h"
 #include "tcpclientcore.h"
 #include "qsqldatabase.h"
+#include <QtSql/QSqlQuery>
+#include <QSqlError>
 
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
@@ -51,6 +53,11 @@ MainWindow::MainWindow(QWidget *parent)
     connect(timer, &QTimer::timeout, this, &MainWindow::updateTime);
     updateTime();
     timer->start(1000);
+
+    /*** 初始化摇床检查定时器（不自动启动，等待TCP连接成功后再启动）***/
+    shakeBedCheckTimer = new QTimer(this);
+    connect(shakeBedCheckTimer, &QTimer::timeout, this, &MainWindow::checkShakeBedTimeout);
+    // 定时器将在点击连接按钮后启动
 
     /*** 初始化棋盘视图与棋子（封装为 ChessBoardView） ***/
     if (ui->graphicsView) {
@@ -272,6 +279,11 @@ void MainWindow::cleanupResources()
         timer->disconnect(); // 断开所有信号连接
     }
     
+    if (shakeBedCheckTimer) {
+        shakeBedCheckTimer->stop();
+        shakeBedCheckTimer->disconnect(); // 断开所有信号连接
+    }
+    
     // 断开TCP连接（首先断开，避免阻塞）
     if (tcpCore) {
         qDebug() << "开始清理TCP连接...";
@@ -366,6 +378,248 @@ void MainWindow::updateTime()
     // 更新时间显示 (格式: 12:33:21)
     QString timeStr = currentDateTime.toString("hh:mm:ss");
     ui->labelTime->setText(timeStr);
+}
+
+// 检查摇床超时并停止
+void MainWindow::checkShakeBedTimeout()
+{
+    if (!dbm) {
+        qWarning() << "数据库对象未初始化，无法检查摇床超时";
+        return;
+    }
+
+    if (!tcpCore) {
+        qWarning() << "TCP核心对象未初始化，无法停止摇床";
+        return;
+    }
+
+    // 查询shakeBedArea表中isEmpty为0的记录
+    QString sql = "SELECT selfLocation, endTime FROM shakeBedArea WHERE isEmpty = 0";
+    QSqlQuery query = dbm->query(sql);
+
+    if (query.lastError().isValid()) {
+        qWarning() << "查询shakeBedArea表失败:" << query.lastError().text();
+        return;
+    }
+
+    // 获取当前时间（用于比较）
+    QDateTime currentDateTime = QDateTime::currentDateTime();
+
+    // 遍历查询结果
+    while (query.next()) {
+        QString endTimeStr = query.value("endTime").toString();
+        int selfLocation = query.value("selfLocation").toInt();
+
+        // 如果endTime为空，跳过
+        if (endTimeStr.isEmpty()) {
+            continue;
+        }
+
+        // 将字符串时间转换为QDateTime进行比较
+        QDateTime endDateTime = QDateTime::fromString(endTimeStr, "yyyy-MM-dd hh:mm:ss");
+        if (!endDateTime.isValid()) {
+            qWarning() << QString("摇床位置 %1 的结束时间格式无效: %2").arg(selfLocation).arg(endTimeStr);
+            continue;
+        }
+
+        // 如果 当前时时间 >endTime， 则停止摇床
+        qDebug() << "确认时间是否可以对比" << endDateTime << currentDateTime;
+        if (currentDateTime > endDateTime) {
+            qDebug() << QString("摇床位置 %1 的结束时间已到，正在停止摇床...").arg(selfLocation);
+
+            // 停止摇床
+            // QString stopShakeCommand = tcpCore->buildMessageWithCrc(QStringLiteral(">0Cxi30100000000"));
+            // qDebug() << "停止摇床命令:" << stopShakeCommand;
+            // tcpCore->sendMessage(stopShakeCommand.toUtf8(), true);
+            controlShakeBed(false, true);
+
+            // 取到放置区（摇床到成品区）
+            moveShakeBedToFinishedProductArea(selfLocation);
+
+            // 可选：更新数据库，将isEmpty设置为1（表示摇床已停止）
+            QString updateSql = QString("UPDATE shakeBedArea SET isEmpty = 1 WHERE selfLocation = %1")
+                .arg(selfLocation);
+            QSqlQuery updateQuery = dbm->query(updateSql);
+            if (updateQuery.lastError().isValid()) {
+                qWarning() << "更新shakeBedArea表失败:" << updateQuery.lastError().text();
+            } else {
+                qDebug() << QString("已更新摇床位置 %1 的状态为空").arg(selfLocation);
+            }
+
+
+            // 如果isEmpty全部为1，意思是没有东西在摇床，则停止
+            QString isEmptySql = "SELECT isEmpty FROM shakeBedArea";
+            QSqlQuery isEmptyQuery = dbm->query(isEmptySql);
+            int isEmpty=0;
+            if (isEmptyQuery.next()) {
+                isEmpty = isEmptyQuery.value("isEmpty").toInt();
+            }
+            else {
+                qWarning() << "未找到 isEmpty 的数据";
+                return;
+            }
+            if (isEmpty == 1) {
+                qDebug() << "没有东西在摇床，停止摇床";
+                QString stopShakeCommand = tcpCore->buildMessageWithCrc(QStringLiteral(">0Cxi30100000000"));
+                qDebug() << "stopShakeCommand" << stopShakeCommand;
+                tcpCore->sendMessageAsync(stopShakeCommand.toUtf8(), true, "0Cxi301");
+            }
+
+            break;
+        }
+    }
+}
+
+// 摇床到成品区（从摇床区取瓶子并放置到成品区）
+void MainWindow::moveShakeBedToFinishedProductArea(int selfLocation)
+{
+    if (!dbm) {
+        qWarning() << "数据库对象未初始化，无法执行摇床到成品区操作";
+        return;
+    }
+
+    if (!tcpCore) {
+        qWarning() << "TCP核心对象未初始化，无法执行摇床到成品区操作";
+        return;
+    }
+
+    qDebug() << QString("开始执行摇床位置 %1 到成品区的操作").arg(selfLocation);
+
+    // 去shakeBedArea找字段isEmpty的值为0的记录，然后取字段selfLocation的值出来待用
+    QString shakeBedAreaSql = "SELECT selfLocation FROM shakeBedArea WHERE isEmpty = 0";
+    QSqlQuery shakeBedAreaQuery = dbm->query(shakeBedAreaSql);
+    int shakeBedAreaSelfLocation=0;
+    if (shakeBedAreaQuery.next()) {
+        shakeBedAreaSelfLocation = shakeBedAreaQuery.value("selfLocation").toInt();
+        qDebug() << "+++++++++++++1" << shakeBedAreaSelfLocation;
+    }
+    else {
+        qWarning() << "未找到 isEmpty = 0 的记录";
+        return;
+    }
+    
+    // 关闭摇床
+    QString stopShakeCommand = tcpCore->buildMessageWithCrc(QStringLiteral(">0Cxi30100000000"));
+    qDebug() << "stopShakeCommand" << stopShakeCommand;
+    tcpCore->sendMessageAsync(stopShakeCommand.toUtf8(), true, "0Cxi301");
+
+
+    // 去other表，获取originX, originY, gripperZ, rightSpacing, bottomSpacing, cols, rows, currentIndex
+    QString otherSql = "SELECT originX, originY, gripperZ, rightSpacing, bottomSpacing, cols, rows, currentIndex FROM other WHERE name = 'shakeBedArea'";
+    QSqlQuery otherQuery = dbm->query(otherSql);
+    int otherOriginX=0, otherOriginY=0, otherGripperZ=0;
+    double otherRightSpacing=0, otherBottomSpacing=0;
+    int otherCols=0, otherRows=0, otherCurrentIndex=0;
+    if (otherQuery.next()) {
+        otherOriginX = otherQuery.value("originX").toInt();
+        otherOriginY = otherQuery.value("originY").toInt();
+        otherGripperZ = otherQuery.value("gripperZ").toInt();
+        otherRightSpacing = otherQuery.value("rightSpacing").toDouble();
+        otherBottomSpacing = otherQuery.value("bottomSpacing").toDouble();
+        otherCols = otherQuery.value("cols").toInt();
+        otherRows = otherQuery.value("rows").toInt();
+        otherCurrentIndex = otherQuery.value("currentIndex").toInt();
+        qDebug() << "+++++++++++++2" << otherOriginX << otherOriginY << otherGripperZ << otherRightSpacing << otherBottomSpacing << otherCols << otherRows << otherCurrentIndex;
+    }
+    else {
+        qWarning() << "未找到 other 的数据";
+        return;
+    }
+    // 通过originX, originY, gripperZ, rightSpacing, bottomSpacing, cols, rows, currentIndex计算出摇床的空位坐标
+    SlotPositionConfig shakeBedAreaConfig(otherOriginX, otherOriginY, otherCols, otherRows, otherRightSpacing, otherBottomSpacing);
+    QPoint shakeBedAreaTargetPos = calculateSlotPosition(shakeBedAreaConfig, shakeBedAreaSelfLocation);
+    int shakeBedAreaTargetX = shakeBedAreaTargetPos.x();
+    int shakeBedAreaTargetY = shakeBedAreaTargetPos.y();
+    // 移动到摇床区指定位置
+    QString moveToShakeBedAreaXCommand = tcpCore->buildDeviceCommand("0A", "D", shakeBedAreaTargetX, 8);
+    tcpCore->sendMessageAsync(moveToShakeBedAreaXCommand.toUtf8(), true);
+    QString waitShakeBedAreaXCommand = tcpCore->buildDeviceCommand("0A", "d", 0, 0);
+    tcpCore->sendMessageAsync(waitShakeBedAreaXCommand.toUtf8(), true, "0Ad01");
+    QString moveToShakeBedAreaYCommand = tcpCore->buildDeviceCommand("09", "D", shakeBedAreaTargetY, 8);
+    tcpCore->sendMessageAsync(moveToShakeBedAreaYCommand.toUtf8(), true);
+    QString waitShakeBedAreaYCommand = tcpCore->buildDeviceCommand("09", "d", 0, 0);
+    tcpCore->sendMessageAsync(waitShakeBedAreaYCommand.toUtf8(), true, "09d01");
+    QString moveToShakeBedAreaZCommand = tcpCore->buildDeviceCommand("06", "D", otherGripperZ, 8);
+    tcpCore->sendMessageAsync(moveToShakeBedAreaZCommand.toUtf8(), true);
+    QString waitShakeBedAreaZCommand = tcpCore->buildDeviceCommand("06", "d", 0, 0);
+    tcpCore->sendMessageAsync(waitShakeBedAreaZCommand.toUtf8(), true, "06d01");
+
+
+    // 5号电机夹住瓶子
+    QString enableGripperCommand = tcpCore->buildDeviceCommand("05", "06", "0105", 100, 4);
+    tcpCore->sendMessageAsync(enableGripperCommand.toUtf8(), false);
+    QString waitGripperEnableCommand = tcpCore->buildDeviceCommand("05", "03", "0202", 1, 4);
+    tcpCore->sendMessageAsync(waitGripperEnableCommand.toUtf8(), false, "0503020002");
+    // 6号电机上移
+    QString raiseTransferZCommand = tcpCore->buildDeviceCommand("06", "D", 100, 8);
+    tcpCore->sendMessageAsync(raiseTransferZCommand.toUtf8(), true);
+    QString waitTransferZRaisedCommand = tcpCore->buildDeviceCommand("06", "d", 0, 0);
+    tcpCore->sendMessageAsync(waitTransferZRaisedCommand.toUtf8(), true, "06d01");
+
+    // 找到 字段name为transferRightArea的originX, originY, gripperZ, rightSpacing, bottomSpacing, cols, rows, currentIndex
+    QString transferRightAreaSql = "SELECT originX, originY, gripperZ, rightSpacing, bottomSpacing, cols, rows, currentIndex FROM other WHERE name = 'transferRightArea'";
+    QSqlQuery transferRightAreaQuery = dbm->query(transferRightAreaSql);
+    int transferRightAreaX=0, transferRightAreaY=0, transferRightAreaZ=0;
+    double transferRightAreaRightSpacing=0, transferRightAreaBottomSpacing=0;
+    int transferRightAreaCols=0, transferRightAreaRows=0, transferRightAreaCurrentIndex=0;
+    if (transferRightAreaQuery.next()) {
+        transferRightAreaX = transferRightAreaQuery.value("originX").toInt();
+        transferRightAreaY = transferRightAreaQuery.value("originY").toInt();
+        transferRightAreaZ = transferRightAreaQuery.value("gripperZ").toInt();
+        transferRightAreaRightSpacing = transferRightAreaQuery.value("rightSpacing").toDouble();
+        transferRightAreaBottomSpacing = transferRightAreaQuery.value("bottomSpacing").toDouble();
+        transferRightAreaCols = transferRightAreaQuery.value("cols").toInt();
+        transferRightAreaRows = transferRightAreaQuery.value("rows").toInt();
+        transferRightAreaCurrentIndex = transferRightAreaQuery.value("currentIndex").toInt();
+    }
+    else {
+        qWarning() << "未找到 transferRightArea 的数据";
+        return;
+    }
+    // 通过originX, originY, gripperZ, rightSpacing, bottomSpacing, cols, rows, currentIndex计算出成品区的空位坐标
+    SlotPositionConfig transferRightAreaConfig(transferRightAreaX, transferRightAreaY, transferRightAreaCols, transferRightAreaRows, transferRightAreaRightSpacing, transferRightAreaBottomSpacing);
+    QPoint transferRightAreaTargetPos = calculateSlotPosition(transferRightAreaConfig, transferRightAreaCurrentIndex);
+    int transferRightAreaTargetX = transferRightAreaTargetPos.x();
+    int transferRightAreaTargetY = transferRightAreaTargetPos.y();
+    // 移动到成品区指定位置
+    QString moveToTransferRightAreaXCommand = tcpCore->buildDeviceCommand("0A", "D", transferRightAreaTargetX, 8);
+    tcpCore->sendMessageAsync(moveToTransferRightAreaXCommand.toUtf8(), true);
+    QString waitTransferRightAreaXCommand = tcpCore->buildDeviceCommand("0A", "d", 0, 0);
+    tcpCore->sendMessageAsync(waitTransferRightAreaXCommand.toUtf8(), true, "0Ad01");
+    QString moveToTransferRightAreaYCommand = tcpCore->buildDeviceCommand("09", "D", transferRightAreaTargetY, 8);
+    tcpCore->sendMessageAsync(moveToTransferRightAreaYCommand.toUtf8(), true);
+    QString waitTransferRightAreaYCommand = tcpCore->buildDeviceCommand("09", "d", 0, 0);
+    tcpCore->sendMessageAsync(waitTransferRightAreaYCommand.toUtf8(), true, "09d01");
+    QString moveToTransferRightAreaZCommand = tcpCore->buildDeviceCommand("06", "D", transferRightAreaZ, 8);
+    tcpCore->sendMessageAsync(moveToTransferRightAreaZCommand.toUtf8(), true);
+    QString waitTransferRightAreaZCommand = tcpCore->buildDeviceCommand("06", "d", 0, 0);
+    tcpCore->sendMessageAsync(waitTransferRightAreaZCommand.toUtf8(), true, "06d01");
+
+    // 松夹爪
+    QString releaseGripperCommand = tcpCore->buildDeviceCommand("05", "06", "0105", 0, 4);
+    tcpCore->sendMessageAsync(releaseGripperCommand.toUtf8(), false);
+    QString waitGripperReleaseCommand = tcpCore->buildDeviceCommand("05", "03", "0202", 1, 4);
+    tcpCore->sendMessageAsync(waitGripperReleaseCommand.toUtf8(), false, "0503020001");
+    // 更新数据库：将成品区的currentIndex加1
+    QString updateSql = QString("UPDATE other SET currentIndex = currentIndex + 1 WHERE name = 'transferRightArea'");
+    QSqlQuery updateQuery = dbm->query(updateSql);
+    if (updateQuery.lastError().isValid()) {
+        qWarning() << "更新other表失败:" << updateQuery.lastError().text();
+    } else {
+        qDebug() << QString("已更新成品区的currentIndex为 %1").arg(transferRightAreaCurrentIndex + 1);
+    }
+    // 上移Z轴
+    // QString raiseTransferZCommand = tcpCore->buildDeviceCommand("06", "D", 100, 8);
+    tcpCore->sendMessageAsync(raiseTransferZCommand.toUtf8(), true);
+    // QString waitTransferZRaisedCommand = tcpCore->buildDeviceCommand("06", "d", 0, 0);
+    tcpCore->sendMessageAsync(waitTransferZRaisedCommand.toUtf8(), true, "06d01");
+
+    // 摇床启动
+    QString startShakeCommand = tcpCore->buildMessageWithCrc(QStringLiteral(">0Cxi3000000012c0000012c"));
+    qDebug() << "startShakeCommand" << startShakeCommand;
+    tcpCore->sendMessageAsync(startShakeCommand.toUtf8(), true, "0Cxi300");
+
+    qDebug() << QString("摇床位置 %1 的瓶子已成功移动到成品区").arg(selfLocation);
 }
 
 // 将指定棋子移动到网格(col,row)

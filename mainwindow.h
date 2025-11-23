@@ -79,6 +79,11 @@ private slots:
      * - 时间：hh:mm:ss
      */
     void updateTime();
+    
+    /**
+     * 定时回调：每秒检查一次摇床区域，如果endTime已到则停止摇床
+     */
+    void checkShakeBedTimeout();
 
     void on_pushButton_6_clicked();
 
@@ -106,6 +111,7 @@ protected:
 private:
     Ui::MainWindow *ui;
     QTimer *timer;
+    QTimer *shakeBedCheckTimer;  // 摇床检查定时器
     
     /**
      * 初始化data.ini文件
@@ -157,18 +163,32 @@ private:
 
     // 取空瓶（盘名称）
     bool takeEmptyBottle(const QString& trayName);
-    // 取液体（液体名称 + 体积）
-    bool getLiquid(const QString& liquidName, double volumeMl);
+    // 取液体（液体名称 + 体积 + tipsNum引用参数，用于返回使用的tips数量）
+    bool getLiquid(const QString& liquidName, double volumeMl, int& tipsNum);
     // 取固体（固体名称 + 质量）
     bool getSolid(const QString& solidName, double mass);
     // 拧紧瓶子
     void tightenBottle();
+    // 开盖（打开瓶盖）
+    void openBottleCap();
+    // 关盖（关闭瓶盖）
+    void closeBottleCap();
+    // 设置5号电机速度（速度范围：10-100）
+    void setMotor5Speed(int speed);
+    // 设置6号电机Z轴速度（速度单位：rpm，转/分钟）
+    void setMotor6ZSpeed(int speed);
+    // 5号电机旋转圈数（圈数：正数为顺时针，负数为逆时针）
+    void rotateMotor5ByCircles(double circles);
     // 摇床（参数：时间或次数等）
     void shakeBed(int parameter);
+    // 控制摇床开关（第一个参数：true=开，false=关；第二个参数：true=立即发送，false=异步发送）
+    void controlShakeBed(bool isOn, bool sendImmediately = false);
     // 摇床初始化（摇3秒后停止）
     void initializeShakeBed();
     // 摇床完成后放置试剂瓶
     void placeShakenReagentBottle();
+    // 摇床到成品区（从摇床区取瓶子并放置到成品区）
+    void moveShakeBedToFinishedProductArea(int selfLocation);
     // 初始化所有设备（TCP连接和设备初始化）
     void initializeAllDevices();
     // xyz轴恢复到零点（06，08，09，0A号电机恢复到零点）
@@ -232,6 +252,15 @@ public slots:
 };
 #endif // MAINWINDOW_H
 
-
+/*
+ * AA0  天平打印关
+ * AA1  天平打印开
+ * AA2  天平去皮
+ * AAcloseShakeBed 关摇床
+ * AAopenShakeBed  开摇床
+ * AArecordShakeBedTime     记录摇床需要的时间
+ * AAemptyBottleAreaCurrentIndexPlusOne
+ * AAtipsHeadAreaCurrentIndexPlusOne
+ */
 
 

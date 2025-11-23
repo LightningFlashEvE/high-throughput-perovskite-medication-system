@@ -43,7 +43,7 @@ public:
     
     // tcp发送信息-接口（新版队列方式）
     // 统一：第三个参数为期望接收值（设备+指令+数据；未知可传 "-----" 表示不等待）
-    void sendMessageAsync(const QByteArray& content, bool asciiOrHex);
+    void sendMessageAsync(const QByteArray& content, bool asciiOrHex = true);
     void sendMessageAsync(const QByteArray& content, bool asciiOrHex, const QString& expectedSignature);
 
     // 断开连接
@@ -188,6 +188,9 @@ signals:
     // 电机到位信号
     void motorReachedPosition(const QString& deviceNum);
     
+    // 6号电机Z轴坐标信号（当收到"06E"查询响应时发出）
+    void z6CoordinateReceived(int coordinate);
+    
     // 天平重量达标信号
     void weightReached(double weight);
     
@@ -199,6 +202,30 @@ signals:
     
     // 天平打印关闭请求信号（当检测到AA0命令时发出）
     void balancePrintOffRequested();
+    
+    /*
+    * AA0  天平打印关
+    * AA1  天平打印开
+    * AA2  天平去皮
+    * AAcloseShakeBed 关摇床
+    * AAopenShakeBed  开摇床
+    * AArecordShakeBedTime     记录摇床需要的时间
+    * 第一步骤
+    */
+    // 记录摇床时间请求信号（当检测到AArecordShakeBedTime命令时发出）
+    void recordShakeBedTimeRequested();
+    
+    // 启动摇床请求信号（当检测到AAopenShakeBed命令时发出）
+    void openShakeBedRequested();
+    
+    // 关闭摇床请求信号（当检测到AAcloseShakeBed命令时发出）
+    void closeShakeBedRequested();
+    
+    // 空瓶区currentIndex加1请求信号（当检测到AAemptyBottleAreaCurrentIndexPlusOne命令时发出）
+    void emptyBottleAreaCurrentIndexPlusOneRequested();
+    
+    // tips头区currentIndex加1请求信号（当检测到AAtipsHeadAreaCurrentIndexPlusOne命令时发出）
+    void tipsHeadAreaCurrentIndexPlusOneRequested();
 
 private slots:
     void onConnected();

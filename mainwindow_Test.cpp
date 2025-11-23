@@ -68,6 +68,7 @@ void MainWindow::initializeSystemComponents()
     // ==========     初始化TCP用来收取485信息     ==========
     tcpCore = new TcpClientCore(this);
     tcpCore->initializeConnectionsAndTimers();
+    
     // ========== 初始化TCP用来收取来自天平的串口信息 ==========
     tcpBalanceCore = new TcpClientCore(this);
     tcpBalanceCore->initializeConnectionsForBalance();
@@ -101,6 +102,54 @@ void MainWindow::initializeSystemComponents()
         tcpBalanceCore->writeBalanceTareCommand("540D0A", TcpClientCore::HexMode);
         tcpBalanceCore->setExpectedWeight(tcpCore->getExpectedWeight());
     });
+    
+    /*
+    * AA0  天平打印关
+    * AA1  天平打印开
+    * AA2  天平去皮
+    * AAcloseShakeBed 关摇床
+    * AAopenShakeBed  开摇床
+    * AArecordShakeBedTime     记录摇床需要的时间
+    * 第三步骤
+    */
+    // 连接 tcpCore 的 recordShakeBedTimeRequested 信号，执行记录摇床时间
+    connect(tcpCore, &TcpClientCore::recordShakeBedTimeRequested, this, [=]() {
+        qDebug() << "收到AArecordShakeBedTime命令，执行记录摇床时间";
+        // 查询shakeBedArea表中isEmpty为1的记录，获取selfLocation
+        QString shakeBedAreaSql = "SELECT selfLocation FROM shakeBedArea WHERE isEmpty = 1 LIMIT 1";
+        QSqlQuery shakeBedAreaQuery = dbm->query(shakeBedAreaSql);
+        if (shakeBedAreaQuery.next()) {
+            int selfLocation = shakeBedAreaQuery.value("selfLocation").toInt();
+            // 记录摇床时间（默认300秒，即5分钟）
+            recordShakeBedTime(selfLocation, 30);
+        } else {
+            qWarning() << "未找到 isEmpty = 1 的记录，无法记录摇床时间";
+        }
+    });
+    
+    // 连接 tcpCore 的 openShakeBedRequested 信号，执行启动摇床
+    connect(tcpCore, &TcpClientCore::openShakeBedRequested, this, [=]() {
+        qDebug() << "收到AAopenShakeBed命令，执行启动摇床";
+        controlShakeBed(true, true); // 同步启动摇床
+    });
+    
+    // 连接 tcpCore 的 closeShakeBedRequested 信号，执行关闭摇床
+    connect(tcpCore, &TcpClientCore::closeShakeBedRequested, this, [=]() {
+        qDebug() << "收到AAcloseShakeBed命令，执行关闭摇床";
+        controlShakeBed(false, true); // 同步关闭摇床
+    });
+    
+    // 连接 tcpCore 的 emptyBottleAreaCurrentIndexPlusOneRequested 信号，执行空瓶区currentIndex加1
+    connect(tcpCore, &TcpClientCore::emptyBottleAreaCurrentIndexPlusOneRequested, this, [=]() {
+        qDebug() << "收到AAemptyBottleAreaCurrentIndexPlusOne命令，执行空瓶区currentIndex加1";
+        incrementDatabaseField("other", "currentIndex", "name = 'emptyBottleArea'");
+    });
+    
+    // 连接 tcpCore 的 tipsHeadAreaCurrentIndexPlusOneRequested 信号，执行tips头区currentIndex加1
+    connect(tcpCore, &TcpClientCore::tipsHeadAreaCurrentIndexPlusOneRequested, this, [=]() {
+        qDebug() << "收到AAtipsHeadAreaCurrentIndexPlusOne命令，执行tips头区currentIndex加1";
+        incrementDatabaseField("other", "currentIndex", "name = 'tipsHeadArea'");
+    });
 
 
 
@@ -114,6 +163,12 @@ void MainWindow::initializeSystemComponents()
         
         initializeAllDevices();
 
+        // 启动摇床检查定时器
+        if (shakeBedCheckTimer && !shakeBedCheckTimer->isActive()) {
+            shakeBedCheckTimer->start(1000);  // 每隔1秒检查一次
+            qDebug() << "摇床检查定时器已启动";
+        }
+
     });
     
     // 按钮2：断开连接
@@ -123,6 +178,11 @@ void MainWindow::initializeSystemComponents()
         tcpCore->disconnectFromTcp();
         tcpBalanceCore->disconnectFromTcp();
 
+        // 停止摇床检查定时器
+        if (shakeBedCheckTimer && shakeBedCheckTimer->isActive()) {
+            shakeBedCheckTimer->stop();
+            qDebug() << "摇床检查定时器已停止";
+        }
 
     });
 
@@ -196,17 +256,17 @@ void MainWindow::initializeSystemComponents()
      * 移动回A盘1号坐标，下降，释放盖子，上升。
      */
 
-    // // 打开空瓶
+    // 打开空瓶
     //takeEmptyBottle("Box_Transfer_Area_Right");
 
-    // // // 取液体，参数为液体名称，液体量
+    // 取液体，参数为液体名称，液体量
     //getLiquid("DMF", 0.01);
 
-    // // // 取固体
-    //getSolid("Na2CO3", 2);
+    // 取固体
+    // getSolid("Na2CO3", 2);
 
     // // 拧紧瓶子放置去摇床
-    tightenBottle();
+    //tightenBottle();
 
 
     // 摇床启动
@@ -270,6 +330,9 @@ void MainWindow::testRecipeSend(const QJsonObject& recipePacket)
     const QString equation = recipePacket.value("化学方程式").toString();
     qDebug() << "化学方程式:" << equation;
 
+    // 解决tips头使用情况的问题。
+    int tipsNum = 0;
+
     // 溶质
     QJsonArray solutes = recipePacket.value("溶质").toArray();
     qDebug() << "溶质条目数:" << solutes.size();
@@ -297,8 +360,6 @@ void MainWindow::testRecipeSend(const QJsonObject& recipePacket)
     }
 
 
-
-
     // TODO: 在此处开始排打顺序执行（按溶质/溶剂分别处理）
     // // 打开空瓶
     takeEmptyBottle("Box_Transfer_Area_Right");
@@ -313,7 +374,7 @@ void MainWindow::testRecipeSend(const QJsonObject& recipePacket)
             continue;
         }
         qDebug() << "准备取液体:" << name << "目标体积(ml):" << volume;
-        getLiquid(name, volume);
+        getLiquid(name, volume, tipsNum);
     }
 
     // 取固体：遍历溶质，传入名称与质量（g）
@@ -332,7 +393,34 @@ void MainWindow::testRecipeSend(const QJsonObject& recipePacket)
     // // 拧紧瓶子放置去摇床
     tightenBottle();
 
+
+
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 // 测试配方发送功能（接收JSON对象和JSON字符串）
@@ -353,6 +441,9 @@ void MainWindow::initializeAllDevices()
     QString stopCommand = tcpCore->buildMessageWithCrc(QStringLiteral(">0Cxi30100000000"));
     tcpCore->writeBalanceTareCommand(stopCommand, TcpClientCore::StringMode);
 
+    // 电机速度恢复 已知的有5号电机的旋转和6号电机的Z轴
+    setMotor5Speed(100);
+    setMotor6ZSpeed(1000);
 
     qDebug() << "消磁开始";
     QString closeElectromagnetCommand = tcpCore->buildDeviceCommand("0D", "05", "00000000", 0, 0);
@@ -810,5 +901,46 @@ bool MainWindow::decrementDatabaseField(const QString& tableName, const QString&
     } else {
         qWarning() << QString("更新表 %1 的字段 %2 时没有记录被影响，可能WHERE条件不匹配").arg(tableName, fieldName);
         return false;
+    }
+}
+
+
+
+
+
+
+
+// 控制摇床开关
+void MainWindow::controlShakeBed(bool isOn, bool sendImmediately)
+{
+    if (!tcpCore) {
+        qWarning() << "TCP核心对象未初始化，无法控制摇床";
+        return;
+    }
+
+    QString command;
+    QString expectedSignature;
+    QString logMessage;
+
+    if (isOn) {
+        // 启动摇床
+        command = tcpCore->buildMessageWithCrc(QStringLiteral(">0Cxi3000000012c0000012c"));
+        expectedSignature = "0Cxi300";
+        logMessage = "启动摇床";
+    } else {
+        // 关闭摇床
+        command = tcpCore->buildMessageWithCrc(QStringLiteral(">0Cxi30100000000"));
+        expectedSignature = "0Cxi301";
+        logMessage = "关闭摇床";
+    }
+
+    qDebug() << logMessage << command;
+
+    if (sendImmediately) {
+        // 立即发送（同步）
+        tcpCore->sendMessage(command.toUtf8(), true);
+    } else {
+        // 异步发送
+        tcpCore->sendMessageAsync(command.toUtf8(), true, expectedSignature);
     }
 }

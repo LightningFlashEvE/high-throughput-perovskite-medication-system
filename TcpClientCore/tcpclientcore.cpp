@@ -584,7 +584,7 @@ void TcpClientCore::onReadyRead()
     
     QByteArray data = m_tcpSocket->readAll();
 
-    qDebug() << "                               收到数据:" << QString::fromUtf8(data) << " " << QString(data.toHex().toUpper());
+    qDebug() << "<<<<<<<<收到数据:" << QString::fromUtf8(data) << " " << QString(data.toHex().toUpper());
     
     // 如果正在轮询，检查是否收到目标响应
     if (m_isPolling) {
@@ -641,6 +641,43 @@ void TcpClientCore::onReadyRead()
                 // 继续处理队列
                 QTimer::singleShot(0, this, &TcpClientCore::processMessageQueue);
             }
+        }
+    }
+    
+    // 解析"06E"命令返回的Z轴坐标
+    QString dataStr = QString::fromUtf8(data);
+    if (dataStr.startsWith("06E", Qt::CaseInsensitive) || dataStr.startsWith(">06E", Qt::CaseInsensitive)) {
+        // 提取"06E"后面的8位十六进制坐标
+        // 格式可能是：">06E12345678XXXX" 或 "06E12345678XXXX"（XXXX是CRC）
+        QString coordinateStr;
+        
+        if (dataStr.startsWith(">06E", Qt::CaseInsensitive)) {
+            // 如果以">06E"开头，跳过">06E"（4个字符），取8位坐标
+            if (dataStr.length() >= 12) {  // ">06E" + 8位坐标 + 至少4位CRC
+                coordinateStr = dataStr.mid(4, 8);  // 从索引4开始取8个字符
+            }
+        } else if (dataStr.startsWith("06E", Qt::CaseInsensitive)) {
+            // 如果以"06E"开头，跳过"06E"（3个字符），取8位坐标
+            if (dataStr.length() >= 11) {  // "06E" + 8位坐标 + 至少4位CRC
+                coordinateStr = dataStr.mid(3, 8);  // 从索引3开始取8个字符
+            }
+        }
+        
+        if (!coordinateStr.isEmpty()) {
+            // 将8位十六进制字符串转换为整数坐标
+            bool ok;
+            int zCoordinate = coordinateStr.toInt(&ok, 16);  // 16进制转10进制
+            
+            if (ok) {
+                qDebug() << "解析到6号电机Z轴坐标:" << zCoordinate << "(十六进制:" << coordinateStr << ")";
+                
+                // 发出信号通知坐标已更新
+                emit z6CoordinateReceived(zCoordinate);
+            } else {
+                qWarning() << "无法解析坐标字符串:" << coordinateStr;
+            }
+        } else {
+            qWarning() << "响应数据格式不正确，无法提取坐标。数据:" << dataStr;
         }
     }
     
@@ -726,7 +763,7 @@ void TcpClientCore::onBalanceReadyRead()
             else
             {
                 // if (m_balancePrintEnabled) {
-                //     qDebug() << "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx";
+                //     qDebug() << "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx" << m_balancePrintEnabled << m_expectedWeight;
                 // }
             }
         } else {
@@ -1171,6 +1208,60 @@ void TcpClientCore::processMessageQueue()
         QTimer::singleShot(0, this, &TcpClientCore::processMessageQueue);
         return;
     }
+    /*
+    * AA0  天平打印关
+    * AA1  天平打印开
+    * AA2  天平去皮
+    * AAcloseShakeBed 关摇床
+    * AAopenShakeBed  开摇床
+    * AArecordShakeBedTime     记录摇床需要的时间
+    * 第二步骤
+    */
+    if (item.asciiOrHex && contentStr == "AArecordShakeBedTime") {
+        // 检测到AArecordShakeBedTime命令（记录摇床时间），不发送，而是发出信号
+        qDebug() << "检测到AArecordShakeBedTime命令，发出记录摇床时间信号";
+        emit recordShakeBedTimeRequested();
+        // 继续处理下一条消息
+        m_isProcessingQueue = false;
+        QTimer::singleShot(0, this, &TcpClientCore::processMessageQueue);
+        return;
+    }
+    if (item.asciiOrHex && contentStr == "AAopenShakeBed") {
+        // 检测到AAopenShakeBed命令（启动摇床），不发送，而是发出信号
+        qDebug() << "检测到AAopenShakeBed命令，发出启动摇床信号";
+        emit openShakeBedRequested();
+        // 继续处理下一条消息
+        m_isProcessingQueue = false;
+        QTimer::singleShot(0, this, &TcpClientCore::processMessageQueue);
+        return;
+    }
+    if (item.asciiOrHex && contentStr == "AAcloseShakeBed") {
+        // 检测到AAcloseShakeBed命令（关闭摇床），不发送，而是发出信号
+        qDebug() << "检测到AAcloseShakeBed命令，发出关闭摇床信号";
+        emit closeShakeBedRequested();
+        // 继续处理下一条消息
+        m_isProcessingQueue = false;
+        QTimer::singleShot(0, this, &TcpClientCore::processMessageQueue);
+        return;
+    }
+    if (item.asciiOrHex && contentStr == "AAemptyBottleAreaCurrentIndexPlusOne") {
+        // 检测到AAemptyBottleAreaCurrentIndexPlusOne命令（空瓶区currentIndex加1），不发送，而是发出信号
+        qDebug() << "检测到AAemptyBottleAreaCurrentIndexPlusOne命令，发出空瓶区currentIndex加1信号";
+        emit emptyBottleAreaCurrentIndexPlusOneRequested();
+        // 继续处理下一条消息
+        m_isProcessingQueue = false;
+        QTimer::singleShot(0, this, &TcpClientCore::processMessageQueue);
+        return;
+    }
+    if (item.asciiOrHex && contentStr == "AAtipsHeadAreaCurrentIndexPlusOne") {
+        // 检测到AAtipsHeadAreaCurrentIndexPlusOne命令（tips头区currentIndex加1），不发送，而是发出信号
+        qDebug() << "检测到AAtipsHeadAreaCurrentIndexPlusOne命令，发出tips头区currentIndex加1信号";
+        emit tipsHeadAreaCurrentIndexPlusOneRequested();
+        // 继续处理下一条消息
+        m_isProcessingQueue = false;
+        QTimer::singleShot(0, this, &TcpClientCore::processMessageQueue);
+        return;
+    }
 
     // 检查是否需要等待响应（优先依据期望接收值，"-----" 或 空 表示不等待）
     bool needsWait = (!item.expectedSignature.isEmpty() && item.expectedSignature != "-----")
@@ -1212,7 +1303,7 @@ void TcpClientCore::processMessageQueue()
     // 在发送消息之前，非阻塞延时40ms
     QTimer::singleShot(40, this, [=, item = item, needsWait = needsWait]() {
 
-        qDebug() << "读取队列信息:" << QString::fromUtf8(item.content) << "，期待回复:" << item.expectedSignature;
+        //qDebug() << "读取队列信息:" << QString::fromUtf8(item.content) << "，期待回复:" << item.expectedSignature;
         // 发送消息（使用非阻塞方式）
         sendMessageInternal(item.content, item.asciiOrHex, needsWait);
         

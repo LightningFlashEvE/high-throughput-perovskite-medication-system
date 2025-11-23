@@ -6,31 +6,68 @@
 #include <QDebug>
 #include <QThread>
 #include <QTimer>
+#include <QEventLoop>
 #include <QSlider>
 #include <QDateTime>
 #include <QtSql/QSqlQuery>
 #include "qsqldatabase.h"
-#include "box.h"
-#include "reagentbottle.h"
-#include "slot.h"
+// #include "box.h"
+// #include "reagentbottle.h"
+// #include "slot.h"
 #include "ui_mainwindow.h"
 
 
 
 void MainWindow::on_pushButton_7_clicked()
 {
-
+    // 关闭摇床（异步发送）
+    controlShakeBed(false);
 }
+
 void MainWindow::on_pushButton_8_clicked()
 {
-
+    // 启动摇床（异步发送）
+    controlShakeBed(true);
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
 // 取空瓶（盘名称）函数定义框架
 bool MainWindow::takeEmptyBottle(const QString& trayName)
 {
+
     Q_UNUSED(trayName);
 
     // TODO: 在此处编写取空瓶的具体实现
@@ -76,13 +113,10 @@ bool MainWindow::takeEmptyBottle(const QString& trayName)
     tcpCore->sendMessageAsync(moveToTransferXCommand.toUtf8(), true);
     QString waitTransferXCommand = tcpCore->buildDeviceCommand("0A", "d", 0, 0);
     tcpCore->sendMessageAsync(waitTransferXCommand.toUtf8(), true, "0Ad01");
-
     QString moveToTransferYCommand = tcpCore->buildDeviceCommand("09", "D", emptyBottleAreaTargetY, 8);
     tcpCore->sendMessageAsync(moveToTransferYCommand.toUtf8(), true);
     QString waitTransferYCommand = tcpCore->buildDeviceCommand("09", "d", 0, 0);
     tcpCore->sendMessageAsync(waitTransferYCommand.toUtf8(), true, "09d01");
-
-    // Decline
     QString moveToTransferZCommand = tcpCore->buildDeviceCommand("06", "D", transferGripperZ, 8);
     tcpCore->sendMessageAsync(moveToTransferZCommand.toUtf8(), true);
     QString waitTransferZCommand = tcpCore->buildDeviceCommand("06", "d", 0, 0);
@@ -101,9 +135,7 @@ bool MainWindow::takeEmptyBottle(const QString& trayName)
     tcpCore->sendMessageAsync(waitGripperEnableCommand.toUtf8(), false, "0503020002"); // 目前是01
 
     // 去数据库把emptyBottleArea里面的currentIndex值+1，并更新到数据库
-    incrementDatabaseField("other", "currentIndex", "name = 'emptyBottleArea'");
-
-
+    tcpCore->sendMessageAsync("AAemptyBottleAreaCurrentIndexPlusOne");  
 
     // Rise
     QString raiseTransferZCommand = tcpCore->buildDeviceCommand("06", "D", 0, 8);
@@ -117,7 +149,6 @@ bool MainWindow::takeEmptyBottle(const QString& trayName)
     tcpCore->sendMessageAsync(openGripCommand.toUtf8(), false, "0B0601050000");
     QString waitGripOpenFeedbackCommand = tcpCore->buildDeviceCommand("0B", "03", "0202", 1, 4);
     tcpCore->sendMessageAsync(waitGripOpenFeedbackCommand.toUtf8(), false, "0B03020001");
-
     // 去other表读取gripArea的x y z值，然后移动到gripArea
     QString gripAreaSql = "SELECT originX, originY, gripperZ FROM other WHERE name = 'gripArea'";
     QSqlQuery gripAreaQuery = dbm->query(gripAreaSql);
@@ -135,18 +166,14 @@ bool MainWindow::takeEmptyBottle(const QString& trayName)
     tcpCore->sendMessageAsync(moveToGripAreaXCommand.toUtf8(), true);
     QString waitGripAreaXCommand = tcpCore->buildDeviceCommand("0A", "d", 0, 0);
     tcpCore->sendMessageAsync(waitGripAreaXCommand.toUtf8(), true, "0Ad01");
-
     QString moveToGripAreaYCommand = tcpCore->buildDeviceCommand("09", "D", gripAreaY, 8);
     tcpCore->sendMessageAsync(moveToGripAreaYCommand.toUtf8(), true);
     QString waitGripAreaYCommand = tcpCore->buildDeviceCommand("09", "d", 0, 0);
     tcpCore->sendMessageAsync(waitGripAreaYCommand.toUtf8(), true, "09d01");
-
     QString moveToGripAreaZCommand = tcpCore->buildDeviceCommand("06", "D", gripAreaZ, 8);
     tcpCore->sendMessageAsync(moveToGripAreaZCommand.toUtf8(), true);
     QString waitGripAreaZCommand = tcpCore->buildDeviceCommand("06", "d", 0, 0);
     tcpCore->sendMessageAsync(waitGripAreaZCommand.toUtf8(), true, "06d01");
-
-
 
 
     // 调整电爪的夹紧与松开的力矩
@@ -159,6 +186,8 @@ bool MainWindow::takeEmptyBottle(const QString& trayName)
     QString waitGripClosedCommand = tcpCore->buildDeviceCommand("0B", "03", "0202", 1, 4);
     tcpCore->sendMessageAsync(waitGripClosedCommand.toUtf8(), false, "0B03020002");  // 目前是01
 
+    // 开盖
+#if 0
     // Rotate to open the cover
     // 电爪旋转
     QString rotateGripCommand = tcpCore->buildDeviceCommand("05", "06", "0108", 64996, 4); // 旋转1.5圈
@@ -166,17 +195,24 @@ bool MainWindow::takeEmptyBottle(const QString& trayName)
     QString readGripperRotationCommand = tcpCore->buildDeviceCommand("05", "03", "0203", 1, 4); // -> 050302030001 + CRC
     tcpCore->sendMessageAsync(readGripperRotationCommand.toUtf8(), false, "0503020001");
 
+#else
+    openBottleCap();
+
+#endif
+
+
+
     // Z轴上移一点
     QString liftZAfterRotationCommand = tcpCore->buildDeviceCommand("06", "D", 163687, 8);
     tcpCore->sendMessageAsync(liftZAfterRotationCommand.toUtf8(), true);
     QString waitZAfterRotationCommand = tcpCore->buildDeviceCommand("06", "d", 0, 0);
     tcpCore->sendMessageAsync(waitZAfterRotationCommand.toUtf8(), true, "06d01");
 
-    // 电爪旋转后归零
-    QString rotateGripToZeroCommand = tcpCore->buildDeviceCommand("05", "06", "0108", 0, 4); // 归零
-    tcpCore->sendMessageAsync(rotateGripToZeroCommand.toUtf8(), false);
-    QString waitRotateGripToZeroCommand = tcpCore->buildDeviceCommand("05", "03", "0203", 1, 4); // 旋转1.5圈
-    tcpCore->sendMessageAsync(waitRotateGripToZeroCommand.toUtf8(), false, "0503020001");
+    // // 电爪旋转后归零，开盖里面带了归零
+    // QString rotateGripToZeroCommand = tcpCore->buildDeviceCommand("05", "06", "0108", 0, 4); // 归零
+    // tcpCore->sendMessageAsync(rotateGripToZeroCommand.toUtf8(), false);
+    // QString waitRotateGripToZeroCommand = tcpCore->buildDeviceCommand("05", "03", "0203", 1, 4); // 旋转1.5圈
+    // tcpCore->sendMessageAsync(waitRotateGripToZeroCommand.toUtf8(), false, "0503020001");
 
     // 夹持区力矩/速度设置：写0103=0x003C（60）
     QString setGripAreaTorqueCommand = tcpCore->buildDeviceCommand("0B", "06", "0103", "003C");
@@ -295,8 +331,8 @@ bool MainWindow::takeEmptyBottle(const QString& trayName)
 }
 
 
-
-bool MainWindow::getLiquid(const QString& liquidName, double volumeMl)
+// 取液体
+bool MainWindow::getLiquid(const QString& liquidName, double volumeMl, int& tipsNum)
 {
     Q_UNUSED(liquidName);
     Q_UNUSED(volumeMl);
@@ -408,31 +444,15 @@ bool MainWindow::getLiquid(const QString& liquidName, double volumeMl)
     QString waitGripClosedCommand = tcpCore->buildDeviceCommand("0B", "03", "0202", 1, 4);
     tcpCore->sendMessageAsync(waitGripClosedCommand.toUtf8(), false, "0B03020002");  // 目前是01
 
-    // 旋转开盖：先复位角度再执行目标角度
-    QString rotateGripToOpenCommand = tcpCore->buildDeviceCommand("05", "06", "0108", 64996, 4); // 逆时针旋转1.5圈
-    tcpCore->sendMessageAsync(rotateGripToOpenCommand.toUtf8(), false);
-    QString readGripperRotationToOpenCommand = tcpCore->buildDeviceCommand("05", "03", "0203", 1, 4);
-    tcpCore->sendMessageAsync(readGripperRotationToOpenCommand.toUtf8(), false, "0503020001");
+    openBottleCap(); // 开盖自带归零
 
     tcpCore->sendMessageAsync(raiseTransferZCommand.toUtf8(), true);
     tcpCore->sendMessageAsync(waitTransferZRaisedCommand.toUtf8(), true, "06d01");// 目前是01
 
 
-    // 电爪旋转归零
+    // // 电爪旋转归零
     QString rotateGripToZeroCommand = tcpCore->buildDeviceCommand("05", "06", "0108", 0, 4); // 归零
-    tcpCore->sendMessageAsync(rotateGripToZeroCommand.toUtf8(), false);
     QString waitRotateGripToZeroCommand = tcpCore->buildDeviceCommand("05", "03", "0203", 1, 4); // 旋转1.5圈
-    tcpCore->sendMessageAsync(waitRotateGripToZeroCommand.toUtf8(), false, "0503020001");
-
-
-
-
-
-
-
-
-
-
 
 
 
@@ -458,9 +478,11 @@ bool MainWindow::getLiquid(const QString& liquidName, double volumeMl)
         tipsHeadRows = tipsHeadQuery.value("rows").toInt();
         tipsHeadRightSpacing = tipsHeadQuery.value("rightSpacing").toDouble();
         tipsHeadBottomSpacing = tipsHeadQuery.value("bottomSpacing").toDouble();
+        // 将获取到的tips索引赋值给外部变量
     }
     SlotPositionConfig config(tipsHeadX, tipsHeadY, tipsHeadCols, tipsHeadRows, tipsHeadRightSpacing, tipsHeadBottomSpacing);
-    QPoint tipstargetPos = calculateSlotPosition(config, tipsHeadSlotIndex);
+    QPoint tipstargetPos = calculateSlotPosition(config, tipsHeadSlotIndex+tipsNum);
+    tipsNum++; // 解决同步过程使用异步导致tips头索引不同步的问题
     int tipsHeadTargetX = tipstargetPos.x();
     int tipsHeadTargetY = tipstargetPos.y();
 
@@ -481,8 +503,10 @@ bool MainWindow::getLiquid(const QString& liquidName, double volumeMl)
     QString waitMoveToGetTipZCommand = tcpCore->buildDeviceCommand("08", "d", 0, 0);
     tcpCore->sendMessageAsync(waitMoveToGetTipZCommand.toUtf8(), true, "08d01");
 
-    // 去other表把currentIndex值+1，并更新到数据库
-    incrementDatabaseField("other", "currentIndex", "name = 'tipsHeadArea'");
+    // tips头序号加一
+    tcpCore->sendMessageAsync("AAtipsHeadAreaCurrentIndexPlusOne");
+
+
 
     // 上移 tip头命令： 08D000000004
     QString raiseTipZCommand = tcpCore->buildDeviceCommand("08", "D", 100, 8); // 00000004
@@ -492,13 +516,8 @@ bool MainWindow::getLiquid(const QString& liquidName, double volumeMl)
 
 
 
-
-
-
     // 07n00C8 吸液volumeMl微升（volumeMl是ml，要转成微升，再转成4位十六进制，前面带0）每次最多吸1000微升，如果超过1000微升，则分多次吸液
     const int volumeUl = static_cast<int>(volumeMl * 1000.0 + 0.5);
-
-
     // 1.移动到移动到夹持区下移
     QString gripLiquidAreaSql = "SELECT originX, originY FROM other WHERE name = 'gripLiquidArea'";
     QSqlQuery gripLiquidAreaQuery = dbm->query(gripLiquidAreaSql);
@@ -582,22 +601,6 @@ bool MainWindow::getLiquid(const QString& liquidName, double volumeMl)
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
     /**
      * 移动到废弃区域，丢弃tips头
      *
@@ -648,14 +651,17 @@ bool MainWindow::getLiquid(const QString& liquidName, double volumeMl)
     tcpCore->sendMessageAsync(waitGripAreaXCommand.toUtf8(), true, "0Ad01");
     tcpCore->sendMessageAsync(moveToGripAreaYCommand.toUtf8(), true);
     tcpCore->sendMessageAsync(waitGripAreaYCommand.toUtf8(), true, "09d01");
-    tcpCore->sendMessageAsync(moveToGripAreaZCommand.toUtf8(), true);
+    QString moveToGripAreaZCommand_reduction= tcpCore->buildDeviceCommand("06", "D", gripAreaZ-24994, 8);
+    tcpCore->sendMessageAsync(moveToGripAreaZCommand_reduction.toUtf8(), true);
     tcpCore->sendMessageAsync(waitGripAreaZCommand.toUtf8(), true, "06d01");
 
-    // 盖盖子（旋转关盖）
-    QString rotateGripToCloseCommand = tcpCore->buildDeviceCommand("05", "06", "0108", 600, 4); // 顺时针1.5圈
-    tcpCore->sendMessageAsync(rotateGripToCloseCommand.toUtf8(), false);
-    QString readGripperRotationToCloseCommand = tcpCore->buildDeviceCommand("05", "03", "0203", 1, 4); // -> 050302030001 + CRC
-    tcpCore->sendMessageAsync(readGripperRotationToCloseCommand.toUtf8(), false, "0503020001");
+    // // 盖盖子（旋转关盖）
+    // QString rotateGripToCloseCommand = tcpCore->buildDeviceCommand("05", "06", "0108", 600, 4); // 顺时针1.5圈
+    // tcpCore->sendMessageAsync(rotateGripToCloseCommand.toUtf8(), false);
+    // QString readGripperRotationToCloseCommand = tcpCore->buildDeviceCommand("05", "03", "0203", 1, 4); // -> 050302030001 + CRC
+    // tcpCore->sendMessageAsync(readGripperRotationToCloseCommand.toUtf8(), false, "0503020001");
+
+    closeBottleCap(); // 关盖自带归零
 
     // 松固定夹爪0B
     QString releaseGripCommand = tcpCore->buildDeviceCommand("0B", "06", "0105", 0, 4);
@@ -669,9 +675,9 @@ bool MainWindow::getLiquid(const QString& liquidName, double volumeMl)
     QString waitRaiseMoveGripCommand = tcpCore->buildDeviceCommand("06", "d", 0, 0);
     tcpCore->sendMessageAsync(waitRaiseMoveGripCommand.toUtf8(), true, "06d01");
 
-    // 电爪旋转归零
-    tcpCore->sendMessageAsync(rotateGripToZeroCommand.toUtf8(), false);
-    tcpCore->sendMessageAsync(waitRotateGripToZeroCommand.toUtf8(), false, "0503020001");
+    // // 电爪旋转归零
+    // tcpCore->sendMessageAsync(rotateGripToZeroCommand.toUtf8(), false);
+    // tcpCore->sendMessageAsync(waitRotateGripToZeroCommand.toUtf8(), false, "0503020001");
 
 
     /**
@@ -702,12 +708,13 @@ bool MainWindow::getLiquid(const QString& liquidName, double volumeMl)
 }
 
 
-
+// 取固体
 bool MainWindow::getSolid(const QString& solidName, double mass)
 {
     Q_UNUSED(solidName);
     Q_UNUSED(mass);
 
+    qDebug() << "嘻嘻哈哈";
     tcpCore->sendMessageAsync("AA1", true); // 打开天平打印
     tcpCore->setExpectedWeight(mass); // tcpCore设置期望重量值， tcpBalanceCore使用
     tcpCore->sendMessageAsync("AA2", true); // 去皮
@@ -896,7 +903,7 @@ bool MainWindow::getSolid(const QString& solidName, double mass)
 }
 
 
-
+// 打包放摇床
 void MainWindow::tightenBottle()
 {
 
@@ -1046,7 +1053,8 @@ void MainWindow::tightenBottle()
     tcpCore->sendMessageAsync(waitGripAreaXCommand.toUtf8(), true, "0Ad01");
     tcpCore->sendMessageAsync(moveToGripAreaYCommand.toUtf8(), true);
     tcpCore->sendMessageAsync(waitGripAreaYCommand.toUtf8(), true, "09d01");
-    tcpCore->sendMessageAsync(moveToGripAreaZCommand.toUtf8(), true);
+    QString moveToGripAreaZCommand_reduction= tcpCore->buildDeviceCommand("06", "D", gripAreaZ-24994, 8); // 下移动的时候，不能太多
+    tcpCore->sendMessageAsync(moveToGripAreaZCommand_reduction.toUtf8(), true);
     tcpCore->sendMessageAsync(waitGripAreaZCommand.toUtf8(), true, "06d01");
 
 
@@ -1057,10 +1065,13 @@ void MainWindow::tightenBottle()
      * 05号电机移动夹爪电机复位
      *
      */
-    QString tightenGripperCommand = tcpCore->buildDeviceCommand("05", "06", "0108", 600, 4);
-    tcpCore->sendMessageAsync(tightenGripperCommand.toUtf8(), false);
-    QString waitTightenGripperCommand = tcpCore->buildDeviceCommand("05", "03", "0203", 1, 4);
-    tcpCore->sendMessageAsync(waitTightenGripperCommand.toUtf8(), false, "0503020001");
+    // QString tightenGripperCommand = tcpCore->buildDeviceCommand("05", "06", "0108", 600, 4);
+    // tcpCore->sendMessageAsync(tightenGripperCommand.toUtf8(), false);
+    // QString waitTightenGripperCommand = tcpCore->buildDeviceCommand("05", "03", "0203", 1, 4);
+    // tcpCore->sendMessageAsync(waitTightenGripperCommand.toUtf8(), false, "0503020001");
+
+    closeBottleCap();
+
 
     QString releaseFixedGripperCommand = tcpCore->buildDeviceCommand("0B", "06", "0105", 0, 4);
     tcpCore->sendMessageAsync(releaseFixedGripperCommand.toUtf8(), false);
@@ -1070,19 +1081,14 @@ void MainWindow::tightenBottle()
     tcpCore->sendMessageAsync(raiseTransferZCommand.toUtf8(), true);
     tcpCore->sendMessageAsync(waitTransferZRaisedCommand.toUtf8(), true, "06d01");
 
-    QString resetGripperCommand = tcpCore->buildDeviceCommand("05", "06", "0108", 0, 4);
-    tcpCore->sendMessageAsync(resetGripperCommand.toUtf8(), false);
-    QString waitResetGripperCommand = tcpCore->buildDeviceCommand("05", "03", "0203", 1, 4);
-    tcpCore->sendMessageAsync(waitResetGripperCommand.toUtf8(), false, "0503020001");
+    // QString resetGripperCommand = tcpCore->buildDeviceCommand("05", "06", "0108", 0, 4);
+    // tcpCore->sendMessageAsync(resetGripperCommand.toUtf8(), false);
+    // QString waitResetGripperCommand = tcpCore->buildDeviceCommand("05", "03", "0203", 1, 4);
+    // tcpCore->sendMessageAsync(waitResetGripperCommand.toUtf8(), false, "0503020001");
 
 
     // 关闭摇床
-    QString stopShakeCommand = tcpCore->buildMessageWithCrc(QStringLiteral(">0Cxi30100000000"));
-    qDebug() << "stopCommand" << stopShakeCommand;
-    tcpCore->sendMessageAsync(stopShakeCommand.toUtf8(), true, "0Cxi301");
-
-
-
+    tcpCore->sendMessageAsync("AAcloseShakeBed");
 
 
     // 数据库去表shakeBedArea找字段isEmpty的值为1的记录，然后取字段selfLocation的值出来待用
@@ -1134,90 +1140,58 @@ void MainWindow::tightenBottle()
     tcpCore->sendMessageAsync(waitShakeBedAreaZCommand.toUtf8(), true, "06d01");
 
 
-
-
-    // /**
-    // * 读取摇床区
-    // *
-    // * 数据库获取 shakeBedArea 的xyz
-    // *
-    // * 数据库获取 shakeBedArea 的rightSpacing, bottomSpacing, cols, rows
-    // * 计算槽位坐标
-    // * 0A, 09, 06电机移动到shakeBedArea的xyz  currentIndex
-    // */
-    // QString shakeBedAreaSql = "SELECT originX, originY, gripperZ, rightSpacing, bottomSpacing, cols, rows, currentIndex FROM other WHERE name = 'shakeBedArea'";
-    // QSqlQuery shakeBedAreaQuery = dbm->query(shakeBedAreaSql);
-    // int shakeBedAreaRightSpacing=0, shakeBedAreaBottomSpacing=0, shakeBedAreaCols=0, shakeBedAreaRows=0, shakeBedAreaSlotIndex=0;
-    // int shakeBedAreaX=0, shakeBedAreaY=0, shakeBedAreaZ=0;
-    // if (shakeBedAreaQuery.next()) {
-    //     shakeBedAreaX = shakeBedAreaQuery.value("originX").toInt();
-    //     shakeBedAreaY = shakeBedAreaQuery.value("originY").toInt();
-    //     shakeBedAreaZ = shakeBedAreaQuery.value("gripperZ").toInt();
-    //     shakeBedAreaRightSpacing = shakeBedAreaQuery.value("rightSpacing").toDouble();
-    //     shakeBedAreaBottomSpacing = shakeBedAreaQuery.value("bottomSpacing").toDouble();
-    //     shakeBedAreaCols = shakeBedAreaQuery.value("cols").toInt();
-    //     shakeBedAreaRows = shakeBedAreaQuery.value("rows").toInt();
-    //     shakeBedAreaSlotIndex = shakeBedAreaQuery.value("currentIndex").toInt();
-    // }
-
-
-    // SlotPositionConfig config(shakeBedAreaX, shakeBedAreaY, shakeBedAreaCols, shakeBedAreaRows, shakeBedAreaRightSpacing, shakeBedAreaBottomSpacing);
-    // QPoint targetPos = calculateSlotPosition(config, shakeBedAreaSlotIndex);
-    // int shakeBedAreaTargetX = targetPos.x();
-    // int shakeBedAreaTargetY = targetPos.y();
-
-    // QString moveToShakeBedAreaZCommand = tcpCore->buildDeviceCommand("0A", "D", shakeBedAreaTargetX, 8);
-    // tcpCore->sendMessageAsync(moveToShakeBedAreaZCommand.toUtf8(), true);
-    // QString waitShakeBedAreaZCommand = tcpCore->buildDeviceCommand("0A", "d", 0, 0);
-    // tcpCore->sendMessageAsync(waitShakeBedAreaZCommand.toUtf8(), true, "0Ad01");
-
-    // QString moveToShakeBedAreaYCommand = tcpCore->buildDeviceCommand("09", "D", shakeBedAreaTargetY, 8);
-    // tcpCore->sendMessageAsync(moveToShakeBedAreaYCommand.toUtf8(), true);
-    // QString waitShakeBedAreaYCommand = tcpCore->buildDeviceCommand("09", "d", 0, 0);
-    // tcpCore->sendMessageAsync(waitShakeBedAreaYCommand.toUtf8(), true, "09d01");
-
-    // QString moveToShakeBedAreaXCommand = tcpCore->buildDeviceCommand("06", "D", shakeBedAreaZ, 8);
-    // tcpCore->sendMessageAsync(moveToShakeBedAreaXCommand.toUtf8(), true);
-    // QString waitShakeBedAreaXCommand = tcpCore->buildDeviceCommand("06", "d", 0, 0);
-    // tcpCore->sendMessageAsync(waitShakeBedAreaXCommand.toUtf8(), true, "06d01");
-
-
-
-
     /**
     * 松移动夹爪， 6号电机上移零点
     *
     */
     tcpCore->sendMessageAsync(releaseGripperCommand.toUtf8(), false);
     tcpCore->sendMessageAsync(waitGripperReleaseCommand.toUtf8(), false, "0503020001");
-    // 去other表把currentIndex值+1，并更新到数据库
-
-
-
-
-
-    // 记录摇床时间信息
-    recordShakeBedTime(shakeBedAreaSelfLocation, 10);
-
-
-
-
-
-
-
     tcpCore->sendMessageAsync(raiseTransferZCommand.toUtf8(), true);
     tcpCore->sendMessageAsync(waitTransferZRaisedCommand.toUtf8(), true, "06d01");
 
-    // xyz轴恢复到零点
-    resetXYZMotorsToZero();
+
+
+    /*
+     * AA0  天平打印关
+     * AA1  天平打印开
+     * AA2  天平去皮
+     * AAcloseShakeBed 关摇床
+     * AAopenShakeBed  开摇床
+     * AArecordShakeBedTime     记录摇床需要的时间
+     * 步骤四:使用
+     tcpCore->sendMessageAsync("AA0", true); // 关闭天平打印
+     */
 
 
     // 启动摇床
-    QString startShakeCommand = tcpCore->buildMessageWithCrc(QStringLiteral(">0Cxi3000000012c0000012c"));
-    qDebug() << "startCommand " << startShakeCommand;
-    tcpCore->sendMessageAsync(startShakeCommand.toUtf8(), true, "0Cxi300");
+    tcpCore->sendMessageAsync("AAopenShakeBed");
 
+    // 记录摇床时间信息  去执行   recordShakeBedTime(shakeBedAreaSelfLocation, 60*5);
+    tcpCore->sendMessageAsync("AArecordShakeBedTime"); // 记录摇床时间信息
+ 
+
+
+    
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 // 记录摇床区域的时间信息
 bool MainWindow::recordShakeBedTime(int selfLocation, int shakeDurationSeconds)
@@ -1233,35 +1207,317 @@ bool MainWindow::recordShakeBedTime(int selfLocation, int shakeDurationSeconds)
         return false;
     }
 
-    // 2. 获取当前时间戳（秒，精确到年月日时分秒）
-    qint64 currentTime = QDateTime::currentSecsSinceEpoch();
-    // 计算结束时间（开始时间 + 摇床持续时间）
-    qint64 endTime = currentTime + shakeDurationSeconds;
-
-    // 3. 格式化时间用于日志输出（精确到年月日时分秒）
-    QDateTime startDateTime = QDateTime::fromSecsSinceEpoch(currentTime);
-    QDateTime endDateTime = QDateTime::fromSecsSinceEpoch(endTime);
-    QString startTimeStr = startDateTime.toString("yyyy-MM-dd hh:mm:ss");
+    // 2. 获取当前时间并格式化（yyyy-MM-dd hh:mm:ss格式）
+    QDateTime currentDateTime = QDateTime::currentDateTime();
+    QDateTime endDateTime = currentDateTime.addSecs(shakeDurationSeconds);
+    QString startTimeStr = currentDateTime.toString("yyyy-MM-dd hh:mm:ss");
     QString endTimeStr = endDateTime.toString("yyyy-MM-dd hh:mm:ss");
 
-    // 4. 更新数据库：设置startTime、endTime和isEmpty
-    QString updateSql = QString("UPDATE shakeBedArea SET startTime = %1, endTime = %2, isEmpty = 0 WHERE selfLocation = %3")
-        .arg(currentTime)
-        .arg(endTime)
-        .arg(selfLocation);
+    // 3. 更新数据库：设置startTime、endTime和isEmpty（使用字符串格式）
+    QString updateSql = QString("UPDATE shakeBedArea SET startTime = '%1', endTime = '%2', isEmpty = 0 WHERE selfLocation = %3")
+        .arg(startTimeStr, endTimeStr, QString::number(selfLocation));
 
     QSqlQuery updateQuery = dbm->query(updateSql);
     if (updateQuery.lastError().isValid()) {
         qWarning() << "更新shakeBedArea表失败:" << updateQuery.lastError().text() << "SQL:" << updateSql;
         return false;
     } else {
-        qDebug() << QString("已更新shakeBedArea表，位置%1：开始时间=%2 (%3)，结束时间=%4 (%5)")
-            .arg(selfLocation)
-            .arg(currentTime)
-            .arg(startTimeStr)
-            .arg(endTime)
-            .arg(endTimeStr);
+        qDebug() << QString("已更新shakeBedArea表，位置%1：开始时间=%2，结束时间=%3")
+            .arg(QString::number(selfLocation), startTimeStr, endTimeStr);
         return true;
     }
+
+
 }
+
+// 开盖函数（打开瓶盖）
+void MainWindow::openBottleCap()
+{
+    /**
+     * 一、准备动作
+     */
+    QString rotateGripToZeroCommand = tcpCore->buildDeviceCommand("05", "06", "0108", 0, 4);// 5号电机归零
+    tcpCore->sendMessageAsync(rotateGripToZeroCommand.toUtf8(), false);
+    QString waitrotateGripToZeroCommand = tcpCore->buildDeviceCommand("05", "03", "0203", 1, 4); // -> 050302030001 + CRC
+    tcpCore->sendMessageAsync(waitrotateGripToZeroCommand.toUtf8(), false);
+
+
+    /**
+     * 二、变量设置
+     */
+    int raiseHeight = 24994;
+    // int currentZ6Coordinate = 0; //当前z坐标
+
+
+    /**
+     * 三、速度和圈数设置
+     */
+    setMotor5Speed(27);
+    setMotor6ZSpeed(35);
+
+
+    // /**
+    //  * 四、查询当前坐标
+    //  */
+    // QString waitrotateGripRightCommand = tcpCore->buildDeviceCommand("06", "E", 0, 0);
+    // tcpCore->sendMessageAsync(waitrotateGripRightCommand.toUtf8(), true, "06E");
+
+
+    // /**
+    //  * 五、阻塞等待
+    //  */
+    // // 1、创建事件循环，阻塞等待坐标返回
+    // QEventLoop eventLoop;
+    // bool coordinateReceived = false;
+    // // 2、连接tcpCore的z6CoordinateReceived信号来获取坐标
+    // QMetaObject::Connection connection = connect(tcpCore, &TcpClientCore::z6CoordinateReceived, this,
+    //                                              [&currentZ6Coordinate, &coordinateReceived, &eventLoop](int coordinate) {
+    //                                                  currentZ6Coordinate = coordinate;
+    //                                                  coordinateReceived = true;
+    //                                                  qDebug() << "获取到6号电机Z轴坐标:" << coordinate;
+    //                                                  eventLoop.quit();  // 退出事件循环，继续执行后续代码
+    //                                              }, Qt::SingleShotConnection);  // 单次连接，处理完一次后自动断开
+    // // 3、设置超时定时器（5秒超时）
+    // QTimer timeoutTimer;
+    // timeoutTimer.setSingleShot(true);
+    // timeoutTimer.setInterval(5000);  // 5秒超时
+    // QObject::connect(&timeoutTimer, &QTimer::timeout, &eventLoop, [&eventLoop, &coordinateReceived, &connection]() {
+    //     if (!coordinateReceived) {
+    //         qWarning() << "等待Z6坐标超时！";
+    //         QObject::disconnect(connection);  // 断开连接
+    //         eventLoop.quit();  // 强制退出事件循环
+    //     }
+    // });
+    // // 4、启动超时定时器
+    // timeoutTimer.start();
+    // // 5、阻塞等待，直到收到坐标信号或超时
+    // eventLoop.exec();
+    // // 6、停止超时定时器
+    // timeoutTimer.stop();
+    // // 7、检查是否成功获取坐标
+    // if (!coordinateReceived) {
+    //     qWarning() << "未能获取到Z6坐标，使用默认值0";
+    //     currentZ6Coordinate = 0;
+    // }
+
+
+    /**
+     * 六、上开盖
+     */
+    // 去数据库获取夹住区域的z坐标
+    QString gripAreaSql = "SELECT gripperZ FROM other WHERE name = 'gripArea'";
+    QSqlQuery gripAreaQuery = dbm->query(gripAreaSql);
+    int gripAreaZ;
+    if (gripAreaQuery.next()) {
+        gripAreaZ = gripAreaQuery.value("gripperZ").toInt();
+    } else {
+        qWarning() << "未找到 gripArea 的数据";
+        return;
+    }
+    // 上开盖
+    qDebug() << "========================" << gripAreaZ << " - " << raiseHeight << " = " << gripAreaZ-raiseHeight;
+    QString moveToGripUpZCommand = tcpCore->buildDeviceCommand("06", "D", gripAreaZ-raiseHeight, 8);// 6号缓慢上移到指定距离
+    tcpCore->sendMessageAsync(moveToGripUpZCommand.toUtf8(), true);
+    rotateMotor5ByCircles(-5.4);
+    QString waitmoveToGripUpZCommand = tcpCore->buildDeviceCommand("05", "03", "0203", 1, 4); // -> 050302030001 + CRC
+    tcpCore->sendMessageAsync(waitmoveToGripUpZCommand.toUtf8(), false, "0503020001");
+    QString waitrotateGripLeftCommand = tcpCore->buildDeviceCommand("06", "d", 0, 0);
+    tcpCore->sendMessageAsync(waitrotateGripLeftCommand.toUtf8(), true, "06d01");
+
+
+    /**
+     * 七、收尾
+     */
+    // 1、电机速度恢复 已知的有5号电机的旋转和6号电机的Z轴
+    setMotor5Speed(100);
+    setMotor6ZSpeed(1000);
+    // 2、旋转归零恢复
+    QString rotateInitCommand = tcpCore->buildDeviceCommand("05", "06", "0101", 1, 4);
+    tcpCore->sendMessageAsync(rotateInitCommand.toUtf8(), false);
+    QString waitRotateInitCommand = tcpCore->buildDeviceCommand("05", "03", "0201", 1, 4);
+    tcpCore->sendMessageAsync(waitRotateInitCommand.toUtf8(), false);
+
+
+}
+
+// 关盖函数（关闭瓶盖）
+void MainWindow::closeBottleCap()
+{
+
+    /**
+     * 一、准备动作
+     */
+    QString rotateGripToZeroCommand = tcpCore->buildDeviceCommand("05", "06", "0108", 0, 4);// 5号电机归零
+    tcpCore->sendMessageAsync(rotateGripToZeroCommand.toUtf8(), false);
+    QString waitrotateGripToZeroCommand = tcpCore->buildDeviceCommand("05", "03", "0203", 1, 4); // -> 050302030001 + CRC
+    tcpCore->sendMessageAsync(waitrotateGripToZeroCommand.toUtf8(), false);
+
+
+    /**
+     * 二、变量设置
+     */
+    // int raiseHeight = 24994;
+    // int currentZ6Coordinate = 0; //当前z坐标
+
+    /**
+     * 三、速度和圈数设置
+     */
+    setMotor5Speed(27);
+    setMotor6ZSpeed(35);
+
+    // /**
+    //  * 四、查询当前坐标
+    //  */
+    // QString waitrotateGripRightCommand = tcpCore->buildDeviceCommand("06", "E", 0, 0);
+    // tcpCore->sendMessageAsync(waitrotateGripRightCommand.toUtf8(), true, "06E");
+
+    // /**
+    //  * 五、阻塞等待
+    //  */
+    // // 1、创建事件循环，阻塞等待坐标返回
+    // QEventLoop eventLoop;
+    // bool coordinateReceived = false;
+    // // 2、连接tcpCore的z6CoordinateReceived信号来获取坐标
+    // QMetaObject::Connection connection = connect(tcpCore, &TcpClientCore::z6CoordinateReceived, this,
+    //                                              [&currentZ6Coordinate, &coordinateReceived, &eventLoop](int coordinate) {
+    //                                                  currentZ6Coordinate = coordinate;
+    //                                                  coordinateReceived = true;
+    //                                                  qDebug() << "获取到6号电机Z轴坐标:" << coordinate;
+    //                                                  eventLoop.quit();  // 退出事件循环，继续执行后续代码
+    //                                              }, Qt::SingleShotConnection);  // 单次连接，处理完一次后自动断开
+    // // 3、设置超时定时器（5秒超时）
+    // QTimer timeoutTimer;
+    // timeoutTimer.setSingleShot(true);
+    // timeoutTimer.setInterval(5000);  // 5秒超时
+    // QObject::connect(&timeoutTimer, &QTimer::timeout, &eventLoop, [&eventLoop, &coordinateReceived, &connection]() {
+    //     if (!coordinateReceived) {
+    //         qWarning() << "等待Z6坐标超时！";
+    //         QObject::disconnect(connection);  // 断开连接
+    //         eventLoop.quit();  // 强制退出事件循环
+    //     }
+    // });
+    // // 4、启动超时定时器
+    // timeoutTimer.start();
+    // // 5、阻塞等待，直到收到坐标信号或超时
+    // eventLoop.exec();
+    // // 6、停止超时定时器
+    // timeoutTimer.stop();
+    // // 7、检查是否成功获取坐标
+    // if (!coordinateReceived) {
+    //     qWarning() << "未能获取到Z6坐标，使用默认值0";
+    //     currentZ6Coordinate = 0;
+    // }
+
+    /**
+     * 六、下拧紧
+     */
+    // 去数据库获取夹住区域的z坐标
+    QString gripAreaSql = "SELECT gripperZ FROM other WHERE name = 'gripArea'";
+    QSqlQuery gripAreaQuery = dbm->query(gripAreaSql);
+    int gripAreaZ;
+    if (gripAreaQuery.next()) {
+        gripAreaZ = gripAreaQuery.value("gripperZ").toInt();
+    } else {
+        qWarning() << "未找到 gripArea 的数据";
+        return;
+    }
+    QString moveToGripUpZCommand = tcpCore->buildDeviceCommand("06", "D", gripAreaZ, 8);// 6号缓慢上移到指定距离
+    tcpCore->sendMessageAsync(moveToGripUpZCommand.toUtf8(), true);
+    rotateMotor5ByCircles(5.4);
+    QString waitmoveToGripUpZCommand = tcpCore->buildDeviceCommand("05", "03", "0203", 1, 4); // -> 050302030001 + CRC
+    tcpCore->sendMessageAsync(waitmoveToGripUpZCommand.toUtf8(), false, "0503020001");
+    QString waitrotateGripLeftCommand = tcpCore->buildDeviceCommand("06", "d", 0, 0);
+    tcpCore->sendMessageAsync(waitrotateGripLeftCommand.toUtf8(), true, "06d01");
+
+    /**
+     * 七、收尾
+     */
+    // 1、先释放5号夹爪
+    QString openGripperCommand = tcpCore->buildDeviceCommand("05", "06", "0105", 0, 4);
+    tcpCore->sendMessageAsync(openGripperCommand.toUtf8(), false);
+    QString waitOpenGripperCommand = tcpCore->buildDeviceCommand("05", "03", "0202", 1, 4);
+    tcpCore->sendMessageAsync(waitOpenGripperCommand.toUtf8(), false, "0503020001");
+    // 2、电机速度恢复 已知的有5号电机的旋转和6号电机的Z轴
+    QString resetSpeed5Command = tcpCore->buildDeviceCommand("05", "06", "0107", 100, 4);
+    tcpCore->sendMessageAsync(resetSpeed5Command.toUtf8(), false, "050601070064");
+    int resetSpeed6zSpeedValue = (100 * 6400) / 60;
+    QString resetSpeed6zValueString = QString::number(resetSpeed6zSpeedValue, 16).toUpper().rightJustified(8, '0')+"0A0A"; // speed5Value转换成8位16进制字符串
+    QString resetSpeed6zCommand = tcpCore->buildMessageWithCrc(">06B00000000" + resetSpeed6zValueString);
+    tcpCore->sendMessageAsync(resetSpeed6zCommand.toUtf8(), true, "06B");
+    // 3、速度恢复
+    setMotor5Speed(100);
+    setMotor6ZSpeed(1000);
+    // 4、旋转归零恢复
+    QString rotateInitCommand = tcpCore->buildDeviceCommand("05", "06", "0101", 1, 4);
+    tcpCore->sendMessageAsync(rotateInitCommand.toUtf8(), false);
+    QString waitRotateInitCommand = tcpCore->buildDeviceCommand("05", "03", "0201", 1, 4);
+    tcpCore->sendMessageAsync(waitRotateInitCommand.toUtf8(), false);
+    // 5、恢复夹持
+    QString enableGripperCommand = tcpCore->buildDeviceCommand("05", "06", "0105", 100, 4);
+    tcpCore->sendMessageAsync(enableGripperCommand.toUtf8(), false);
+    QString waitGripperEnableCommand = tcpCore->buildDeviceCommand("05", "03", "0202", 1, 4);
+     tcpCore->sendMessageAsync(waitGripperEnableCommand.toUtf8(), false, "0503020002"); // 目前是01
+
+}
+
+// 设置5号电机速度
+void MainWindow::setMotor5Speed(int speed)
+{
+    // 验证速度范围（10-100）
+    if (speed < 10 || speed > 100) {
+        qWarning() << "5号电机速度超出范围！速度:" << speed << "，有效范围: 10-100";
+        return;
+    }
+    
+    // 构建5号电机速度设置命令
+    QString speed5Command = tcpCore->buildDeviceCommand("05", "06", "0107", speed, 4);
+    
+    // 构建期望签名：05060107 + 速度的4位16进制字符串
+    QString expectedSignature = "05060107" + QString::number(speed, 16).toUpper().rightJustified(4, '0');
+    
+    // 发送命令
+    tcpCore->sendMessageAsync(speed5Command.toUtf8(), false, expectedSignature);
+    
+    qDebug() << "设置5号电机速度:" << speed;
+}
+
+// 设置6号电机Z轴速度
+void MainWindow::setMotor6ZSpeed(int speed)
+{
+    // 验证速度范围（建议范围：1-10000 rpm，但不强制限制）
+    if (speed <= 0) {
+        qWarning() << "6号电机Z轴速度无效！速度:" << speed << "，必须大于0";
+        return;
+    }
+    
+    // 计算速度值：(速度 * 6400) / 60
+    int speedValue = (speed * 6400) / 60;
+    
+    // 转换为8位16进制字符串并添加"0A0A"后缀
+    QString speedValueString = QString::number(speedValue, 16).toUpper().rightJustified(8, '0') + "0A0A";
+    
+    // 构建命令：">06B00000000" + 速度值字符串
+    QString speed6zCommand = tcpCore->buildMessageWithCrc(">06B00000000" + speedValueString);
+    
+    // 发送命令（ASCII模式，期望签名"06B"）
+    tcpCore->sendMessageAsync(speed6zCommand.toUtf8(), true, "06B");
+    
+    qDebug() << "设置6号电机Z轴速度:" << speed << "rpm";
+}
+
+// 5号电机旋转圈数
+void MainWindow::rotateMotor5ByCircles(double circles)
+{
+    // 将圈数转换为角度值（圈数 * 360度）
+    int angleValue = static_cast<int>(circles * 360);
+    
+    // 构建5号电机旋转命令（寄存器0108用于旋转）
+    QString rotateCommand = tcpCore->buildDeviceCommand("05", "06", "0108", angleValue, 4);
+    
+    // 发送命令（Hex模式）
+    tcpCore->sendMessageAsync(rotateCommand.toUtf8(), false);
+    
+    qDebug() << "5号电机旋转:" << circles << "圈（角度值:" << angleValue << "度）";
+}
+
 

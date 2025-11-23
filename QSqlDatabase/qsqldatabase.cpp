@@ -157,8 +157,8 @@ void AppSqlDatabase::createDefaultTables()
         "CREATE TABLE IF NOT EXISTS %1 ("
         "  selfLocation INTEGER PRIMARY KEY,"
         "  isEmpty INTEGER NOT NULL DEFAULT 0,"
-        "  startTime INTEGER NOT NULL DEFAULT 0,"
-        "  endTime INTEGER NOT NULL DEFAULT 0"
+        "  startTime TEXT NOT NULL DEFAULT '',"
+        "  endTime TEXT NOT NULL DEFAULT ''"
         ")"
     ).arg(QString::fromLatin1(kTableShakeBedArea));
 
@@ -211,7 +211,7 @@ void AppSqlDatabase::seedDefaultData()
         {"name", "emptyBottleArea"},
         {"originX", 5478},
         {"originY", 23420},
-        {"gripperZ", 269232},
+        {"gripperZ", 274377}, // old:269232 new:274377
         {"tipsZ", 0},
         {"solidZ", 0},
         {"rightSpacing", 1732.75},
@@ -368,15 +368,15 @@ void AppSqlDatabase::seedDefaultData()
         {"rows", 3}
     });
 
-    // 插入第十条记录，transferRightArea
+    // 插入第十条记录
     // 初始化 shakeBedArea 表，创建15条默认记录（selfLocation从0到14）
     if (isTableEmpty(QString::fromLatin1(kTableShakeBedArea))) {
         for (int i = 0; i < 15; ++i) {
             insertRow(QString::fromLatin1(kTableShakeBedArea), {
                 {"selfLocation", i},
                 {"isEmpty", 1},
-                {"startTime", 0},
-                {"endTime", 0}
+                {"startTime", ""},
+                {"endTime", ""}
             });
         }
     }
@@ -389,10 +389,10 @@ void AppSqlDatabase::seedDefaultData()
         {"gripperZ", 266175},
         {"tipsZ", 0},
         {"solidZ", 0},
-        {"rightSpacing", 0},
-        {"bottomSpacing", 0},
-        {"cols", 0},
-        {"rows", 0}
+        {"rightSpacing", 1732.75},
+        {"bottomSpacing", 4355.0},
+        {"cols", 5},
+        {"rows", 3}
     });
 
 
