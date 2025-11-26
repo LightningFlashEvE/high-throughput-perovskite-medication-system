@@ -944,3 +944,89 @@ void MainWindow::controlShakeBed(bool isOn, bool sendImmediately)
         tcpCore->sendMessageAsync(command.toUtf8(), true, expectedSignature);
     }
 }
+
+
+
+
+
+
+// 设置5号电机速度
+void MainWindow::setMotor5Speed(int speed)
+{
+    // 验证速度范围（10-100）
+    if (speed < 10 || speed > 100) {
+        qWarning() << "5号电机速度超出范围！速度:" << speed << "，有效范围: 10-100";
+        return;
+    }
+
+    // 构建5号电机速度设置命令
+    QString speed5Command = tcpCore->buildDeviceCommand("05", "06", "0107", speed, 4);
+
+    // 构建期望签名：05060107 + 速度的4位16进制字符串
+    QString expectedSignature = "05060107" + QString::number(speed, 16).toUpper().rightJustified(4, '0');
+
+    // 发送命令
+    tcpCore->sendMessageAsync(speed5Command.toUtf8(), false, expectedSignature);
+
+    qDebug() << "设置5号电机速度:" << speed;
+}
+
+// 设置6号电机Z轴速度
+void MainWindow::setMotor6ZSpeed(int speed)
+{
+    // 验证速度范围（建议范围：1-10000 rpm，但不强制限制）
+    if (speed <= 0) {
+        qWarning() << "6号电机Z轴速度无效！速度:" << speed << "，必须大于0";
+        return;
+    }
+
+    // 计算速度值：(速度 * 6400) / 60
+    int speedValue = (speed * 6400) / 60;
+
+    // 转换为8位16进制字符串并添加"0A0A"后缀
+    QString speedValueString = QString::number(speedValue, 16).toUpper().rightJustified(8, '0') + "0A0A";
+
+    // 构建命令：">06B00000000" + 速度值字符串
+    QString speed6zCommand = tcpCore->buildMessageWithCrc(">06B00000000" + speedValueString);
+
+    // 发送命令（ASCII模式，期望签名"06B"）
+    tcpCore->sendMessageAsync(speed6zCommand.toUtf8(), true, "06B");
+
+    qDebug() << "设置6号电机Z轴速度:" << speed << "rpm";
+}
+
+// 5号电机旋转圈数
+// 设置5号设备拧紧力度
+void MainWindow::setMotor5TighteningForce(int force)
+{
+    // TODO: 在此处编写设置5号设备拧紧力度的具体实现
+    // 参数 force 范围：10-100      01 06 01 060032E9E2
+    // 发送： 05 03 0106 0001 65F7
+    // 返回： 05 0302 0032 3991
+    Q_UNUSED(force);
+
+    QString command = tcpCore->buildDeviceCommand("05", "06", "0106", force, 4);
+    tcpCore->sendMessageAsync(command.toUtf8(), false, command);
+
+    QString waitCommand = tcpCore->buildDeviceCommand("05", "03", "0106", 1, 4);
+    QString responseData = QString("050302") + QString::number(force, 16).toUpper().rightJustified(4, '0');
+    tcpCore->sendMessageAsync(waitCommand.toUtf8(), false, responseData);
+
+    //qDebug() << "设置5号电机拧紧力度:" << force << " 响应数据:" << responseData << " 命令:" << command;
+
+}
+
+void MainWindow::rotateMotor5ByCircles(double circles)
+{
+    // 将圈数转换为角度值（圈数 * 360度）
+    int angleValue = static_cast<int>(circles * 360);
+
+    // 构建5号电机旋转命令（寄存器0108用于旋转）
+    QString rotateCommand = tcpCore->buildDeviceCommand("05", "06", "0108", angleValue, 4);
+
+    // 发送命令（Hex模式）
+    tcpCore->sendMessageAsync(rotateCommand.toUtf8(), false);
+
+    qDebug() << "5号电机旋转:" << circles << "圈（角度值:" << angleValue << "度）";
+}
+

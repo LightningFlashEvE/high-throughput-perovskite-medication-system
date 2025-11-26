@@ -175,6 +175,8 @@ private:
     void closeBottleCap();
     // 设置5号电机速度（速度范围：10-100）
     void setMotor5Speed(int speed);
+    // 设置5号设备拧紧力度（力度范围：10-100）
+    void setMotor5TighteningForce(int force);
     // 设置6号电机Z轴速度（速度单位：rpm，转/分钟）
     void setMotor6ZSpeed(int speed);
     // 5号电机旋转圈数（圈数：正数为顺时针，负数为逆时针）

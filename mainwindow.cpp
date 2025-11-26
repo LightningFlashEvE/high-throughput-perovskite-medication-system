@@ -33,7 +33,6 @@ MainWindow::MainWindow(QWidget *parent)
 
     // 初始化tcpBalanceCore串口组件
     
-
     // 初始化data.ini文件。1.检查是否存在文件，不存在则创建文件并且提供默认值。
     initializeDataIni();
 
@@ -436,8 +435,8 @@ void MainWindow::checkShakeBedTimeout()
             // 取到放置区（摇床到成品区）
             moveShakeBedToFinishedProductArea(selfLocation);
 
-            // 可选：更新数据库，将isEmpty设置为1（表示摇床已停止）
-            QString updateSql = QString("UPDATE shakeBedArea SET isEmpty = 1 WHERE selfLocation = %1")
+            // 可选：更新数据库，将isEmpty设置为1（表示摇床已停止），并清理开始时间和结束时间
+            QString updateSql = QString("UPDATE shakeBedArea SET isEmpty = 1, startTime = '', endTime = '' WHERE selfLocation = %1")
                 .arg(selfLocation);
             QSqlQuery updateQuery = dbm->query(updateSql);
             if (updateQuery.lastError().isValid()) {

@@ -20,14 +20,18 @@
 
 void MainWindow::on_pushButton_7_clicked()
 {
-    // 关闭摇床（异步发送）
-    controlShakeBed(false);
+
+
+    closeBottleCap();
 }
 
 void MainWindow::on_pushButton_8_clicked()
 {
-    // 启动摇床（异步发送）
-    controlShakeBed(true);
+    // 1、先释放5号夹爪
+    QString openGripperCommand = tcpCore->buildDeviceCommand("05", "06", "0105", 0, 4);
+    tcpCore->sendMessageAsync(openGripperCommand.toUtf8(), false, openGripperCommand);
+    QString waitOpenGripperCommand = tcpCore->buildDeviceCommand("05", "03", "0202", 1, 4); // 05  03  0202  0001  25F6
+    tcpCore->sendMessageAsync(waitOpenGripperCommand.toUtf8(), false, "0503020001");
 }
 
 
@@ -312,11 +316,6 @@ bool MainWindow::takeEmptyBottle(const QString& trayName)
     tcpCore->sendMessageAsync(moveToBalanceAreaZCommand.toUtf8(), true);
     QString waitBalanceAreaZCommand = tcpCore->buildDeviceCommand("06", "d", 0, 0);
     tcpCore->sendMessageAsync(waitBalanceAreaZCommand.toUtf8(), true, "06d01");
-
-
-
-
-
 
 
 
@@ -906,7 +905,6 @@ bool MainWindow::getSolid(const QString& solidName, double mass)
 // 打包放摇床
 void MainWindow::tightenBottle()
 {
-
     /**
      * xyz移动到天平
      *
@@ -1250,59 +1248,16 @@ void MainWindow::openBottleCap()
 
 
     /**
-     * 三、速度和圈数设置
+     * 三、【5号电机速度】、【5号电机旋转力矩】和【6号电机移动Z】设置
      */
     setMotor5Speed(27);
     setMotor6ZSpeed(35);
+    setMotor5TighteningForce(100);
 
-
-    // /**
-    //  * 四、查询当前坐标
-    //  */
-    // QString waitrotateGripRightCommand = tcpCore->buildDeviceCommand("06", "E", 0, 0);
-    // tcpCore->sendMessageAsync(waitrotateGripRightCommand.toUtf8(), true, "06E");
-
-
-    // /**
-    //  * 五、阻塞等待
-    //  */
-    // // 1、创建事件循环，阻塞等待坐标返回
-    // QEventLoop eventLoop;
-    // bool coordinateReceived = false;
-    // // 2、连接tcpCore的z6CoordinateReceived信号来获取坐标
-    // QMetaObject::Connection connection = connect(tcpCore, &TcpClientCore::z6CoordinateReceived, this,
-    //                                              [&currentZ6Coordinate, &coordinateReceived, &eventLoop](int coordinate) {
-    //                                                  currentZ6Coordinate = coordinate;
-    //                                                  coordinateReceived = true;
-    //                                                  qDebug() << "获取到6号电机Z轴坐标:" << coordinate;
-    //                                                  eventLoop.quit();  // 退出事件循环，继续执行后续代码
-    //                                              }, Qt::SingleShotConnection);  // 单次连接，处理完一次后自动断开
-    // // 3、设置超时定时器（5秒超时）
-    // QTimer timeoutTimer;
-    // timeoutTimer.setSingleShot(true);
-    // timeoutTimer.setInterval(5000);  // 5秒超时
-    // QObject::connect(&timeoutTimer, &QTimer::timeout, &eventLoop, [&eventLoop, &coordinateReceived, &connection]() {
-    //     if (!coordinateReceived) {
-    //         qWarning() << "等待Z6坐标超时！";
-    //         QObject::disconnect(connection);  // 断开连接
-    //         eventLoop.quit();  // 强制退出事件循环
-    //     }
-    // });
-    // // 4、启动超时定时器
-    // timeoutTimer.start();
-    // // 5、阻塞等待，直到收到坐标信号或超时
-    // eventLoop.exec();
-    // // 6、停止超时定时器
-    // timeoutTimer.stop();
-    // // 7、检查是否成功获取坐标
-    // if (!coordinateReceived) {
-    //     qWarning() << "未能获取到Z6坐标，使用默认值0";
-    //     currentZ6Coordinate = 0;
-    // }
 
 
     /**
-     * 六、上开盖
+     * 四、上开盖
      */
     // 去数据库获取夹住区域的z坐标
     QString gripAreaSql = "SELECT gripperZ FROM other WHERE name = 'gripArea'";
@@ -1326,7 +1281,7 @@ void MainWindow::openBottleCap()
 
 
     /**
-     * 七、收尾
+     * 五、收尾
      */
     // 1、电机速度恢复 已知的有5号电机的旋转和6号电机的Z轴
     setMotor5Speed(100);
@@ -1345,73 +1300,27 @@ void MainWindow::closeBottleCap()
 {
 
     /**
-     * 一、准备动作
+     * 一、准备动作：5号电机旋转归零
      */
-    QString rotateGripToZeroCommand = tcpCore->buildDeviceCommand("05", "06", "0108", 0, 4);// 5号电机归零
-    tcpCore->sendMessageAsync(rotateGripToZeroCommand.toUtf8(), false);
-    QString waitrotateGripToZeroCommand = tcpCore->buildDeviceCommand("05", "03", "0203", 1, 4); // -> 050302030001 + CRC
-    tcpCore->sendMessageAsync(waitrotateGripToZeroCommand.toUtf8(), false);
-
+    QString rotateInitCommand = tcpCore->buildDeviceCommand("05", "06", "0101", 1, 4);
+    tcpCore->sendMessageAsync(rotateInitCommand.toUtf8(), false);
+    QString waitRotateInitCommand = tcpCore->buildDeviceCommand("05", "03", "0201", 1, 4);
+    tcpCore->sendMessageAsync(waitRotateInitCommand.toUtf8(), false);
+    // QString rotateGripToZeroCommand = tcpCore->buildDeviceCommand("05", "06", "0108", 0, 4);
+    // tcpCore->sendMessageAsync(rotateGripToZeroCommand.toUtf8(), false);
+    // QString waitrotateGripToZeroCommand = tcpCore->buildDeviceCommand("05", "03", "0203", 1, 4); // -> 050302030001 + CRC
+    // tcpCore->sendMessageAsync(waitrotateGripToZeroCommand.toUtf8(), false);
 
     /**
-     * 二、变量设置
-     */
-    // int raiseHeight = 24994;
-    // int currentZ6Coordinate = 0; //当前z坐标
-
-    /**
-     * 三、速度和圈数设置
+     * 二、5号电机转速、5号旋转力矩设置、6号电机上移速度
      */
     setMotor5Speed(27);
     setMotor6ZSpeed(35);
-
-    // /**
-    //  * 四、查询当前坐标
-    //  */
-    // QString waitrotateGripRightCommand = tcpCore->buildDeviceCommand("06", "E", 0, 0);
-    // tcpCore->sendMessageAsync(waitrotateGripRightCommand.toUtf8(), true, "06E");
-
-    // /**
-    //  * 五、阻塞等待
-    //  */
-    // // 1、创建事件循环，阻塞等待坐标返回
-    // QEventLoop eventLoop;
-    // bool coordinateReceived = false;
-    // // 2、连接tcpCore的z6CoordinateReceived信号来获取坐标
-    // QMetaObject::Connection connection = connect(tcpCore, &TcpClientCore::z6CoordinateReceived, this,
-    //                                              [&currentZ6Coordinate, &coordinateReceived, &eventLoop](int coordinate) {
-    //                                                  currentZ6Coordinate = coordinate;
-    //                                                  coordinateReceived = true;
-    //                                                  qDebug() << "获取到6号电机Z轴坐标:" << coordinate;
-    //                                                  eventLoop.quit();  // 退出事件循环，继续执行后续代码
-    //                                              }, Qt::SingleShotConnection);  // 单次连接，处理完一次后自动断开
-    // // 3、设置超时定时器（5秒超时）
-    // QTimer timeoutTimer;
-    // timeoutTimer.setSingleShot(true);
-    // timeoutTimer.setInterval(5000);  // 5秒超时
-    // QObject::connect(&timeoutTimer, &QTimer::timeout, &eventLoop, [&eventLoop, &coordinateReceived, &connection]() {
-    //     if (!coordinateReceived) {
-    //         qWarning() << "等待Z6坐标超时！";
-    //         QObject::disconnect(connection);  // 断开连接
-    //         eventLoop.quit();  // 强制退出事件循环
-    //     }
-    // });
-    // // 4、启动超时定时器
-    // timeoutTimer.start();
-    // // 5、阻塞等待，直到收到坐标信号或超时
-    // eventLoop.exec();
-    // // 6、停止超时定时器
-    // timeoutTimer.stop();
-    // // 7、检查是否成功获取坐标
-    // if (!coordinateReceived) {
-    //     qWarning() << "未能获取到Z6坐标，使用默认值0";
-    //     currentZ6Coordinate = 0;
-    // }
-
+    setMotor5TighteningForce(20);
+    
     /**
-     * 六、下拧紧
+     * 三、去数据库获取【夹持区】的z坐标，电机配合旋转。
      */
-    // 去数据库获取夹住区域的z坐标
     QString gripAreaSql = "SELECT gripperZ FROM other WHERE name = 'gripArea'";
     QSqlQuery gripAreaQuery = dbm->query(gripAreaSql);
     int gripAreaZ;
@@ -1421,22 +1330,35 @@ void MainWindow::closeBottleCap()
         qWarning() << "未找到 gripArea 的数据";
         return;
     }
-    QString moveToGripUpZCommand = tcpCore->buildDeviceCommand("06", "D", gripAreaZ, 8);// 6号缓慢上移到指定距离
-    tcpCore->sendMessageAsync(moveToGripUpZCommand.toUtf8(), true);
-    rotateMotor5ByCircles(5.4);
-    QString waitmoveToGripUpZCommand = tcpCore->buildDeviceCommand("05", "03", "0203", 1, 4); // -> 050302030001 + CRC
-    tcpCore->sendMessageAsync(waitmoveToGripUpZCommand.toUtf8(), false, "0503020001");
-    QString waitrotateGripLeftCommand = tcpCore->buildDeviceCommand("06", "d", 0, 0);
-    tcpCore->sendMessageAsync(waitrotateGripLeftCommand.toUtf8(), true, "06d01");
+    QString moveToGripUpZCommand = tcpCore->buildDeviceCommand("06", "D", gripAreaZ, 8);
+    tcpCore->sendMessageAsync(moveToGripUpZCommand.toUtf8(), true); // 下移
+    rotateMotor5ByCircles(5.4); // 旋转
+
+    QString waitmoveToGripUpZCommand = tcpCore->buildDeviceCommand("05", "03", "0203", 1, 4); // 拧紧是要报错0003： 0 代表运动中， 1 代表到达位置， 3旋转过程中堵转
+    tcpCore->sendMessageAsync(waitmoveToGripUpZCommand.toUtf8(), false, "0503020003");
+
+    // 达到旋转力矩后  【停止5号旋转】 和 【停止6号移动】
+    QString stop5MotorCommand = tcpCore->buildDeviceCommand("05", "06", "0102", 1, 4); // 执行紧急停止（写操作）
+    tcpCore->sendMessageAsync(stop5MotorCommand.toUtf8(), false);   
+    QString waitStop5MotorCommand = tcpCore->buildDeviceCommand("05", "03", "0102", 1, 4); // 查询紧急停止（读操作）
+    tcpCore->sendMessageAsync(waitStop5MotorCommand.toUtf8(), false, "0503020001");
+    QString moveToGripDownZCommand = tcpCore->buildDeviceCommand("06", "K", 0, 1);
+    tcpCore->sendMessageAsync(moveToGripDownZCommand.toUtf8(), true, "06K");
 
     /**
-     * 七、收尾
+     * 四、收尾
      */
     // 1、先释放5号夹爪
+    QString initializeGripperCommand = tcpCore->buildDeviceCommand("05", "06", "0100", 1, 4);
+    tcpCore->sendMessageAsync(initializeGripperCommand.toUtf8(), false);
+    QString waitGripperInitializedCommand = tcpCore->buildDeviceCommand("05", "03", "0200", 1, 4);
+    tcpCore->sendMessageAsync(waitGripperInitializedCommand.toUtf8(), false);
     QString openGripperCommand = tcpCore->buildDeviceCommand("05", "06", "0105", 0, 4);
-    tcpCore->sendMessageAsync(openGripperCommand.toUtf8(), false);
-    QString waitOpenGripperCommand = tcpCore->buildDeviceCommand("05", "03", "0202", 1, 4);
+    tcpCore->sendMessageAsync(openGripperCommand.toUtf8(), false, openGripperCommand);
+    QString waitOpenGripperCommand = tcpCore->buildDeviceCommand("05", "03", "0202", 1, 4); // 05  03  0202  0001  25F6
     tcpCore->sendMessageAsync(waitOpenGripperCommand.toUtf8(), false, "0503020001");
+    // ********下
+
     // 2、电机速度恢复 已知的有5号电机的旋转和6号电机的Z轴
     QString resetSpeed5Command = tcpCore->buildDeviceCommand("05", "06", "0107", 100, 4);
     tcpCore->sendMessageAsync(resetSpeed5Command.toUtf8(), false, "050601070064");
@@ -1448,76 +1370,20 @@ void MainWindow::closeBottleCap()
     setMotor5Speed(100);
     setMotor6ZSpeed(1000);
     // 4、旋转归零恢复
-    QString rotateInitCommand = tcpCore->buildDeviceCommand("05", "06", "0101", 1, 4);
+    //QString rotateInitCommand = tcpCore->buildDeviceCommand("05", "06", "0101", 1, 4);
     tcpCore->sendMessageAsync(rotateInitCommand.toUtf8(), false);
-    QString waitRotateInitCommand = tcpCore->buildDeviceCommand("05", "03", "0201", 1, 4);
+    //QString waitRotateInitCommand = tcpCore->buildDeviceCommand("05", "03", "0201", 1, 4);
     tcpCore->sendMessageAsync(waitRotateInitCommand.toUtf8(), false);
+
+    // ********上
     // 5、恢复夹持
     QString enableGripperCommand = tcpCore->buildDeviceCommand("05", "06", "0105", 100, 4);
     tcpCore->sendMessageAsync(enableGripperCommand.toUtf8(), false);
     QString waitGripperEnableCommand = tcpCore->buildDeviceCommand("05", "03", "0202", 1, 4);
-     tcpCore->sendMessageAsync(waitGripperEnableCommand.toUtf8(), false, "0503020002"); // 目前是01
+    tcpCore->sendMessageAsync(waitGripperEnableCommand.toUtf8(), false, "0503020002"); // 目前是01
+    // 6、旋转力矩恢复
+    setMotor5TighteningForce(60);
 
-}
-
-// 设置5号电机速度
-void MainWindow::setMotor5Speed(int speed)
-{
-    // 验证速度范围（10-100）
-    if (speed < 10 || speed > 100) {
-        qWarning() << "5号电机速度超出范围！速度:" << speed << "，有效范围: 10-100";
-        return;
-    }
-    
-    // 构建5号电机速度设置命令
-    QString speed5Command = tcpCore->buildDeviceCommand("05", "06", "0107", speed, 4);
-    
-    // 构建期望签名：05060107 + 速度的4位16进制字符串
-    QString expectedSignature = "05060107" + QString::number(speed, 16).toUpper().rightJustified(4, '0');
-    
-    // 发送命令
-    tcpCore->sendMessageAsync(speed5Command.toUtf8(), false, expectedSignature);
-    
-    qDebug() << "设置5号电机速度:" << speed;
-}
-
-// 设置6号电机Z轴速度
-void MainWindow::setMotor6ZSpeed(int speed)
-{
-    // 验证速度范围（建议范围：1-10000 rpm，但不强制限制）
-    if (speed <= 0) {
-        qWarning() << "6号电机Z轴速度无效！速度:" << speed << "，必须大于0";
-        return;
-    }
-    
-    // 计算速度值：(速度 * 6400) / 60
-    int speedValue = (speed * 6400) / 60;
-    
-    // 转换为8位16进制字符串并添加"0A0A"后缀
-    QString speedValueString = QString::number(speedValue, 16).toUpper().rightJustified(8, '0') + "0A0A";
-    
-    // 构建命令：">06B00000000" + 速度值字符串
-    QString speed6zCommand = tcpCore->buildMessageWithCrc(">06B00000000" + speedValueString);
-    
-    // 发送命令（ASCII模式，期望签名"06B"）
-    tcpCore->sendMessageAsync(speed6zCommand.toUtf8(), true, "06B");
-    
-    qDebug() << "设置6号电机Z轴速度:" << speed << "rpm";
-}
-
-// 5号电机旋转圈数
-void MainWindow::rotateMotor5ByCircles(double circles)
-{
-    // 将圈数转换为角度值（圈数 * 360度）
-    int angleValue = static_cast<int>(circles * 360);
-    
-    // 构建5号电机旋转命令（寄存器0108用于旋转）
-    QString rotateCommand = tcpCore->buildDeviceCommand("05", "06", "0108", angleValue, 4);
-    
-    // 发送命令（Hex模式）
-    tcpCore->sendMessageAsync(rotateCommand.toUtf8(), false);
-    
-    qDebug() << "5号电机旋转:" << circles << "圈（角度值:" << angleValue << "度）";
 }
 
 

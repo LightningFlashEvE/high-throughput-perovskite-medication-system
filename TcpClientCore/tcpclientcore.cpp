@@ -473,6 +473,7 @@ void TcpClientCore::sendMessageAsync(const QByteArray& content, bool asciiOrHex,
     if (!m_isProcessingQueue) {
         m_queueTimer->start(0);
     }
+
 }
 
 // 断开连接
@@ -856,7 +857,7 @@ QString TcpClientCore::buildGripperMessageWithCrc(const QString& data)
     // 拼接原始数据和CRC
     QString fullMessage = data + crcStr;
     
-    qDebug() << "电爪消息构建:" << data << "-> CRC:" << ("0x" + crcStr) << "-> 完整消息:" << fullMessage;
+    qDebug() << "构建消息:" << data << "-> CRC:" << ("0x" + crcStr) << "-> 完整消息:" << fullMessage;
     
     return fullMessage;
 }
