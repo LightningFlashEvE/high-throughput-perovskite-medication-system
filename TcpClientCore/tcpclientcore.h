@@ -8,6 +8,11 @@
 #include <QEventLoop>
 #include <QQueue>
 #include <QStringList>
+#include <QDateTime>
+#include <QVector>
+#include <QMap>
+
+
 
 // 消息队列项
 struct MessageQueueItem {
@@ -21,6 +26,23 @@ struct MessageQueueItem {
         : content(c), asciiOrHex(aoh), shouldWaitForResponse(false) {}
     MessageQueueItem(const QByteArray& c, bool aoh, const QString& expected)
         : content(c), asciiOrHex(aoh), shouldWaitForResponse(!expected.isEmpty() && expected != "-----"), expectedSignature(expected) {}
+};
+
+// 配方处理状态
+enum RecipeProcessState {
+    RecipeNotProcessed  = 0,  // 未处理：刚创建，还未加入任何发送/执行流程
+    RecipeProcessing    = 1,  // 正在执行：已导入/正在执行
+    RecipeFinished      = 2   // 执行完毕：该配方所有命令执行完成
+};
+
+// 配方消息队列项
+struct RecipeQueueItem {
+    QString recipeName;                      // 配方名称（化学方程式）
+    QQueue<MessageQueueItem> messageQueue;   // 该配方的消息队列
+    QDateTime createTime;                    // 创建时间
+    RecipeProcessState processState;         // 配方处理状态
+    
+    RecipeQueueItem() : processState(RecipeNotProcessed) {}
 };
 
 class TcpClientCore : public QObject
@@ -45,6 +67,15 @@ public:
     // 统一：第三个参数为期望接收值（设备+指令+数据；未知可传 "-----" 表示不等待）
     void sendMessageAsync(const QByteArray& content, bool asciiOrHex = true);
     void sendMessageAsync(const QByteArray& content, bool asciiOrHex, const QString& expectedSignature);
+    
+    // 清空消息队列
+    void clearMessageQueue();
+    
+    // 暂停队列处理
+    void pauseQueue();
+    
+    // 继续队列处理
+    void resumeQueue();
 
     // 断开连接
     void disconnectFromTcp();
@@ -197,6 +228,9 @@ signals:
     // 天平去皮请求信号（当检测到AA2命令时发出）
     void balanceTareRequested();
     
+    // 设置期望重量请求信号（当检测到AAsetExpectedWeight命令时发出，携带重量值）
+    void setExpectedWeightRequested(double weight);
+    
     // 天平打印打开请求信号（当检测到AA1命令时发出）
     void balancePrintOnRequested();
     
@@ -212,8 +246,11 @@ signals:
     * AArecordShakeBedTime     记录摇床需要的时间
     * 第一步骤
     */
-    // 记录摇床时间请求信号（当检测到AArecordShakeBedTime命令时发出）
-    void recordShakeBedTimeRequested();
+    // 记录摇床时间请求信号（当检测到AArecordShakeBedTime命令时发出，携带selfLocation和shakeDurationSeconds）
+    void recordShakeBedTimeRequested(int selfLocation, int shakeDurationSeconds);
+
+    // 配方状态变更请求信号（当检测到AAsetRecipeProcessState命令时发出，携带新的状态值）
+    void recipeProcessStateChangeRequested(int newState);
     
     // 启动摇床请求信号（当检测到AAopenShakeBed命令时发出）
     void openShakeBedRequested();
@@ -221,11 +258,24 @@ signals:
     // 关闭摇床请求信号（当检测到AAcloseShakeBed命令时发出）
     void closeShakeBedRequested();
     
+    // 启动摇床并在指定秒数后关闭请求信号（当检测到AAshakeBedForSeconds:X命令时发出）
+    void shakeBedForSecondsRequested(int seconds);
+    
     // 空瓶区currentIndex加1请求信号（当检测到AAemptyBottleAreaCurrentIndexPlusOne命令时发出）
     void emptyBottleAreaCurrentIndexPlusOneRequested();
     
-    // tips头区currentIndex加1请求信号（当检测到AAtipsHeadAreaCurrentIndexPlusOne命令时发出）
-    void tipsHeadAreaCurrentIndexPlusOneRequested();
+    // tips头区currentIndex加1请求信号（当检测到AAtipsHeadAreaCurrentIndexPlusOne命令时发出，携带tipsHeadUsageSelfLocation）
+    void tipsHeadAreaCurrentIndexPlusOneRequested(int tipsHeadUsageSelfLocation);
+
+    // 摇床离开请求信号（当检测到AAleaveTheShaker命令时发出，携带selfLocation）
+    void leaveTheShakerRequested(int selfLocation);
+
+    // 所有设备初始化完成的请求信号（当检测到AAallDevicesInitialized命令时发出）
+    void allDevicesInitializedRequested();
+
+    // 配方队列中当前批次消息全部发送完毕（m_messageQueue 为空且本轮处理结束）时发出
+    // MainWindow 可以在此信号中调用 sendMessage(m_recipeMessageQueues) 导入下一个配方
+    void messageQueueEmpty();
 
 private slots:
     void onConnected();
@@ -257,12 +307,19 @@ public:
     bool m_isProcessingQueue;                  // 是否正在处理队列
     QTimer* m_queueTimer;                     // 队列处理定时器
     bool m_isWaitingForResponse;              // 是否正在等待响应
+    bool m_isQueuePaused;                     // 队列是否被用户暂停（新增）
     QString m_currentExpectedNormalized;      // 当前等待的标准化期望前缀
     bool m_currentAsciiMode;                  // 当前等待是否ASCII模式
     
     // 天平称重相关
-    double m_expectedWeight;                  // 期望重量值（用于对比，默认为0）
-    bool m_balancePrintEnabled = false;       // 是否打印天平接收数据（默认关闭）
+    static double m_expectedWeight;            // 期望重量值（用于对比，默认为0，所有对象共用）
+    static bool m_balancePrintEnabled;         // 是否打印天平接收数据（默认关闭，所有对象共用）
+    static double m_weightThresholds[5];       // 5个重量阈值（所有对象共用）
+    static bool m_thresholdTriggered[5];       // 标记每个阈值是否已触发（所有对象共用）
+    
+    // 计时器相关
+    QMap<QString, QDateTime> m_timerStartTimes;  // 存储各个计时器的开始时间（timerName -> startTime）
+    QMap<QString, qint64> m_timerResults;        // 存储各个计时器的耗时结果（timerName -> elapsedMs）
     
     /**
      * @brief 检查收到的数据是否是到位响应（XYZ电机）
@@ -310,6 +367,14 @@ public:
      */
     void sendMessageInternal(const QByteArray& content, bool asciiOrHex, bool shouldWait);
 
+
+    // 发送配方队列（引用方式，处理多个配方消息队列）
+    void sendMessage(QVector<RecipeQueueItem>& recipeMessageQueues);
+    
+    
+
+
 };
 
 #endif // TCPCLIENTCORE_H
+

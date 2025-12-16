@@ -17,6 +17,9 @@ const char* kConnName = "app_sqlite_conn";
 constexpr auto kTableTransferLeft = "LiquidMaterialArea";
 constexpr auto kTableOther = "other";
 constexpr auto kTableShakeBedArea = "shakeBedArea";
+constexpr auto kTableTipsHeadUsage = "tipsHeadUsage";
+constexpr auto kTableRecipeQueue = "recipeQueue";
+constexpr auto kTableRecipeMessageQueue = "recipeMessageQueue";
 }
 
 AppSqlDatabase::AppSqlDatabase(const QString &dbFilePath, QObject *parent)
@@ -86,6 +89,9 @@ bool AppSqlDatabase::openDatabase(const QString &dbFilePath)
                 qWarning() << "SQLite 打开失败:" << existingDb.lastError().text();
                 return false;
             }
+            // 确保外键约束已启用
+            QSqlQuery query(existingDb);
+            query.exec("PRAGMA foreign_keys = ON");
             return true;
         }
     }
@@ -96,6 +102,13 @@ bool AppSqlDatabase::openDatabase(const QString &dbFilePath)
         qWarning() << "SQLite 打开失败:" << db.lastError().text();
         return false;
     }
+    
+    // 启用外键约束（SQLite 默认关闭）
+    QSqlQuery query(db);
+    if (!query.exec("PRAGMA foreign_keys = ON")) {
+        qWarning() << "启用外键约束失败:" << query.lastError().text();
+    }
+    
     qDebug() << "SQLite 已打开:" << dbFilePath;
     return true;
 }
@@ -162,8 +175,38 @@ void AppSqlDatabase::createDefaultTables()
         ")"
     ).arg(QString::fromLatin1(kTableShakeBedArea));
 
+    const QString createTipsHeadUsage = QStringLiteral(
+        "CREATE TABLE IF NOT EXISTS %1 ("
+        "  selfLocation INTEGER PRIMARY KEY,"
+        "  status INTEGER NOT NULL DEFAULT 1"
+        ")"
+    ).arg(QString::fromLatin1(kTableTipsHeadUsage));
+
+    const QString createRecipeQueue = QStringLiteral(
+        "CREATE TABLE IF NOT EXISTS %1 ("
+        "  id INTEGER PRIMARY KEY AUTOINCREMENT,"
+        "  recipeName TEXT NOT NULL,"
+        "  createTime TEXT NOT NULL,"
+        "  processState INTEGER NOT NULL DEFAULT 0,"
+        "  executionOrder INTEGER NOT NULL DEFAULT 0"
+        ")"
+    ).arg(QString::fromLatin1(kTableRecipeQueue));
+
+    const QString createRecipeMessageQueue = QStringLiteral(
+        "CREATE TABLE IF NOT EXISTS %1 ("
+        "  id INTEGER PRIMARY KEY AUTOINCREMENT,"
+        "  recipeId INTEGER NOT NULL,"
+        "  messageOrder INTEGER NOT NULL,"
+        "  content BLOB NOT NULL,"
+        "  asciiOrHex INTEGER NOT NULL DEFAULT 1,"
+        "  shouldWaitForResponse INTEGER NOT NULL DEFAULT 0,"
+        "  expectedSignature TEXT NOT NULL DEFAULT '',"
+        "  FOREIGN KEY (recipeId) REFERENCES %2(id) ON DELETE CASCADE"
+        ")"
+    ).arg(QString::fromLatin1(kTableRecipeMessageQueue), QString::fromLatin1(kTableRecipeQueue));
+
     QSqlQuery query(db);
-    const QList<QString> statements{createTransferLeft, createOther, createShakeBedArea};
+    const QList<QString> statements{createTransferLeft, createOther, createShakeBedArea, createTipsHeadUsage, createRecipeQueue, createRecipeMessageQueue};
     for (const QString &sql : statements) {
         if (!query.exec(sql)) {
             qWarning() << "创建默认表失败:" << query.lastError().text() << "SQL:" << sql;
@@ -211,7 +254,7 @@ void AppSqlDatabase::seedDefaultData()
         {"name", "emptyBottleArea"},
         {"originX", 5478},
         {"originY", 23420},
-        {"gripperZ", 274377}, // old:269232 new:274377
+        {"gripperZ", 270781}, // old:269232 new:274377
         {"tipsZ", 0},
         {"solidZ", 0},
         {"rightSpacing", 1732.75},
@@ -226,7 +269,7 @@ void AppSqlDatabase::seedDefaultData()
         {"originX", 20383},
         {"originY", 35699},
         {"gripperZ", 265192},
-        {"tipsZ", 0},
+        {"tipsZ", 60828},
         {"solidZ", 0},
         {"rightSpacing", 0},
         {"bottomSpacing", 0},
@@ -237,9 +280,9 @@ void AppSqlDatabase::seedDefaultData()
     ensureNamedRecord(QString::fromLatin1(kTableOther), QStringLiteral("name"), QStringLiteral("balanceArea"), {
         {"currentIndex", 0},
         {"name", "balanceArea"},
-        {"originX", 21499},
-        {"originY", 8439},
-        {"gripperZ", 270545},
+        {"originX", 21525},
+        {"originY", 7333},
+        {"gripperZ", 260583},
         {"tipsZ", 0}, // 为0  59970
         {"solidZ", 0},
         {"rightSpacing", 0},
@@ -251,32 +294,16 @@ void AppSqlDatabase::seedDefaultData()
     ensureNamedRecord(QString::fromLatin1(kTableOther), QStringLiteral("name"), QStringLiteral("balanceAreaForSolid"), {
        {"currentIndex", 0},
        {"name", "balanceAreaForSolid"},
-       {"originX", 10113},
-       {"originY", 14108},
+       {"originX", 10115},
+       {"originY", 13290},
        {"gripperZ", 0},
        {"tipsZ", 0},
-       {"solidZ", 28822},
+       {"solidZ", 13124}, // 28822
        {"rightSpacing", 0},
        {"bottomSpacing", 0},
        {"cols", 0},
        {"rows", 0}
    });
-
-
-    // 插入第九条记录，balanceAreaForTipsArea
-    ensureNamedRecord(QString::fromLatin1(kTableOther), QStringLiteral("name"), QStringLiteral("balanceAreaForTipsArea"), {
-       {"currentIndex", 0},
-       {"name", "balanceAreaForTipsArea"},
-       {"originX", 21814},
-       {"originY", 14685},
-       {"gripperZ", 0},
-       {"tipsZ", 60828},
-       {"solidZ", 0},
-       {"rightSpacing", 0},
-       {"bottomSpacing", 0},
-       {"cols", 0},
-       {"rows", 0}
-    });
 
     // 插入第三条记录：tipsHeadArea
     ensureNamedRecord(QString::fromLatin1(kTableOther), QStringLiteral("name"), QStringLiteral("tipsHeadArea"), {
@@ -331,7 +358,7 @@ void AppSqlDatabase::seedDefaultData()
         {"originY", 3472},
         {"gripperZ", 0},
         {"tipsZ", 0},
-        {"solidZ", 241838},
+        {"solidZ", 238646},   // 235455  241838
         {"rightSpacing", 0},
         {"bottomSpacing", 0},
         {"cols", 0},
@@ -357,8 +384,8 @@ void AppSqlDatabase::seedDefaultData()
     ensureNamedRecord(QString::fromLatin1(kTableOther), QStringLiteral("name"), QStringLiteral("shakeBedArea"), {
         {"currentIndex", 0},
         {"name", "shakeBedArea"},
-        {"originX", 14970},
-        {"originY", 3726},
+        {"originX", 14893},
+        {"originY", 4430},
         {"gripperZ", 276999},
         {"tipsZ", 0},
         {"solidZ", 0},
@@ -377,6 +404,16 @@ void AppSqlDatabase::seedDefaultData()
                 {"isEmpty", 1},
                 {"startTime", ""},
                 {"endTime", ""}
+            });
+        }
+    }
+
+    // 初始化 tipsHeadUsage 表，创建96条默认记录（selfLocation从0到95，status全为1）
+    if (isTableEmpty(QString::fromLatin1(kTableTipsHeadUsage))) {
+        for (int i = 0; i < 96; ++i) {
+            insertRow(QString::fromLatin1(kTableTipsHeadUsage), {
+                {"selfLocation", i},
+                {"status", 1}
             });
         }
     }
