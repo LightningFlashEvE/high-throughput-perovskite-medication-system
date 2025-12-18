@@ -58,7 +58,7 @@
             <item row="0" column="1">
              <widget class="QLineEdit" name="lineEdit_formula">
               <property name="text">
-               <string>FAI</string>
+               <string>Cs0.05FA0.95PbI3</string>
               </property>
               <property name="placeholderText">
                <string>例如: Cs0.17FA0.83Pb(I0.8Br0.2)3</string>
@@ -68,7 +68,7 @@
             <item row="1" column="0">
              <widget class="QLabel" name="label_molarity">
               <property name="text">
-               <string>摩尔浓度 (mol/mL):</string>
+               <string>摩尔浓度 (mol/L):</string>
               </property>
              </widget>
             </item>
@@ -81,13 +81,13 @@
                <double>0.000000000000000</double>
               </property>
               <property name="maximum">
-               <double>10.000000000000000</double>
+               <double>100.000000000000000</double>
               </property>
               <property name="singleStep">
                <double>0.100000000000000</double>
               </property>
               <property name="value">
-               <double>1.000000000000000</double>
+               <double>1.300000000000000</double>
               </property>
              </widget>
             </item>
@@ -113,7 +113,7 @@
                <double>0.100000000000000</double>
               </property>
               <property name="value">
-               <double>0.010000000000000</double>
+               <double>1.000000000000000</double>
               </property>
              </widget>
             </item>

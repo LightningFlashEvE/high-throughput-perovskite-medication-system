@@ -6,10 +6,13 @@
 #include <cmath>
 
 // 静态成员变量初始化
-double TcpClientCore::m_expectedWeight = 0.0;
-bool TcpClientCore::m_balancePrintEnabled = false;
-double TcpClientCore::m_weightThresholds[5] = {0.0, 0.0, 0.0, 0.0, 0.0};
-bool TcpClientCore::m_thresholdTriggered[5] = {false, false, false, false, false};
+// 静态变量初始化（使用 g_ 前缀表示全局共享）
+double TcpClientCore::g_expectedWeight = 0.0;
+bool TcpClientCore::g_balancePrintEnabled = false;
+double TcpClientCore::g_weightThresholds[3] = {0.0, 0.0, 0.0};
+bool TcpClientCore::g_thresholdTriggered[3] = {false, false, false};
+bool TcpClientCore::g_isWeightPauseActive = false;
+QMutex TcpClientCore::g_weightCheckMutex;
 
 
 TcpClientCore::TcpClientCore(QObject *parent)
@@ -34,7 +37,7 @@ void TcpClientCore::initializeConnectionsAndTimers()
     connect(m_tcpSocket, &QTcpSocket::connected, this, &TcpClientCore::onConnected);
     connect(m_tcpSocket, &QTcpSocket::disconnected, this, &TcpClientCore::onDisconnected);
     connect(m_tcpSocket, &QTcpSocket::readyRead, this, &TcpClientCore::onReadyRead);
-    
+
     // 兼容不同Qt版本的错误信号
     #if QT_VERSION >= QT_VERSION_CHECK(5, 15, 0)
     connect(m_tcpSocket, &QAbstractSocket::errorOccurred, this, &TcpClientCore::onSocketError);
@@ -42,12 +45,12 @@ void TcpClientCore::initializeConnectionsAndTimers()
     connect(m_tcpSocket, static_cast<void(QAbstractSocket::*)(QAbstractSocket::SocketError)>(&QAbstractSocket::error),
             this, &TcpClientCore::onSocketError);
     #endif
-    
+
     // 创建轮询定时器
     m_pollTimer = new QTimer(this);
     m_pollTimer->setInterval(500);  // 0.5秒
     connect(m_pollTimer, &QTimer::timeout, this, &TcpClientCore::pollMotorPosition);
-    
+
     // 创建队列处理定时器（单次触发）
     m_queueTimer = new QTimer(this);
     m_queueTimer->setSingleShot(true);
@@ -84,7 +87,7 @@ void TcpClientCore::disconnectConnectionsForBalance()
     if (!m_tcpSocket) {
         return;
     }
-    
+
     // 断开信号和槽（天平专用版本）
     disconnect(m_tcpSocket, &QTcpSocket::connected, this, &TcpClientCore::onBalanceConnected);
     disconnect(m_tcpSocket, &QTcpSocket::disconnected, this, &TcpClientCore::onBalanceDisconnected);
@@ -101,19 +104,19 @@ void TcpClientCore::disconnectConnectionsForBalance()
 
 void TcpClientCore::connectReceiveForBalance()
 {
-    if (m_balancePrintEnabled) {
+    if (g_balancePrintEnabled) {
         return;
     }
-    m_balancePrintEnabled = true;
+    g_balancePrintEnabled = true;
     qDebug() << "Balance receive print enabled";
 }
 
 void TcpClientCore::disconnectReceiveForBalance()
 {
-    if (!m_balancePrintEnabled) {
+    if (!g_balancePrintEnabled) {
         return;
     }
-    m_balancePrintEnabled = false;
+    g_balancePrintEnabled = false;
     qDebug() << "Balance receive print disabled";
 }
 
@@ -122,12 +125,12 @@ TcpClientCore::~TcpClientCore()
 {
     // 停止轮询
     stopPolling();
-    
+
     // 如果事件循环正在运行，先退出它
     if (m_pollEventLoop && m_pollEventLoop->isRunning()) {
         m_pollEventLoop->quit();
     }
-    
+
     // 停止队列处理
     if (m_queueTimer) {
         m_queueTimer->stop();
@@ -135,7 +138,7 @@ TcpClientCore::~TcpClientCore()
     m_messageQueue.clear();
     m_isProcessingQueue = false;
     m_isWaitingForResponse = false;
-    
+
     // 断开TCP连接（非阻塞方式）
     if (m_tcpSocket) {
         if (m_tcpSocket->state() == QAbstractSocket::ConnectedState) {
@@ -153,7 +156,7 @@ bool TcpClientCore::connectToTcp(const QString& localIP, const QString& remoteIP
         qWarning() << "TCP Socket 未初始化";
         return false;
     }
-    
+
     // 如果已经连接，先断开
     const QAbstractSocket::SocketState currentState = m_tcpSocket->state();
     if (currentState == QAbstractSocket::ConnectedState || currentState == QAbstractSocket::ClosingState) {
@@ -171,7 +174,7 @@ bool TcpClientCore::connectToTcp(const QString& localIP, const QString& remoteIP
         qWarning() << "检测到异常状态" << currentState << "，强制中止";
         m_tcpSocket->abort();
     }
-    
+
     // 设置代理
     if (proxyDisabled) {
         m_tcpSocket->setProxy(QNetworkProxy::NoProxy);
@@ -180,7 +183,7 @@ bool TcpClientCore::connectToTcp(const QString& localIP, const QString& remoteIP
         m_tcpSocket->setProxy(QNetworkProxy::DefaultProxy);
         qDebug() << "使用默认网络代理设置";
     }
-    
+
     // 如果指定了本地IP，绑定本地地址
     if (!localIP.isEmpty()) {
         QHostAddress localAddress(localIP);
@@ -189,11 +192,11 @@ bool TcpClientCore::connectToTcp(const QString& localIP, const QString& remoteIP
             qDebug() << "绑定本地地址:" << localIP;
         }
     }
-    
+
     // 连接到远程服务器
     qDebug() << "正在连接到" << remoteIP << ":" << remotePort;
     m_tcpSocket->connectToHost(remoteIP, remotePort);
-    
+
     // 等待连接建立（最多3秒）
     if (m_tcpSocket->waitForConnected(3000)) {
         qDebug() << "TCP连接成功";
@@ -208,10 +211,10 @@ bool TcpClientCore::connectToTcp(const QString& localIP, const QString& remoteIP
 quint16 TcpClientCore::calculateCrc16(const QByteArray& data)
 {
     quint16 crc = 0xFFFF;  // 初始值
-    
+
     for (int i = 0; i < data.length(); ++i) {
         crc ^= static_cast<quint8>(data[i]);  // XOR字节到CRC
-        
+
         for (int j = 0; j < 8; ++j) {  // 处理8位
             if (crc & 0x0001) {
                 crc >>= 1;
@@ -221,7 +224,7 @@ quint16 TcpClientCore::calculateCrc16(const QByteArray& data)
             }
         }
     }
-    
+
     return crc;
 }
 
@@ -232,17 +235,17 @@ void TcpClientCore::writeBalanceTareCommand(const QString& data, int mode)
         qWarning() << "TCP Socket 未初始化";
         return;
     }
-    
+
     if (m_tcpSocket->state() != QAbstractSocket::ConnectedState) {
         qWarning() << "未连接到服务器，无法发送命令";
         return;
     }
-    
+
     if (data.isEmpty()) {
         qWarning() << "发送内容为空";
         return;
     }
-    
+
     // 数据格式转换
     QByteArray dataToSend;
     switch (mode) {
@@ -260,95 +263,88 @@ void TcpClientCore::writeBalanceTareCommand(const QString& data, int mode)
             dataToSend = data.toUtf8();
             break;
     }
-    
+
     // 通过TCP发送数据，检查发送结果
     qint64 bytesWritten = m_tcpSocket->write(dataToSend);
-    
+
+
     if (bytesWritten == -1) {
         qWarning() << "发送失败:" << m_tcpSocket->errorString();
         return;
     }
-    
+
     m_tcpSocket->flush();
-    qDebug() << "发送成功，字节数:" << bytesWritten;
+    qDebug() << "★发送成功，字节数:" << bytesWritten;
 }
 
 // 设置期望重量值（用于称重对比）
 void TcpClientCore::setExpectedWeight(double weight)
 {
-    m_expectedWeight = weight;
-    
+    // 重量如果小于0.0003则打印错误并且把重量按0.0003算
+    // 如果重量在0.0005以内   则这样分：第一份重量-0.0002   第二份重量-0.0001  第三份是重量
+    // 如果重量超过0.0005到0.0021   则这样分：第一份重量-0.0004   第二份重量-0.0002  第三份是重量
+    // 如果重量超过0.0021   则这样分：第一份重量-0.0020   第二份重量-0.0010  第三份是重量
+
+    // 检查重量是否小于最小值
+    if (weight < 0.0003) {
+        qWarning() << QString("警告：重量 %1mg 小于最小允许值 0.0003mg，将按 0.0003mg 计算").arg(weight, 0, 'f', 4);
+        weight = 0.0003;
+    }
+
+    g_expectedWeight = weight;
+
     // 清空阈值和触发标记
-    for (int i = 0; i < 5; i++) {
-        m_weightThresholds[i] = 0.0;
-        m_thresholdTriggered[i] = false;
+    for (int i = 0; i < 3; i++) {
+        g_weightThresholds[i] = 0.0;
+        g_thresholdTriggered[i] = false;
     }
-    
-    // 四舍五入到小数点后4位，再存入阈值
+
+    // 四舍五入到小数点后4位
     auto round4 = [](double v) { return std::round(v * 10000.0) / 10000.0; };
-    
+
     // 根据重量范围使用不同的阈值计算策略
-    if (weight >= 0.01) {
-        // 重量 >= 0.01g：81%到100%分成5份，前4个每份约4.75%，最后一个为100%
-        for (int i = 0; i < 4; i++) {
-            double progress = (81.0 + static_cast<double>(i) * 4.75) / 100.0;  // 81%, 85.75%, 90.5%, 95.25%
-            m_weightThresholds[i] = round4(weight * progress);
-            m_thresholdTriggered[i] = false;  // 重置触发标记
-        }
-        // 最后一个阈值是目标值（100%）
-        m_weightThresholds[4] = round4(weight);
-        m_thresholdTriggered[4] = false;  // 重置触发标记
+    if (weight <= 0.0005) {
+        // 重量 ≤ 0.0005mg
+        g_weightThresholds[0] = round4(weight - 0.0002);  // 第一份：重量 - 0.0002
+        g_weightThresholds[1] = round4(weight - 0.0002);  // 第二份：重量 - 0.0001
+        g_weightThresholds[2] = round4(weight);           // 第三份：重量
     }
-    else if (0.01 > weight && weight >= 0.001) {
-        // 0.01 > 重量 >= 0.001g：20%到100%均分成5份
-        for (int i = 0; i < 5; i++) {
-            double progress = static_cast<double>(i + 1) / 5.0;  // 20%, 40%, 60%, 80%, 100%
-            m_weightThresholds[i] = round4(weight * progress);
-            m_thresholdTriggered[i] = false;  // 重置触发标记
-        }
-    }
-    else if (0.001 >= weight && weight >= 0.0002) {
-        // 0.001 >= 重量 >= 0.0002g：前4个阈值统一为目标的90%，最后一个阈值是目标值
-        double uniformValue = round4(weight * 0.9);  // 前4个统一为目标的90%
-        for (int i = 0; i < 4; i++) {
-            m_weightThresholds[i] = uniformValue;
-            m_thresholdTriggered[i] = false;  // 重置触发标记
-        }
-        // 最后一个阈值是目标值
-        m_weightThresholds[4] = round4(weight);
-        m_thresholdTriggered[4] = false;  // 重置触发标记
+    else if (weight <= 0.0110) {
+        // 0.0005 < 重量 ≤ 0.0110mg
+        g_weightThresholds[0] = round4(weight - 0.0018);  // 第一份：重量 - 0.0004
+        g_weightThresholds[1] = round4(weight - 0.0003);  // 第二份：重量 - 0.0002
+        g_weightThresholds[2] = round4(weight);           // 第三份：重量
     }
     else {
-        // 重量 < 0.0002g：所有阈值统一为目标值
-        for (int i = 0; i < 5; i++) {
-            m_weightThresholds[i] = round4(weight);
-            m_thresholdTriggered[i] = false;  // 重置触发标记
-        }
+        // 重量 > 0.0060mg
+        g_weightThresholds[0] = round4(weight - 0.0050);  // 第一份：重量 - 0.0100
+        g_weightThresholds[1] = round4(weight - 0.0010);  // 第二份：重量 - 0.0010
+        g_weightThresholds[2] = round4(weight);           // 第三份：重量
     }
-    
-    qDebug() << QString("设置期望重量值：%1g，已计算5个阈值").arg(weight);
-    for (int i = 0; i < 5; i++) {
-        qDebug() << QString("  阈值%1: %2g").arg(i + 1).arg(m_weightThresholds[i], 0, 'f', 4);
+
+    qDebug() << QString("设置期望重量值：%1mg，已计算3个阈值").arg(weight, 0, 'f', 4);
+    for (int i = 0; i < 3; i++) {
+        qDebug() << QString("  阈值%1: %2mg").arg(i + 1).arg(g_weightThresholds[i], 0, 'f', 4);
     }
 }
 
 // 获取期望重量值
 double TcpClientCore::getExpectedWeight() const
 {
-    return m_expectedWeight;
+    return g_expectedWeight;
 }
 
 // 清除期望重量值（恢复为0）
 void TcpClientCore::clearExpectedWeight()
 {
-    m_expectedWeight = 0.0;
-    
+    g_expectedWeight = 0.0;
+
     // 清除所有阈值和触发标记
-    for (int i = 0; i < 5; i++) {
-        m_weightThresholds[i] = 0.0;
-        m_thresholdTriggered[i] = false;
+    for (int i = 0; i < 3; i++) {
+        g_weightThresholds[i] = 0.0;
+        g_thresholdTriggered[i] = false;
     }
-    
+
     qDebug() << "已清除期望重量值和所有阈值";
 }
 
@@ -367,17 +363,17 @@ bool TcpClientCore::sendMessage(const QByteArray& content, bool asciiOrHex)
         qWarning() << "TCP Socket 未初始化";
         return false;
     }
-    
+
     if (m_tcpSocket->state() != QAbstractSocket::ConnectedState) {
         qWarning() << "未连接到服务器，无法发送消息";
         return false;
     }
-    
+
     if (content.isEmpty()) {
         qWarning() << "发送内容为空";
         return false;
     }
-    
+
     /*
      * ============================
      * 2. 检测是否需要轮询
@@ -391,11 +387,11 @@ bool TcpClientCore::sendMessage(const QByteArray& content, bool asciiOrHex)
     bool isPositionQuery = false;
     bool isGripperInitQuery = false;
     QString deviceNum;
-    
+
     if (asciiOrHex && contentStr.startsWith(">") && contentStr.length() >= 4) {
         // ASCII模式：XYZ电机查询到位
         QChar functionCode = contentStr.at(3);  // 提取功能码（第4个字符，索引为3）
-        
+
         if (functionCode == 'd') {
             isPositionQuery = true;
             deviceNum = contentStr.mid(1, 2);  // 提取设备编号（位置1-2）
@@ -407,14 +403,14 @@ bool TcpClientCore::sendMessage(const QByteArray& content, bool asciiOrHex)
         // 示例：05 03 02 00 00 01 85 B2 -> "05030200000185B2"
         QString functionCode = contentStr.mid(2, 2);    // 功能码（位置2-3）
         QString registerAddr = contentStr.mid(4, 4);    // 寄存器地址（位置4-7）
-        
+
         if (functionCode.toUpper() == "03" && (registerAddr.toUpper() == "0200" || registerAddr.toUpper() == "0201" || registerAddr.toUpper() == "0202" )) {
             isGripperInitQuery = true;
             deviceNum = contentStr.left(2);  // 提取设备编号（前2位）
             qDebug() << "检测到电爪初始化查询命令，设备编号:" << deviceNum;
         }
     }
-    
+
     /*
      * ============================
      * 3. 数据格式转换
@@ -423,13 +419,13 @@ bool TcpClientCore::sendMessage(const QByteArray& content, bool asciiOrHex)
      * Hex模式（asciiOrHex = false）：先从十六进制字符串转换为字节数组
      */
     QByteArray dataToSend;
-    
+
     if (asciiOrHex) {
         dataToSend = content;  // ASCII模式：直接发送
     } else {
         dataToSend = QByteArray::fromHex(content);  // 十六进制模式：转换后发送
     }
-    
+
     /*
      * ============================
      * 4. 通过TCP发送数据
@@ -437,15 +433,15 @@ bool TcpClientCore::sendMessage(const QByteArray& content, bool asciiOrHex)
      * 写入Socket，检查发送结果，刷新缓冲区
      */
     qint64 bytesWritten = m_tcpSocket->write(dataToSend);
-    
+
     if (bytesWritten == -1) {
         qWarning() << "发送失败:" << m_tcpSocket->errorString();
         return false;
     }
-    
+
     m_tcpSocket->flush();
     // qDebug() << "发送成功，字节数:" << bytesWritten;
-    
+
     /*
      * ============================
      * 5. 轮询机制
@@ -463,20 +459,20 @@ bool TcpClientCore::sendMessage(const QByteArray& content, bool asciiOrHex)
         } else if (isGripperInitQuery) {
             qDebug() << "(ง •_•)ง启动轮询，等待设备" << deviceNum << "电爪初始化完成...";
         }
-        
+
         // 启动轮询定时器
         startPolling(deviceNum, contentStr);
-        
+
         // 创建事件循环，阻塞等待到位信号
         if (!m_pollEventLoop) {
             m_pollEventLoop = new QEventLoop(this);
         }
-        
+
         qDebug() << "进入阻塞等待...";
         m_pollEventLoop->exec();  // 阻塞在这里，直到收到目标响应（在 onReadyRead 中退出）
         qDebug() << "退出阻塞，Start the next step\n\n\n";
     }
-    
+
     return true;
 }
 
@@ -546,26 +542,26 @@ void TcpClientCore::sendMessageAsync(const QByteArray& content, bool asciiOrHex)
         qWarning() << "未连接到服务器，无法发送消息";
         return;
     }
-    
+
     // 检查发送内容是否为空
     if (content.isEmpty()) {
         qWarning() << "发送内容为空";
         return;
     }
-    
+
     // 如果定时器未初始化，自动初始化（向后兼容）
     if (!m_queueTimer) {
         initializeConnectionsAndTimers();
     }
-    
+
     // 将消息加入队列
     MessageQueueItem item(content, asciiOrHex);
     m_messageQueue.enqueue(item);
-    
+
     // 如果当前没有在处理队列且未暂停，启动处理
     if (!m_isProcessingQueue && !m_isWaitingForResponse) {
         // 参数0表示定时器将在0毫秒后超时，即在事件循环的下一个迭代中"立即"触发超时事件
-        m_queueTimer->start(0);  // 立即触发   
+        m_queueTimer->start(0);  // 立即触发
     }
     else
     {
@@ -619,22 +615,28 @@ void TcpClientCore::pauseQueue()
     qDebug() << "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━";
     qDebug() << "⏸ ⏸ ⏸  暂停队列";
     qDebug() << "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━";
-    
+
     // 设置暂停标志（优先级最高！）
     m_isQueuePaused = true;          // ⚠️ 最高优先级：停止轮询并退出阻塞
     m_isWaitingForResponse = true;   // ⚠️ 第二优先级：阻止processMessageQueue继续处理
     m_isProcessingQueue = true;      // ⚠️ 第三优先级：阻止sendMessageAsync启动定时器
-    
+
     qDebug() << "  步骤1: 设置 m_isQueuePaused = true（停止轮询，退出阻塞）";
     qDebug() << "  步骤2: 设置 m_isWaitingForResponse = true（拦截processMessageQueue）";
     qDebug() << "  步骤3: 设置 m_isProcessingQueue = true（阻止新定时器启动）";
-    
+
     // 停止定时器
     if (m_queueTimer) {
         m_queueTimer->stop();
         qDebug() << "  步骤4: 调用 stop() 停止队列定时器";
     }
-    
+
+    // 清除当前期望值，避免与后续直接发送的命令冲突
+    if (!m_currentExpectedNormalized.isEmpty()) {
+        qDebug() << "  步骤5: 清除当前期望值:" << m_currentExpectedNormalized;
+        m_currentExpectedNormalized.clear();
+    }
+
     qDebug() << "  ✓ 当前队列剩余消息:" << m_messageQueue.size() << "条";
     qDebug() << "  ✓ 队列已暂停，如果正在轮询等待，将在下次轮询检查时退出";
     qDebug() << "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n";
@@ -646,14 +648,14 @@ void TcpClientCore::resumeQueue()
     qDebug() << "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━";
     qDebug() << "▶▶▶ 继续队列";
     qDebug() << "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━";
-    
+
     // 继续运行队列
     m_isQueuePaused = false;         // 清除暂停标志（允许轮询继续）
     m_isWaitingForResponse = false;  // 清除阻止标志
     m_isProcessingQueue = false;     // 重置处理标志
-    
+
     qDebug() << "  当前队列长度:" << m_messageQueue.size();
-    
+
     // 如果队列不为空，启动队列处理定时器
     if (m_queueTimer && !m_messageQueue.isEmpty()) {
         m_queueTimer->start(0);
@@ -668,31 +670,31 @@ void TcpClientCore::resumeQueue()
 void TcpClientCore::disconnectFromTcp()
 {
     qDebug() << "开始断开TCP连接并清理资源...";
-    
+
     // 1. 停止轮询
     stopPolling();
-    
+
     // 2. 如果事件循环正在运行，先退出它
     if (m_pollEventLoop && m_pollEventLoop->isRunning()) {
         qDebug() << "退出事件循环...";
         m_pollEventLoop->quit();
     }
-    
+
     // 3. 停止队列处理定时器
     if (m_queueTimer) {
         m_queueTimer->stop();
     }
-    
+
     // 4. 清空消息队列
     if (!m_messageQueue.isEmpty()) {
         qDebug() << "清空消息队列，未发送消息数:" << m_messageQueue.size();
         m_messageQueue.clear();
     }
-    
+
     // 5. 重置状态标志
     m_isProcessingQueue = false;
     m_isWaitingForResponse = false;
-    
+
     // 6. 断开TCP连接
     if (m_tcpSocket) {
         const QAbstractSocket::SocketState state = m_tcpSocket->state();
@@ -711,7 +713,7 @@ void TcpClientCore::disconnectFromTcp()
             m_tcpSocket->abort();
         }
     }
-    
+
     qDebug() << "TCP连接已断开，资源清理完成";
 }
 
@@ -765,11 +767,11 @@ void TcpClientCore::onReadyRead()
     if (!m_tcpSocket) {
         return;
     }
-    
+
     QByteArray data = m_tcpSocket->readAll();
 
     qDebug() << "<<<<<<<<收到数据:" << QString::fromUtf8(data) << " " << QString(data.toHex().toUpper())  << " 期望：" << m_currentExpectedNormalized;
-    
+
     // 如果正在轮询，检查是否收到目标响应
     if (m_isPolling) {
         bool conditionMet = false;
@@ -804,22 +806,22 @@ void TcpClientCore::onReadyRead()
                 conditionMet = true;
             }
         }
-        
+
         if (conditionMet) {
             qDebug() << "匹配成功，匹配成功的命令。" << data;
             qDebug() << "结束轮询。";
             // 停止轮询
             stopPolling();
             m_currentExpectedNormalized.clear();
-            
+
             // 发射到位信号
             emit motorReachedPosition(m_pollingDeviceNum); // 预留
-            
+
             // 如果有事件循环在等待，退出它
             if (m_pollEventLoop && m_pollEventLoop->isRunning()) {
                 m_pollEventLoop->quit();
             }
-            
+
             // 通知队列处理：响应已收到
             if (m_isWaitingForResponse) {
                 m_isWaitingForResponse = false;
@@ -828,14 +830,14 @@ void TcpClientCore::onReadyRead()
             }
         }
     }
-    
+
     // 解析"06E"命令返回的Z轴坐标
     QString dataStr = QString::fromUtf8(data);
     if (dataStr.startsWith("06E", Qt::CaseInsensitive) || dataStr.startsWith(">06E", Qt::CaseInsensitive)) {
         // 提取"06E"后面的8位十六进制坐标
         // 格式可能是：">06E12345678XXXX" 或 "06E12345678XXXX"（XXXX是CRC）
         QString coordinateStr;
-        
+
         if (dataStr.startsWith(">06E", Qt::CaseInsensitive)) {
             // 如果以">06E"开头，跳过">06E"（4个字符），取8位坐标
             if (dataStr.length() >= 12) {  // ">06E" + 8位坐标 + 至少4位CRC
@@ -847,15 +849,15 @@ void TcpClientCore::onReadyRead()
                 coordinateStr = dataStr.mid(3, 8);  // 从索引3开始取8个字符
             }
         }
-        
+
         if (!coordinateStr.isEmpty()) {
             // 将8位十六进制字符串转换为整数坐标
             bool ok;
             int zCoordinate = coordinateStr.toInt(&ok, 16);  // 16进制转10进制
-            
+
             if (ok) {
                 qDebug() << "解析到6号电机Z轴坐标:" << zCoordinate << "(十六进制:" << coordinateStr << ")";
-                
+
                 // 发出信号通知坐标已更新
                 emit z6CoordinateReceived(zCoordinate);
             } else {
@@ -865,7 +867,7 @@ void TcpClientCore::onReadyRead()
             qWarning() << "响应数据格式不正确，无法提取坐标。数据:" << dataStr;
         }
     }
-    
+
     emit dataReceived(data);
 }
 
@@ -950,56 +952,58 @@ void TcpClientCore::onBalanceReadyRead()
         QString sign = match.captured(1);      // 获取符号（+、- 或空）
         QString numberStr = match.captured(2); // 获取数字部分
         QString weightStr = sign + numberStr;   // 组合符号和数字
-        
+
         bool ok;
         double weight = weightStr.toDouble(&ok);
 
-        if (ok) {  
-            // 如果设置了期望重量值（不为0），进行分级对比
-            if (m_expectedWeight != 0.0) {
-                // 检查是否达到某个重量阈值（从低到高检查，确保按顺序触发）
-                for (int i = 0; i < 5; i++) {
+        if (!g_isWeightPauseActive) {
+            qDebug() << QString("●●NONONONONONONONONO●●  %1g 期望值%3g-----").arg(weight).arg(g_expectedWeight);
+            return;
+        }
 
-                    if (!m_thresholdTriggered[i])
+        if (ok) {
+            // 加锁保护称重检测逻辑，防止多线程同时访问
+            QMutexLocker locker(&g_weightCheckMutex);
+            
+            // 如果设置了期望重量值（不为0），进行分级对比
+            if (g_expectedWeight != 0.0) {
+                // 检查是否达到某个重量阈值（从低到高检查，确保按顺序触发）
+                for (int i = 0; i < 3; i++) {
+
+                    if (!g_thresholdTriggered[i])
                     {
-                        if (m_balancePrintEnabled )
+                        if (g_balancePrintEnabled )
                         {
-                            qDebug() << QString("--NO%1-- %2g / %3g（%4g）-----").arg(i).arg(weight).arg(m_weightThresholds[i]).arg(m_expectedWeight);
+                            qDebug() << QString("●●NO%1●●  %2g/%3g（%4g）-----").arg(i).arg(weight).arg(g_weightThresholds[i]).arg(g_expectedWeight);
                         }
                         // 如果当前重量达到阈值且该阈值尚未触发
-                        if (weight >= m_weightThresholds[i])
+                        if (weight >= g_weightThresholds[i])
                         {
                             // 标记该阈值已触发
-                            m_thresholdTriggered[i] = true;
+                            g_thresholdTriggered[i] = true;
 
-                            if (m_balancePrintEnabled) {
-                                // 根据重量范围计算百分比
-                                int percentage;
-                                if (m_expectedWeight >= 0.01) {
-                                    if (i < 4) {
-                                        percentage = static_cast<int>(81 + i * 4.75);  // 81%, 86%, 91%, 95%
-                                    } else {
-                                        percentage = 100;  // 最后一个阈值是100%
-                                    }
-                                } else if (m_expectedWeight >= 0.001) {
-                                    percentage = (i + 1) * 20;  // 20%, 40%, 60%, 80%, 100%
-                                } else {
-                                    percentage = 90 + i * 2;  // 90%, 92%, 94%, 96%, 100%
-                                }
-                                qDebug() << QString("重量达标第%1级（%2%）！当前重量：%3g，阈值：%4g")
-                                                .arg(i + 1).arg(percentage).arg(weight).arg(m_weightThresholds[i]);
+                            if (g_balancePrintEnabled)
+                            {
+                                // 简化输出：直接显示达标信息，不计算百分比
+                                qDebug() << QString("✓ 重量达标第%1级！当前重量：%2mg，阈值：%3mg")
+                                                .arg(i + 1)
+                                                .arg(weight, 0, 'f', 4)
+                                                .arg(g_weightThresholds[i], 0, 'f', 4);
                             }
 
                             // 发送信号 重量达标带重量值（第i+1级）
+                            // 注意：不在这里自动暂停队列，由信号接收方决定是否暂停
                             emit weightReached(weight);
-                            // pauseQueue();
+                            g_isWeightPauseActive = false;
+
                         }
                         break;
                     }
                 }
             }
+            // locker 在作用域结束时自动解锁
         } else {
-            if (m_balancePrintEnabled) {
+            if (g_balancePrintEnabled) {
                 qDebug() << "天平无法解析的重量值：" << weightStr;
             }
         }
@@ -1040,24 +1044,24 @@ void TcpClientCore::onBalanceSocketError(QAbstractSocket::SocketError error)
 QString TcpClientCore::int2hex(qint64 value, int width)
 {
     QString hexData;
-    
+
     // 处理负数：如果 value < 0，需要特殊处理
     if (value < 0) {
         // 负数处理：先-1，然后转16进制，再取反
         qint64 absValue = -value;  // 取绝对值
         qint64 processedValue = absValue - 1;     // -1
-        
+
         // 取反（二进制取反）
         qint64 mask = (1LL << (width * 4)) - 1;  // 根据位宽确定掩码
         qint64 invertedValue = (~processedValue) & mask;
-        
+
         // 转换回十六进制，保持指定位宽
         hexData = QString("%1").arg(invertedValue, width, 16, QChar('0')).toUpper();
     } else {
         // 正数：直接转换为指定位宽的十六进制字符串
         hexData = QString("%1").arg(value, width, 16, QChar('0')).toUpper();
     }
-    
+
     return hexData;
 }
 
@@ -1066,18 +1070,18 @@ QString TcpClientCore::buildMessageWithCrc(const QString& data)
 {
     // 将QString转为QByteArray进行CRC计算
     QByteArray dataBytes = data.toUtf8();
-    
+
     // 直接调用已有的 CRC16 计算函数
     quint16 crc = calculateCrc16(dataBytes);
-    
+
     // 转换为4位十六进制字符串（大写，补0）
     QString crcHex = QString("%1").arg(crc, 4, 16, QChar('0')).toUpper();
-    
+
     // 拼接原始数据和CRC
     QString fullMessage = data + crcHex;
-    
+
     qDebug() << "构建消息:" << data << "+" << crcHex << "完整消息:" << fullMessage;
-    
+
     return fullMessage;
 }
 
@@ -1087,13 +1091,13 @@ QString TcpClientCore::buildGripperMessageWithCrc(const QString& data)
     // 将十六进制字符串转换为字节数组
     QByteArray dataBytes = QByteArray::fromHex(data.toUtf8());
     //qDebug() << "1111111111===============111111111" << dataBytes << data;
-    
+
     // 计算ModBus CRC16（电爪专用）
     quint16 crc = 0xFFFF;  // 初始值
-    
+
     for (int i = 0; i < dataBytes.length(); ++i) {
         crc ^= static_cast<quint8>(dataBytes[i]);  // XOR字节到CRC
-        
+
         for (int j = 0; j < 8; ++j) {  // 处理8位
             if (crc & 0x0001) {
                 crc >>= 1;
@@ -1104,17 +1108,17 @@ QString TcpClientCore::buildGripperMessageWithCrc(const QString& data)
         }
     }
     //qDebug() << "1111111111===============222222" << dataBytes<< data;
-    
+
     // ModBus CRC格式：低字节在前，高字节在后
     QString crcLow = QString("%1").arg(crc & 0xFF, 2, 16, QChar('0')).toUpper();
     QString crcHigh = QString("%1").arg((crc >> 8) & 0xFF, 2, 16, QChar('0')).toUpper();
     QString crcStr = crcLow + crcHigh;
-    
+
     // 拼接原始数据和CRC
     QString fullMessage = data + crcStr;
-    
+
     qDebug() << "构建消息:" << data << "-> CRC:" << (crcStr) << "-> 完整消息:" << fullMessage;
-    
+
     return fullMessage;
 }
 
@@ -1136,7 +1140,7 @@ QString TcpClientCore::buildDeviceCommand(const QString& deviceNum, const QStrin
      * 夹爪电机序号：05 0B 0C
      *   移液器序号：07
      */
-    
+
     // 如果位数为0，命令数据为空字符串
     QString processedCommandData;
     if (width == 0) {
@@ -1145,7 +1149,7 @@ QString TcpClientCore::buildDeviceCommand(const QString& deviceNum, const QStrin
         // 使用 int2hex 函数将数字转换为十六进制字符串（自动处理负数）
         processedCommandData = int2hex(commandData, width);
     }
-    
+
     // 验证设备编号并构建命令
     if (deviceNum == "01" || deviceNum == "02" || deviceNum == "03" ||
         deviceNum == "04" || deviceNum == "06" || deviceNum == "08" ||
@@ -1171,26 +1175,26 @@ QString TcpClientCore::buildDeviceCommand(const QString& deviceNum, const QStrin
 }
 
 // 电爪专用：构建设备命令（重载版本，4个参数：ID + 功能码 + 寄存器地址 + 寄存器数据）
-QString TcpClientCore::buildDeviceCommand(const QString& deviceNum, 
-                                          const QString& functionCode, 
-                                          const QString& registerAddress, 
+QString TcpClientCore::buildDeviceCommand(const QString& deviceNum,
+                                          const QString& functionCode,
+                                          const QString& registerAddress,
                                           const QString& registerData)
 {
     // 电爪使用ModBus RTU协议，数据格式：ID + 功能码 + 寄存器地址 + 寄存器数据
     QString rawCommand = deviceNum + functionCode + registerAddress + registerData;
     //qDebug() << "检查data有没有边长" << deviceNum << functionCode <<registerAddress<< registerData;
-    
+
     // 使用电爪专用的ModBus CRC计算
     QString result = buildGripperMessageWithCrc(rawCommand);
     //qDebug() << "边长后" <<  result;
-    
+
     return result;
 }
 
 // 电爪专用：构建设备命令（重载版本，5个参数：支持十进制数据和位宽）
-QString TcpClientCore::buildDeviceCommand(const QString& deviceNum, 
-                                          const QString& functionCode, 
-                                          const QString& registerAddress, 
+QString TcpClientCore::buildDeviceCommand(const QString& deviceNum,
+                                          const QString& functionCode,
+                                          const QString& registerAddress,
                                           qint64 decimalData,
                                           int dataWidth)
 {
@@ -1198,20 +1202,20 @@ QString TcpClientCore::buildDeviceCommand(const QString& deviceNum,
     if (dataWidth == 0) {
         return buildDeviceCommand(deviceNum, functionCode, registerAddress, "");
     }
-    
+
     // 使用 int2hex 函数将数字转换为十六进制字符串（自动处理负数）
     QString hexData = int2hex(decimalData, dataWidth);
-    
+
     // 检查正数是否超出范围
     if (decimalData >= 0) {
         qint64 maxValue = (1LL << (dataWidth * 4)) - 1;  // 例如：4位 = 0xFFFF = 65535
         if (decimalData > maxValue) {
-            qWarning() << "数据超出范围！数值:" << decimalData 
-                       << "最大值:" << maxValue 
+            qWarning() << "数据超出范围！数值:" << decimalData
+                       << "最大值:" << maxValue
                        << "(" << dataWidth << "位)";
         }
     }
-    
+
     // qDebug() << "检查各个元素:" << deviceNum << functionCode << registerAddress << hexData;
 
     // 调用4参数版本
@@ -1240,16 +1244,16 @@ void TcpClientCore::startPolling(const QString& deviceNum, const QString& comman
         qWarning() << "已经在轮询中，无法启动新的轮询";
         return;
     }
-    
+
     // 如果定时器未初始化，自动初始化（向后兼容）
     if (!m_pollTimer) {
         initializeConnectionsAndTimers();
     }
-    
+
     m_isPolling = true;
     m_pollingDeviceNum = deviceNum;
     m_pollingCommand = command;
-    
+
     // 启动定时器（不打印日志，避免刷屏）
     m_pollTimer->start();
 }
@@ -1260,17 +1264,17 @@ void TcpClientCore::stopPolling()
     if (!m_isPolling) {
         return;
     }
-    
+
     m_isPolling = false;
     m_pollTimer->stop();
     m_pollingDeviceNum.clear();
     m_pollingCommand.clear();
-    
+
     // 如果有事件循环正在运行，退出它
     if (m_pollEventLoop && m_pollEventLoop->isRunning()) {
         m_pollEventLoop->quit();
     }
-    
+
     // 不打印日志，避免刷屏
 }
 
@@ -1280,7 +1284,7 @@ void TcpClientCore::pollMotorPosition()
     if (!m_isPolling || m_pollingCommand.isEmpty()) {
         return;
     }
-    
+
     // ⚠️ 检查是否用户暂停了队列
     if (m_isQueuePaused) {
         qDebug() << "⏸ 检测到队列暂停，停止轮询并退出事件循环";
@@ -1290,16 +1294,16 @@ void TcpClientCore::pollMotorPosition()
         }
         return;
     }
-    
+
     // 不打印轮询发送信息，避免每0.3秒刷屏
-    
+
     /*
      * 根据命令格式判断发送模式：
      * - 以 ">" 开头：XYZ电机（ASCII模式，直接发送）
      * - 不以 ">" 开头：电爪ModBus（Hex模式，需要转换）
      */
     QByteArray dataToSend;
-    
+
     if (m_pollingCommand.startsWith(">")) {
         // ASCII模式：XYZ电机，直接发送
         dataToSend = m_pollingCommand.toUtf8();
@@ -1307,7 +1311,7 @@ void TcpClientCore::pollMotorPosition()
         // Hex模式：电爪ModBus，先从十六进制字符串转换为字节数组
         dataToSend = QByteArray::fromHex(m_pollingCommand.toUtf8());
     }
-    
+
     if (m_tcpSocket && m_tcpSocket->state() == QAbstractSocket::ConnectedState) {
         m_tcpSocket->write(dataToSend);
         // qDebug() << "轮询发送:" << QString(dataToSend.toHex().toUpper());
@@ -1315,7 +1319,7 @@ void TcpClientCore::pollMotorPosition()
     } else {
         qWarning() << "TCP未连接，停止轮询";
         stopPolling();
-        
+
         if (m_pollEventLoop && m_pollEventLoop->isRunning()) {
             m_pollEventLoop->quit();
         }
@@ -1327,42 +1331,42 @@ bool TcpClientCore::checkIfReachedPosition(const QByteArray& data)
 {
     // 将接收到的数据转换为字符串
     QString dataStr = QString::fromUtf8(data);
-    
+
     // 期望格式：>06d01 + 4位CRC  或  >0Ad01 + 4位CRC
     // 其中 01 表示已到达预定位置
-    
+
     // 检查数据长度是否合理（至少需要 >XXdYY + ZZZZ = 11个字符）
     if (dataStr.length() < 11) {
         return false;
     }
-    
+
     // 检查是否以 > 开头
     if (!dataStr.startsWith(">")) {
         return false;
     }
-    
+
     // 提取设备编号（位置1-2）
     QString deviceNum = dataStr.mid(1, 2);
-    
+
     // 检查设备编号是否匹配
     if (deviceNum.toUpper() != m_pollingDeviceNum.toUpper()) {
         return false;
     }
-    
+
     // 检查功能码是否是 'd'
     QChar functionCode = dataStr.at(3);
     if (functionCode != 'd') {
         return false;
     }
-    
+
     // 提取状态码（位置4-5）
     QString statusCode = dataStr.mid(4, 2);
-    
+
     // 状态码 01 表示到达预定位置
     if (statusCode == "01") {
         return true;
     }
-    
+
     // 其他状态码的含义（不打印，避免刷屏）：
     // 00: 运行中
     // 02: 异常撞击
@@ -1370,7 +1374,7 @@ bool TcpClientCore::checkIfReachedPosition(const QByteArray& data)
     // 04: 未检测到液位到达最大距离
     // 05: 力矩模式下运行到极限位置
     // 08: 紧急停止
-    
+
     return false;
 }
 
@@ -1384,36 +1388,36 @@ bool TcpClientCore::checkIfGripperInitialized(const QByteArray& data)
      * 字节2: 字节计数（0x02 = 2字节数据）
      * 字节3-4: 数据（0x00 0x01 = 初始化完成）
      * 字节5-6: CRC16校验
-     * 
+     *
      * 示例：05 03 02 00 01 79 84
      */
-    
+
     // 检查数据长度（至少7字节：ID + FC + BC + 2字节数据 + 2字节CRC）
     if (data.length() < 7) {
         return false;
     }
-    
+
     // 提取设备ID（字节0）
     quint8 deviceId = static_cast<quint8>(data[0]);
     QString deviceIdStr = QString("%1").arg(deviceId, 2, 16, QChar('0')).toUpper();
-    
+
     // 检查设备ID是否匹配
     if (deviceIdStr != m_pollingDeviceNum.toUpper()) {
         return false;
     }
-    
+
     // 检查功能码（字节1）是否是 0x03
     quint8 functionCode = static_cast<quint8>(data[1]);
     if (functionCode != 0x03) {
         return false;
     }
-    
+
     // 检查字节计数（字节2）是否是 0x02
     quint8 byteCount = static_cast<quint8>(data[2]);
     if (byteCount != 0x02) {
         return false;
     }
-    
+
     // 提取状态数据（字节3-4）
     quint16 statusData = (static_cast<quint8>(data[3]) << 8) | static_cast<quint8>(data[4]);
     if (statusData == 0x0001 || statusData == 0x0002) {
@@ -1421,18 +1425,18 @@ bool TcpClientCore::checkIfGripperInitialized(const QByteArray& data)
     }
 
 
-    
+
     // 如果是其他状态，可以打印调试信息
     // qDebug() << "电爪状态:" << QString("0x%1").arg(statusData, 4, 16, QChar('0')).toUpper();
-    
+
     return false;
 }
 
 // 处理消息队列
 void TcpClientCore::processMessageQueue()
 {
-    qDebug() << "★★★★★ processMessageQueue() 被调用，当前队列长度:" << m_messageQueue.size();
-    
+    qDebug() << "●●●●●●processMessageQueue() 被调用，★★★★★当前队列长度:" << m_messageQueue.size() << "★★★★★";
+
     // 如果队列为空，停止处理
     if (m_messageQueue.isEmpty()) {
         m_isProcessingQueue = false;
@@ -1442,18 +1446,18 @@ void TcpClientCore::processMessageQueue()
     }
 
     if (m_isWaitingForResponse) {
-        qDebug() << "⏸ ⏸ ⏸  队列已暂停（m_isWaitingForResponse = true），不继续处理";
+        qDebug() << "◆◆◆队列已暂停（m_isWaitingForResponse = true），不继续处理";
         qDebug() << "      剩余 " << m_messageQueue.size() << " 条消息等待处理";
         return;
     }
-    
+
     // 标记为正在处理
     m_isProcessingQueue = true;
-    
+
     // 取出队列中的第一条消息
     MessageQueueItem item = m_messageQueue.dequeue();
-    qDebug() << "▶▶▶ 正在处理消息:" << item.content << " | 剩余队列长度:" << m_messageQueue.size();
-    
+    qDebug() << "▲▲▲正在处理消息:" << item.content << " | 剩余队列长度:" << m_messageQueue.size();
+
 
 
 
@@ -1469,13 +1473,29 @@ void TcpClientCore::processMessageQueue()
     * AArecordShakeBedTime     记录摇床需要的时间
     * 第二步骤
     */
-    // 检查是否是AA0、AA1或AA2命令（天平命令）
+    // 检查是否是AA0、AA1、AA2 或自定义 AA 命令（天平/逻辑命令）
     QString contentStr = QString::fromUtf8(item.content);
     if (item.asciiOrHex && contentStr == "AA0") {
         // 检测到AA0命令（关闭天平打印），不发送，而是发出信号
         qDebug() << "检测到AA0命令，发出天平打印关闭信号";
+
+        // 关闭打印的同时，将重量阈值和触发标记重置为默认值
+        for (int i = 0; i < 3; ++i) {
+            TcpClientCore::g_weightThresholds[i] = 0.0;
+            TcpClientCore::g_thresholdTriggered[i] = false;
+        }
+
         emit balancePrintOffRequested();
         // 继续处理下一条消息
+        m_isProcessingQueue = false;
+        QTimer::singleShot(0, this, &TcpClientCore::processMessageQueue);
+        return;
+    }
+    // 自定义命令：AAEnableWeightCheck —— 仅在本地生效，启用称重检测
+    if (item.asciiOrHex && contentStr == "AAEnableWeightCheck") {
+        qDebug() << "检测到 AAEnableWeightCheck 命令，设置 g_isWeightPauseActive = true（启用称重检测）";
+        TcpClientCore::g_isWeightPauseActive = true;
+        // 不发送到下位机，直接跳过，并继续处理下一条消息
         m_isProcessingQueue = false;
         QTimer::singleShot(0, this, &TcpClientCore::processMessageQueue);
         return;
@@ -1497,7 +1517,7 @@ void TcpClientCore::processMessageQueue()
         if (ok) {
             setExpectedWeight(weight); // 给谁设置重量：tcpCore
             emit setExpectedWeightRequested(weight);// 给谁设置重量：tcpBalanceCore
-            qDebug() << "检测到AAsetExpectedWeight命令，设置期望重量:" << weight << "g";
+            qDebug() << "检测到AAsetExpectedWeight命令，设置期望重量:" << weight << "mg";
         } else {
             qWarning() << "AAsetExpectedWeight命令格式错误，无法解析重量值:" << weightStr;
         }
@@ -1621,30 +1641,30 @@ void TcpClientCore::processMessageQueue()
         // 检测到AAendTimer命令（结束计时），计算耗时
         QString timerName = contentStr.mid(QString("AAendTimer:").length());
         QDateTime endTime = QDateTime::currentDateTime();
-        
+
         if (m_timerStartTimes.contains(timerName)) {
             QDateTime startTime = m_timerStartTimes[timerName];
             qint64 elapsedMs = startTime.msecsTo(endTime);
-            
+
             // 将毫秒转换为时分秒
             int hours = elapsedMs / (1000 * 60 * 60);
             int minutes = (elapsedMs % (1000 * 60 * 60)) / (1000 * 60);
             int seconds = (elapsedMs % (1000 * 60)) / 1000;
             int milliseconds = elapsedMs % 1000;
-            
+
             qDebug().noquote() << QString("\n\n\n\n========== 计时结束 [%1] ==========").arg(timerName);
             qDebug().noquote() << QString("开始时间: %1").arg(startTime.toString("yyyy-MM-dd hh:mm:ss.zzz"));
             qDebug().noquote() << QString("结束时间: %1").arg(endTime.toString("yyyy-MM-dd hh:mm:ss.zzz"));
             qDebug().noquote() << QString("消耗时间: %1小时 %2分钟 %3秒 %4毫秒 (总计: %5毫秒)")
                         .arg(hours).arg(minutes).arg(seconds).arg(milliseconds).arg(elapsedMs);
             qDebug().noquote() << QString("==========================================\n\n\n\n");
-            
+
             // 清除计时器记录
             m_timerStartTimes.remove(timerName);
         } else {
             qWarning() << QString("未找到计时器 [%1] 的开始时间，无法计算耗时").arg(timerName);
         }
-        
+
         // 继续处理下一条消息
         m_isProcessingQueue = false;
         QTimer::singleShot(0, this, &TcpClientCore::processMessageQueue);
@@ -1695,7 +1715,7 @@ void TcpClientCore::processMessageQueue()
     bool needsWait = (!item.expectedSignature.isEmpty() && item.expectedSignature != "-----")
                      ? true
                      : needsWaitForResponse(item.content, item.asciiOrHex);
-    
+
     if (needsWait) {
         // 需要等待响应（如查询到位命令），设置等待标志
         m_isWaitingForResponse = true;
@@ -1732,14 +1752,14 @@ void TcpClientCore::processMessageQueue()
         qDebug() << "当前发送的命令是:" << item.content << item.asciiOrHex << needsWait;
     }
 
-    
+
     // 在发送消息之前，非阻塞延时40ms
     QTimer::singleShot(40, this, [=, item = item, needsWait = needsWait]() {
 
         //qDebug() << "读取队列信息:" << QString::fromUtf8(item.content) << "，期待回复:" << item.expectedSignature;
         // 发送消息（使用非阻塞方式）
         sendMessageInternal(item.content, item.asciiOrHex, needsWait);
-        
+
         // 如果不需要等待响应，立即处理下一条消息
         if (!needsWait) {
             // 递归处理下一条消息（通过定时器异步调用，避免阻塞）
@@ -1753,7 +1773,7 @@ void TcpClientCore::processMessageQueue()
 bool TcpClientCore::needsWaitForResponse(const QByteArray& content, bool asciiOrHex)
 {
     QString contentStr = QString::fromUtf8(content);
-    
+
     // ASCII模式：查询命令（'d' 功能码）需要等待
     if (asciiOrHex && contentStr.startsWith(">") && contentStr.length() >= 4) {
         QChar functionCode = contentStr.at(3);
@@ -1765,13 +1785,13 @@ bool TcpClientCore::needsWaitForResponse(const QByteArray& content, bool asciiOr
     else if (!asciiOrHex && contentStr.length() >= 12) {
         QString functionCode = contentStr.mid(2, 2);
         QString registerAddr = contentStr.mid(4, 4);
-        
-        if (functionCode.toUpper() == "03" && 
+
+        if (functionCode.toUpper() == "03" &&
             (registerAddr.toUpper() == "0200" || registerAddr.toUpper() == "0201" || registerAddr.toUpper() == "0202")) {
             return true;
         }
     }
-    
+
     return false;
 }
 
@@ -1783,37 +1803,37 @@ void TcpClientCore::sendMessageInternal(const QByteArray& content, bool asciiOrH
         qWarning() << "未连接到服务器，无法发送消息";
         return;
     }
-    
+
     // 数据格式转换
     QByteArray dataToSend;
-    
+
     if (asciiOrHex) {
         dataToSend = content;  // ASCII模式：直接发送
     } else {
         dataToSend = QByteArray::fromHex(content);  // 十六进制模式：转换后发送
     }
-    
+
     // 通过TCP发送数据
     qint64 bytesWritten = m_tcpSocket->write(dataToSend);
-    
+
     if (bytesWritten == -1) {
         qWarning() << "发送失败:" << m_tcpSocket->errorString();
         return;
     }
-    
+
     m_tcpSocket->flush();
-    
+
     // 如果需要等待响应，启动轮询
     if (shouldWait) {
         QString contentStr = QString::fromUtf8(content);
         QString deviceNum;
-        
+
         if (asciiOrHex && contentStr.startsWith(">") && contentStr.length() >= 4) {
             deviceNum = contentStr.mid(1, 2);
         } else if (!asciiOrHex && contentStr.length() >= 12) {
             deviceNum = contentStr.left(2);
         }
-        
+
         startPolling(deviceNum, contentStr);
     }
 }

@@ -179,7 +179,8 @@ QJsonObject RecipeAnalyzer::buildRecipePacket(const QString& formula,
     for (const auto &r : results) {
         QJsonObject item;
         item["名称"] = r.name;
-        item["用量"] = r.grams; // mg
+        // r.grams 已经是毫克单位，四舍五入到1位小数
+        item["用量"] = std::round(r.grams * 10.0) / 10.0;
         item["单位"] = "mg";
         solutes.append(item);
     }
@@ -496,7 +497,7 @@ QList<PrecursorResult> RecipeAnalyzer::calculatePrecursors(const QString& formul
     // 分配FA -> FAI
     if (n_FA > 0) {
         double faiMoles = n_FA;
-        double faiGrams = faiMoles * PRECURSOR_WEIGHTS["FAI"];
+        double faiGrams = faiMoles * PRECURSOR_WEIGHTS["FAI"] * 1000.0; // 转换为毫克
         results.append(PrecursorResult("FAI", faiMoles, faiGrams));
         halideNeeds["I"] -= n_FA;
     }
@@ -504,7 +505,7 @@ QList<PrecursorResult> RecipeAnalyzer::calculatePrecursors(const QString& formul
     // 分配Cs -> CsI
     if (n_Cs > 0) {
         double csiMoles = n_Cs;
-        double csiGrams = csiMoles * PRECURSOR_WEIGHTS["CsI"];
+        double csiGrams = csiMoles * PRECURSOR_WEIGHTS["CsI"] * 1000.0; // 转换为毫克
         results.append(PrecursorResult("CsI", csiMoles, csiGrams));
         halideNeeds["I"] -= n_Cs;
     }
@@ -538,7 +539,7 @@ QList<PrecursorResult> RecipeAnalyzer::calculatePrecursors(const QString& formul
             
             if (take > 0) {
                 double saltMoles = take;
-                double saltGrams = saltMoles * PRECURSOR_WEIGHTS[salt];
+                double saltGrams = saltMoles * PRECURSOR_WEIGHTS[salt] * 1000.0; // 转换为毫克
                 results.append(PrecursorResult(salt, saltMoles, saltGrams));
                 halideNeeds[halide] -= take;
                 remaining -= take;
@@ -561,7 +562,7 @@ QList<PrecursorResult> RecipeAnalyzer::calculatePrecursors(const QString& formul
     
     for (const auto& salt : pbSalts) {
         if (salt.second > 1e-12) {
-            double saltGrams = salt.second * PRECURSOR_WEIGHTS[salt.first];
+            double saltGrams = salt.second * PRECURSOR_WEIGHTS[salt.first] * 1000.0; // 转换为毫克
             results.append(PrecursorResult(salt.first, salt.second, saltGrams));
         }
     }
@@ -604,7 +605,8 @@ void RecipeAnalyzer::updateResultsTable(const QList<PrecursorResult>& results)
         
         ui->tableWidget_precursors->setItem(i, 0, new QTableWidgetItem(result.name));
         ui->tableWidget_precursors->setItem(i, 1, new QTableWidgetItem(formatNumber(result.moles, 6)));
-        ui->tableWidget_precursors->setItem(i, 2, new QTableWidgetItem(formatNumber(result.grams, 4)));
+        // result.grams 已经是毫克单位，保留1位小数并四舍五入
+        ui->tableWidget_precursors->setItem(i, 2, new QTableWidgetItem(formatNumber(result.grams, 1)));
     }
     
     ui->tableWidget_precursors->resizeColumnsToContents();

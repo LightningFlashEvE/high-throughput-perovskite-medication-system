@@ -15,6 +15,7 @@ namespace {
 const char* kConnName = "app_sqlite_conn";
 
 constexpr auto kTableTransferLeft = "LiquidMaterialArea";
+constexpr auto kTableSolidMaterialArea = "SolidMaterialArea";
 constexpr auto kTableOther = "other";
 constexpr auto kTableShakeBedArea = "shakeBedArea";
 constexpr auto kTableTipsHeadUsage = "tipsHeadUsage";
@@ -150,6 +151,21 @@ void AppSqlDatabase::createDefaultTables()
         ")"
     ).arg(QString::fromLatin1(kTableTransferLeft));
 
+    const QString createSolidMaterialArea = QStringLiteral(
+        "CREATE TABLE IF NOT EXISTS %1 ("
+        "  selfLocation INTEGER PRIMARY KEY,"
+        "  solidName TEXT NOT NULL,"
+        "  originX INTEGER NOT NULL DEFAULT -1256,"
+        "  originY INTEGER NOT NULL DEFAULT 3407,"
+        "  solidZ INTEGER NOT NULL DEFAULT 239050,"
+        "  rightSpacing REAL NOT NULL DEFAULT 2507.5,"
+        "  bottomSpacing REAL NOT NULL DEFAULT 5637.25,"
+        "  cols INTEGER NOT NULL DEFAULT 3,"
+        "  rows INTEGER NOT NULL DEFAULT 5,"
+        "  currentIndex INTEGER NOT NULL DEFAULT 0"
+        ")"
+    ).arg(QString::fromLatin1(kTableSolidMaterialArea));
+
     const QString createOther = QStringLiteral(
         "CREATE TABLE IF NOT EXISTS %1 ("
         "  currentIndex INTEGER NOT NULL,"
@@ -206,7 +222,7 @@ void AppSqlDatabase::createDefaultTables()
     ).arg(QString::fromLatin1(kTableRecipeMessageQueue), QString::fromLatin1(kTableRecipeQueue));
 
     QSqlQuery query(db);
-    const QList<QString> statements{createTransferLeft, createOther, createShakeBedArea, createTipsHeadUsage, createRecipeQueue, createRecipeMessageQueue};
+    const QList<QString> statements{createTransferLeft, createSolidMaterialArea, createOther, createShakeBedArea, createTipsHeadUsage, createRecipeQueue, createRecipeMessageQueue};
     for (const QString &sql : statements) {
         if (!query.exec(sql)) {
             qWarning() << "创建默认表失败:" << query.lastError().text() << "SQL:" << sql;
@@ -244,7 +260,62 @@ void AppSqlDatabase::seedDefaultData()
             {"bottomSpacing", 4355.0},
             {"cols", 5},
             {"rows", 3},
+            {"currentIndex", 0}
+        });
+        insertRow(QString::fromLatin1(kTableTransferLeft), {
+            {"selfLocation", 2},
+            {"liquidName", "NMP"},
+            {"originX", 15050},
+            {"originY", 23094},
+            {"pipetteZ", 0},
+            {"gripperZ", 272187},
+            {"solidZ", 0},
+            {"rightSpacing", 1732.75},
+            {"bottomSpacing", 4355.0},
+            {"cols", 5},
+            {"rows", 3},
+            {"currentIndex", 0}
+        });
+
+    }
+
+    // 固体药品表初始数据
+    if (isTableEmpty(QString::fromLatin1(kTableSolidMaterialArea))) {
+        insertRow(QString::fromLatin1(kTableSolidMaterialArea), {
+            {"selfLocation", 0},
+            {"solidName", "FAI"},
+            {"originX", -1256},
+            {"originY", 3407},
+            {"solidZ", 239050},
+            {"rightSpacing", 2507.5},
+            {"bottomSpacing", 5637.25},
+            {"cols", 3},
+            {"rows", 5},
+            {"currentIndex", 0}
+        });
+        insertRow(QString::fromLatin1(kTableSolidMaterialArea), {
+            {"selfLocation", 1},
+            {"solidName", "CsI"},
+            {"originX", -1256},
+            {"originY", 3407},
+            {"solidZ", 239050},
+            {"rightSpacing", 2507.5},
+            {"bottomSpacing", 5637.25},
+            {"cols", 3},
+            {"rows", 5},
             {"currentIndex", 1}
+        });
+        insertRow(QString::fromLatin1(kTableSolidMaterialArea), {
+            {"selfLocation", 2},
+            {"solidName", "PbI2"},
+            {"originX", -1256},
+            {"originY", 3407},
+            {"solidZ", 239050},
+            {"rightSpacing", 2507.5},
+            {"bottomSpacing", 5637.25},
+            {"cols", 3},
+            {"rows", 5},
+            {"currentIndex", 2}
         });
     }
 

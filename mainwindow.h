@@ -24,12 +24,13 @@ struct SlotPositionConfig {
     double sourceY;     // 原点Y坐标（左上角）
     int cols;           // 盘的列数（横向数量）
     int rows;           // 盘的行数（纵向数量）
-    double spacingX;    // 横向间距（往左为负方向）
-    double spacingY;   // 纵向间距（往下为正方向）
+    double spacingX;    // 横向间距
+    double spacingY;    // 纵向间距（往下为正方向）
+    bool xDirectionReverse;  // X方向是否反向：false=减法(往左，默认), true=加法(往右)
 
-    SlotPositionConfig() : sourceX(0), sourceY(0), cols(0), rows(0), spacingX(0), spacingY(0) {}
-    SlotPositionConfig(double x, double y, int c, int r, double sx, double sy)
-        : sourceX(x), sourceY(y), cols(c), rows(r), spacingX(sx), spacingY(sy) {}
+    SlotPositionConfig() : sourceX(0), sourceY(0), cols(0), rows(0), spacingX(0), spacingY(0), xDirectionReverse(false) {}
+    SlotPositionConfig(double x, double y, int c, int r, double sx, double sy, bool xReverse = false)
+        : sourceX(x), sourceY(y), cols(c), rows(r), spacingX(sx), spacingY(sy), xDirectionReverse(xReverse) {}
 };
 
 class QTimer;
@@ -102,6 +103,8 @@ private slots:
      * 目前为空实现，后续可填入紧急停止逻辑
      */
     void onEmergencyStopButtonClicked();
+
+    void on_pushButton_3_clicked();
 
 protected:
     /**
@@ -189,8 +192,8 @@ private:
     bool takeEmptyBottle(const QString& trayName, QQueue<MessageQueueItem>& messageQueue);
     // 取液体（液体名称 + 体积 + tipsNum引用参数 + 消息队列引用）
     bool getLiquid(const QString& liquidName, double volumeMl, QQueue<MessageQueueItem>& messageQueue);
-    // 取固体（固体名称 + 质量 + 消息队列引用）
-    bool getSolid(const QString& solidName, double mass, QQueue<MessageQueueItem>& messageQueue);
+    // 取固体（固体名称 + 质量 + 消息队列引用 + 固体盘位置索引）
+    bool getSolid(const QString& solidName, double mass, QQueue<MessageQueueItem>& messageQueue, int currentIndex = 0);
     // 拧紧瓶子（消息队列引用）
     void tightenBottle(QQueue<MessageQueueItem>& messageQueue);
     // 关盖（关闭瓶盖）
@@ -314,7 +317,6 @@ public:
      */
     QString getLocalWiredIP();
 
-    bool getSolid_test(const QString &solidName, double mass, QQueue<MessageQueueItem> &messageQueue);
 public slots:
     // 测试配方发送功能（接收JSON对象）
     void testRecipeSend(const QJsonObject& recipePacket);

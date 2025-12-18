@@ -450,9 +450,9 @@ void MainWindow::onShakeBedEmptyCheckTimeout()
         return;
     }
 
-    qDebug() << "\n================";
-    qDebug() << "|  检查摇床为空  |";
-    qDebug() << "================";
+    // qDebug() << "\n================";
+    // qDebug() << "|  检查摇床为空  |";
+    // qDebug() << "================";
 
     // 查询shakeBedArea表中所有记录的isEmpty字段
     QString sql = "SELECT isEmpty FROM shakeBedArea";
