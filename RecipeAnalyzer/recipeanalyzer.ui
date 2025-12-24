@@ -55,16 +55,6 @@
               </property>
              </widget>
             </item>
-            <item row="0" column="1">
-             <widget class="QLineEdit" name="lineEdit_formula">
-              <property name="text">
-               <string>Cs0.05FA0.95PbI3</string>
-              </property>
-              <property name="placeholderText">
-               <string>例如: Cs0.17FA0.83Pb(I0.8Br0.2)3</string>
-              </property>
-             </widget>
-            </item>
             <item row="1" column="0">
              <widget class="QLabel" name="label_molarity">
               <property name="text">
@@ -113,7 +103,17 @@
                <double>0.100000000000000</double>
               </property>
               <property name="value">
-               <double>1.000000000000000</double>
+               <double>0.010000000000000</double>
+              </property>
+             </widget>
+            </item>
+            <item row="0" column="1">
+             <widget class="QLineEdit" name="lineEdit_formula">
+              <property name="text">
+               <string>FAPbI3</string>
+              </property>
+              <property name="placeholderText">
+               <string>例如: Cs0.17FA0.83Pb(I0.8Br0.2)3</string>
               </property>
              </widget>
             </item>

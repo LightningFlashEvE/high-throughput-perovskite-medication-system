@@ -606,9 +606,8 @@ bool MainWindow::getLiquid(const QString& liquidName, double volumeMl, QQueue<Me
         tipsHeadRightSpacing = tipsHeadQuery.value("rightSpacing").toDouble();
         tipsHeadBottomSpacing = tipsHeadQuery.value("bottomSpacing").toDouble();
     }
-    SlotPositionConfig config(tipsHeadX+tipsHeadSlotIndex*2223, tipsHeadY, tipsHeadCols, tipsHeadRows, tipsHeadRightSpacing, tipsHeadBottomSpacing);
-    
 
+    SlotPositionConfig config(tipsHeadX+tipsHeadSlotIndex*2223, tipsHeadY, tipsHeadCols, tipsHeadRows, tipsHeadRightSpacing, tipsHeadBottomSpacing);
     QPoint tipstargetPos = calculateSlotPosition(config, tipsHeadUsageSelfLocation);
     int tipsHeadTargetX = tipstargetPos.x();
     int tipsHeadTargetY = tipstargetPos.y();
@@ -695,7 +694,7 @@ bool MainWindow::getLiquid(const QString& liquidName, double volumeMl, QQueue<Me
     QSqlQuery balanceAreaQuery = dbm->query(balanceAreaSql);
     int balanceAreaForTipsAreaX=0, balanceAreaForTipsAreaY=0,  balanceAreaForTipsAreaZ=0;
     if (balanceAreaQuery.next()) {
-        balanceAreaForTipsAreaX = balanceAreaQuery.value("originX").toInt();
+        balanceAreaForTipsAreaX = balanceAreaQuery.value("originX").toInt()+291;
         balanceAreaForTipsAreaY = balanceAreaQuery.value("originY").toInt()+6246;
         balanceAreaForTipsAreaZ = balanceAreaQuery.value("tipsZ").toInt();
     } else {
@@ -936,19 +935,19 @@ bool MainWindow::getSolid(const QString& solidName, double mass, QQueue<MessageQ
     int maxSpeed;
     if (mass < 0.0010)
     {
-        maxSpeed = 100;
+        maxSpeed = 100;  // 100
     }
     else if (mass < 0.0100)
     {
-        maxSpeed = 150;
+        maxSpeed = 200; // 150
     }
-    else if(mass < 0.0200)
+    else if(mass < 0.0300)
     {
-        maxSpeed = 200;
+        maxSpeed = 500; // 200
     }
     else
     {
-        maxSpeed = 500;
+        maxSpeed = 800; // 500
     }
     qDebug() << "速度最大值用：" << maxSpeed;
     
@@ -1050,14 +1049,14 @@ bool MainWindow::getSolid(const QString& solidName, double mass, QQueue<MessageQ
 
 
     // 崴脚大法
-    // QString moveSolidXleftCommand = tcpCore->buildDeviceCommand("04", "D", solidAreaX-100, 8);
-    // messageQueue.enqueue(MessageQueueItem(moveSolidXleftCommand.toUtf8(), true));
-    // QString moveSolidXUpCommand = tcpCore->buildDeviceCommand("03", "D", solidAreaY-150, 8);
-    // messageQueue.enqueue(MessageQueueItem(moveSolidXUpCommand.toUtf8(), true));
-    // QString waitmoveSolidXUpCommand = tcpCore->buildDeviceCommand("03", "d", 0, 0);
-    // messageQueue.enqueue(MessageQueueItem(waitmoveSolidXUpCommand.toUtf8(), true, "03d01"));
-    // QString waitmoveSolidXleftCommand = tcpCore->buildDeviceCommand("04", "d", 0, 0);
-    // messageQueue.enqueue(MessageQueueItem(waitmoveSolidXleftCommand.toUtf8(), true, "04d01"));
+    QString moveSolidXleftCommand = tcpCore->buildDeviceCommand("04", "D", solidAreaX-100, 8);
+    messageQueue.enqueue(MessageQueueItem(moveSolidXleftCommand.toUtf8(), true));
+    QString moveSolidXUpCommand = tcpCore->buildDeviceCommand("03", "D", solidAreaY-150, 8);
+    messageQueue.enqueue(MessageQueueItem(moveSolidXUpCommand.toUtf8(), true));
+    QString waitmoveSolidXUpCommand = tcpCore->buildDeviceCommand("03", "d", 0, 0);
+    messageQueue.enqueue(MessageQueueItem(waitmoveSolidXUpCommand.toUtf8(), true, "03d01"));
+    QString waitmoveSolidXleftCommand = tcpCore->buildDeviceCommand("04", "d", 0, 0);
+    messageQueue.enqueue(MessageQueueItem(waitmoveSolidXleftCommand.toUtf8(), true, "04d01"));
 
 
 
@@ -1284,8 +1283,8 @@ void MainWindow::tightenBottle(QQueue<MessageQueueItem>& messageQueue)
     // 启动摇床
     messageQueue.enqueue(MessageQueueItem("AAopenShakeBed", true));
     
-    // 记录摇床时间信息（传递selfLocation和摇床持续时间，默认30秒），确认已经使用值自加1（此时为3）
-    QString recordCmd = QString("AArecordShakeBedTime:%1:%2").arg(shakeBedAreaSelfLocation).arg(30);
+    // 记录摇床时间信息（传递selfLocation和摇床持续时间，默认15秒），确认已经使用值自加1（此时为3）
+    QString recordCmd = QString("AArecordShakeBedTime:%1:%2").arg(shakeBedAreaSelfLocation).arg(15);
     messageQueue.enqueue(MessageQueueItem(recordCmd.toUtf8(), true));
 }
 

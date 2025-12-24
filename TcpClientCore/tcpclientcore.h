@@ -324,6 +324,17 @@ public:
     QMap<QString, QDateTime> m_timerStartTimes;  // 存储各个计时器的开始时间（timerName -> startTime）
     QMap<QString, qint64> m_timerResults;        // 存储各个计时器的耗时结果（timerName -> elapsedMs）
     
+    // 自动重连相关
+    QString m_lastRemoteIP;                       // 上次连接的远程IP
+    quint16 m_lastRemotePort;                     // 上次连接的远程端口
+    QString m_lastLocalIP;                        // 上次连接的本地IP
+    bool m_lastProxyDisabled;                     // 上次连接是否禁用代理
+    bool m_autoReconnectEnabled;                  // 是否启用自动重连
+    bool m_manualDisconnect;                      // 是否手动断开（手动断开时不自动重连）
+    int m_reconnectAttempts;                      // 当前重连尝试次数
+    static const int MAX_RECONNECT_ATTEMPTS = 5;  // 最大重连尝试次数
+    QTimer* m_reconnectTimer;                     // 重连定时器
+    
     /**
      * @brief 检查收到的数据是否是到位响应（XYZ电机）
      * @param data 收到的数据
@@ -349,6 +360,17 @@ public:
      * @brief 停止轮询机制
      */
     void stopPolling();
+    
+    /**
+     * @brief 尝试重连
+     */
+    void attemptReconnect();
+    
+    /**
+     * @brief 设置是否启用自动重连
+     * @param enabled 是否启用
+     */
+    void setAutoReconnectEnabled(bool enabled) { m_autoReconnectEnabled = enabled; }
     
     /**
      * @brief 处理消息队列

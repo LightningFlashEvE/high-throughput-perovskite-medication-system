@@ -25,10 +25,23 @@ TcpClientCore::TcpClientCore(QObject *parent)
     , m_queueTimer(nullptr)
     , m_isWaitingForResponse(false)
     , m_isQueuePaused(false)
+    , m_lastRemotePort(0)
+    , m_lastProxyDisabled(false)
+    , m_autoReconnectEnabled(true)
+    , m_manualDisconnect(false)
+    , m_reconnectAttempts(0)
+    , m_reconnectTimer(nullptr)
 
 {
     // 创建 TCP Socket
     m_tcpSocket = new QTcpSocket(this);
+    
+    // 创建重连定时器
+    m_reconnectTimer = new QTimer(this);
+    m_reconnectTimer->setSingleShot(true);
+    connect(m_reconnectTimer, &QTimer::timeout, this, [this]() {
+        attemptReconnect();
+    });
 }
 
 void TcpClientCore::initializeConnectionsAndTimers()
@@ -192,6 +205,14 @@ bool TcpClientCore::connectToTcp(const QString& localIP, const QString& remoteIP
             qDebug() << "绑定本地地址:" << localIP;
         }
     }
+
+    // 保存连接参数用于自动重连
+    m_lastRemoteIP = remoteIP;
+    m_lastRemotePort = remotePort;
+    m_lastLocalIP = localIP;
+    m_lastProxyDisabled = proxyDisabled;
+    m_reconnectAttempts = 0;  // 重置重连计数
+    m_manualDisconnect = false;  // 重置手动断开标志
 
     // 连接到远程服务器
     qDebug() << "正在连接到" << remoteIP << ":" << remotePort;
@@ -671,6 +692,14 @@ void TcpClientCore::disconnectFromTcp()
 {
     qDebug() << "开始断开TCP连接并清理资源...";
 
+    // 标记为手动断开，阻止自动重连
+    m_manualDisconnect = true;
+    
+    // 停止重连定时器
+    if (m_reconnectTimer) {
+        m_reconnectTimer->stop();
+    }
+
     // 1. 停止轮询
     stopPolling();
 
@@ -756,6 +785,13 @@ void TcpClientCore::onDisconnected()
 {
     qDebug() << "TCP连接已断开";
     emit disconnected();
+    
+    // 触发自动重连（手动断开时不重连）
+    if (!m_manualDisconnect && m_autoReconnectEnabled && !m_lastRemoteIP.isEmpty() && m_reconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
+        int delay = qMin(3000 * (m_reconnectAttempts + 1), 15000);
+        qDebug() << "将在" << delay << "ms后尝试第" << (m_reconnectAttempts + 1) << "次重连...";
+        m_reconnectTimer->start(delay);
+    }
 }
 
 
@@ -890,6 +926,43 @@ void TcpClientCore::onBalanceDisconnected()
 {
     qDebug() << "天平TCP连接已断开";
     emit disconnected();
+    
+    // 触发自动重连（手动断开时不重连）
+    if (!m_manualDisconnect && m_autoReconnectEnabled && !m_lastRemoteIP.isEmpty() && m_reconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
+        int delay = qMin(3000 * (m_reconnectAttempts + 1), 15000);  // 递增延迟，最大15秒
+        qDebug() << "将在" << delay << "ms后尝试第" << (m_reconnectAttempts + 1) << "次重连...";
+        m_reconnectTimer->start(delay);
+    }
+}
+
+void TcpClientCore::attemptReconnect()
+{
+    if (!m_autoReconnectEnabled || m_lastRemoteIP.isEmpty()) {
+        return;
+    }
+    
+    if (m_tcpSocket && m_tcpSocket->state() == QAbstractSocket::ConnectedState) {
+        qDebug() << "已连接，取消重连";
+        m_reconnectAttempts = 0;
+        return;
+    }
+    
+    m_reconnectAttempts++;
+    qDebug() << "正在尝试第" << m_reconnectAttempts << "次重连到" << m_lastRemoteIP << ":" << m_lastRemotePort;
+    
+    bool success = connectToTcp(m_lastLocalIP, m_lastRemoteIP, m_lastRemotePort, m_lastProxyDisabled);
+    
+    if (success) {
+        qDebug() << "重连成功";
+        m_reconnectAttempts = 0;
+    } else if (m_reconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
+        int delay = qMin(3000 * (m_reconnectAttempts + 1), 15000);
+        qDebug() << "重连失败，将在" << delay << "ms后重试...";
+        m_reconnectTimer->start(delay);
+    } else {
+        qWarning() << "已达到最大重连次数" << MAX_RECONNECT_ATTEMPTS << "，停止重连";
+        emit errorOccurred(QString("重连失败，已尝试%1次").arg(MAX_RECONNECT_ATTEMPTS));
+    }
 }
 
 

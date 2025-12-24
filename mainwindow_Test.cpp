@@ -98,8 +98,8 @@ void MainWindow::initializeSystemComponents()
         tcpCore->writeBalanceTareCommand(">01K0EE65", TcpClientCore::AsciiMode);
         
         // 5秒后继续队列
-        QTimer::singleShot(5000, this, [=]() {
-            qDebug() << "⏰ 5秒暂停结束，恢复队列";
+        QTimer::singleShot(10000, this, [=]() {
+            qDebug() << "⏰ 10秒暂停结束，恢复队列";
             tcpCore->resumeQueue();
         });
     });
