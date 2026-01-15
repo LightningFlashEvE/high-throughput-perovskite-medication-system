@@ -16,6 +16,8 @@
 #include <QFileInfo>
 #include <QDebug>
 #include <QApplication>
+#include <QLabel>
+#include <QSlider>
 #include "rtspplayer.h"
 #include "tcpclientcore.h"
 #include "qsqldatabase.h"
@@ -257,7 +259,83 @@ MainWindow::MainWindow(QWidget *parent)
         });
     }
 
-
+    // 初始化滑块值显示标签
+    if (ui->horizontalSliderTight) {
+        sliderValueLabel = new QLabel(this);
+        sliderValueLabel->setStyleSheet(
+            "QLabel {"
+            "  background-color: rgba(0, 0, 0, 200);"
+            "  color: white;"
+            "  border-radius: 4px;"
+            "  padding: 2px 6px;"
+            "  font-size: 12px;"
+            "}"
+        );
+        sliderValueLabel->setAlignment(Qt::AlignCenter);
+        sliderValueLabel->hide();  // 初始隐藏
+        
+        // 更新标签位置的辅助函数
+        auto updateLabelPosition = [this](int value) {
+            if (!sliderValueLabel || !ui->horizontalSliderTight) return;
+            
+            QSlider *slider = ui->horizontalSliderTight;
+            
+            // 更新标签文本
+            sliderValueLabel->setText(QString::number(value));
+            sliderValueLabel->adjustSize();
+            
+            // 计算滑块值对应的位置比例
+            double ratio = 0.0;
+            if (slider->maximum() != slider->minimum()) {
+                ratio = (value - slider->minimum()) / double(slider->maximum() - slider->minimum());
+            }
+            
+            // 获取滑块的几何位置（相对于父控件）
+            QRect sliderRect = slider->geometry();
+            
+            // 估算滑块的可用宽度（考虑左右边距，通常QSlider左右各留约12-15像素）
+            const int margin = 15;  // 滑块左右边距
+            int availableWidth = sliderRect.width() - 2 * margin;
+            
+            // 计算滑块拖动点在滑块控件内的相对X坐标
+            int handleXRelative = margin + int(ratio * availableWidth);
+            
+            // 将滑块内的相对坐标转换为窗口坐标
+            QPoint sliderLocalPos(handleXRelative, sliderRect.height() / 2);
+            QPoint globalPos = slider->mapToGlobal(sliderLocalPos);
+            QPoint windowPos = this->mapFromGlobal(globalPos);
+            
+            // 设置标签位置（在滑块上方居中）
+            int labelX = windowPos.x() - sliderValueLabel->width() / 2;
+            int labelY = windowPos.y() - sliderRect.height() / 2 - sliderValueLabel->height() - 8;  // 在滑块上方8像素
+            
+            sliderValueLabel->move(labelX, labelY);
+            sliderValueLabel->show();
+        };
+        
+        // 当开始拖动时显示标签
+        connect(ui->horizontalSliderTight, &QSlider::sliderPressed, this, [this, updateLabelPosition]() {
+            if (sliderValueLabel && ui->horizontalSliderTight) {
+                updateLabelPosition(ui->horizontalSliderTight->value());
+            }
+        });
+        
+        // 拖动时更新标签位置和文本
+        connect(ui->horizontalSliderTight, &QSlider::valueChanged, this, [updateLabelPosition](int value) {
+            updateLabelPosition(value);
+        });
+        
+        // 当滑块停止拖动时延迟隐藏标签
+        connect(ui->horizontalSliderTight, &QSlider::sliderReleased, this, [this]() {
+            if (sliderValueLabel) {
+                QTimer::singleShot(1000, this, [this]() {  // 1秒后隐藏
+                    if (sliderValueLabel) {
+                        sliderValueLabel->hide();
+                    }
+                });
+            }
+        });
+    }
 
 }
 

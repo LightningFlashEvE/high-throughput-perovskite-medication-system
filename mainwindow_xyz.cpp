@@ -29,44 +29,25 @@ void MainWindow::on_pushButton_7_clicked()
     newRecipe.processState = RecipeNotProcessed;
 
     /************** 分成3份，使用余弦平滑过渡速度控制 *******************/
-    // ========== 方式1：固定三级速度（当前使用）==========
-    // 第1级：最大速度500（测试用）
-    // 第2级：固定100
-    // 第3级：固定50
+    // 辅助函数：返回三级速度（最大值500、余弦计算的中间值、最小值50）
     const int maxSpeed = 500;
-    const int totalSegments = 3;
-    
     auto calculateSmoothSpeed = [maxSpeed](int segment) -> int {
         if (segment == 0) {
-            return maxSpeed;  // 第1次：最大速度500
+            return maxSpeed;  // 第1次：最大速度
         } else if (segment == 1) {
-            return 50;       // 第2次：固定中间速度100
+            // 第2次：使用余弦函数 0 到 π/2 的中点计算中间值
+            // cos(π/4) ≈ 0.707
+            double smooth = cos(M_PI / 4.0);
+            return static_cast<int>(50 + (maxSpeed - 50) * smooth);
         } else {
-            return 50;        // 第3次：固定最小速度50
+            return 50;  // 第3次：最小速度
         }
     };
-    
-    // ========== 方式2：余弦平滑过渡（已屏蔽）==========
-    // 使用余弦函数 π/2 到 π 实现速度平滑过渡
-    // const int minSpeed = 50;
-    // auto calculateSmoothSpeed = [maxSpeed, minSpeed, totalSegments](int segment) -> int {
-    //     // 将 segment 映射到 π/2 到 π 的角度范围
-    //     // segment=0 → π/2 (cos=0, 最大速度)
-    //     // segment=1 → 3π/4 (cos≈-0.707, 中间速度)
-    //     // segment=2 → π (cos=-1, 最小速度)
-    //     double angle = M_PI / 2.0 + segment * (M_PI / 2.0) / (totalSegments - 1);
-    //     double cosValue = cos(angle);
-    //     
-    //     // cos从0到-1，映射到速度从maxSpeed到minSpeed
-    //     // speed = maxSpeed + cosValue × (maxSpeed - minSpeed)
-    //     int speed = static_cast<int>(maxSpeed + cosValue * (maxSpeed - minSpeed));
-    //     
-    //     return speed;
-    // };
 
-    // 将称重过程分成3份，固定三级速度
+    // 将称重过程分成3份
+    const int totalSegments = 3;
     for (int segment = 0; segment < totalSegments; segment++) {
-        // 根据 segment 计算速度（固定三级）
+        // 根据 segment 计算速度（0=最大, 1=中间, 2=最小）
         int m_Speed = calculateSmoothSpeed(segment);
 
         // 改速度
@@ -148,11 +129,11 @@ void MainWindow::on_pushButton_7_clicked()
 #elif 0
 
     qDebug() << "\n\n++++++++++++++++++++++";
-    // 打印重量表的值（静态变量使用 g_ 前缀）
-    for (int i = 0; i < 3; i++) {  // 改为3个阈值（之前是5个）
+    // 打印重量表的值    m_weightThresholds[5];    m_thresholdTriggered[5]; 
+    for (int i = 0; i < 5; i++) {
         qDebug() << QString("重量阈值%1: %2  |  阈值触发%3: %4")
-                    .arg(i).arg(TcpClientCore::g_weightThresholds[i], 0, 'f', 4)
-                    .arg(i).arg(TcpClientCore::g_thresholdTriggered[i]);
+                    .arg(i).arg(tcpCore->m_weightThresholds[i], 0, 'f', 4)
+                    .arg(i).arg(tcpCore->m_thresholdTriggered[i]);
     }
     qDebug() << "++++++++++++++++++++++\n\n";
 
@@ -192,27 +173,10 @@ void MainWindow::on_pushButton_7_clicked()
     }
     tcpCore->writeBalanceTareCommand(">01K0EE65", TcpClientCore::AsciiMode);
 
-#elif 0
-
-    // 打印期望重量
-    // ============ 步骤1：创建新的配方队列项 ============
-    RecipeQueueItem newRecipe;
-
-    newRecipe.recipeName = "1212";                     // 使用化学方程式作为配方名称
-    newRecipe.createTime = QDateTime::currentDateTime(); // 记录创建时间
-    newRecipe.processState = RecipeNotProcessed;         // 配方初始为“未处理”
-
-
-    // 拧紧瓶子放置去摇床
-    tightenBottle(newRecipe.messageQueue);
 #else
 
-    qDebug() << "------------------------------------------------------------------:";
-    // 遍历m_messageQueue的内容
-    while (!tcpCore->m_messageQueue.isEmpty()) {
-        MessageQueueItem item = tcpCore->m_messageQueue.dequeue();
-        qDebug() << "消息队列内容:" << item.content;
-    }
+    // 打印期望重量
+    
 
 
 #endif
@@ -283,16 +247,6 @@ bool MainWindow::takeEmptyBottle(const QString& trayName, QQueue<MessageQueueIte
     } else {
         qWarning() << "未找到 Box_Transfer_Area_Right 表的数据";
         return false;
-    }
-    // 如果currentIndex是15的时候，把数据库改成0，改成获取首个。因为15是最后一个，获取首个。同时不希望超出范围。同时需要修改数据库。
-    if(transferSlotIndex == 15) {
-        transferSlotIndex = 0;
-        // 将 currentIndex 重置为 0
-        QString resetSql = QString("UPDATE other SET currentIndex = 0 WHERE name = 'emptyBottleArea'");
-        QSqlQuery resetQuery = dbm->query(resetSql);
-        if (resetQuery.lastError().isValid()) {
-            qWarning() << "重置 emptyBottleArea 的 currentIndex 失败:" << resetQuery.lastError().text();
-        }
     }
 
     // 使用 calculateSlotPosition 函数计算目标槽位坐标
@@ -606,8 +560,9 @@ bool MainWindow::getLiquid(const QString& liquidName, double volumeMl, QQueue<Me
         tipsHeadRightSpacing = tipsHeadQuery.value("rightSpacing").toDouble();
         tipsHeadBottomSpacing = tipsHeadQuery.value("bottomSpacing").toDouble();
     }
-
     SlotPositionConfig config(tipsHeadX+tipsHeadSlotIndex*2223, tipsHeadY, tipsHeadCols, tipsHeadRows, tipsHeadRightSpacing, tipsHeadBottomSpacing);
+    
+
     QPoint tipstargetPos = calculateSlotPosition(config, tipsHeadUsageSelfLocation);
     int tipsHeadTargetX = tipstargetPos.x();
     int tipsHeadTargetY = tipstargetPos.y();
@@ -643,6 +598,8 @@ bool MainWindow::getLiquid(const QString& liquidName, double volumeMl, QQueue<Me
     // 由 TcpClientCore 在解析后，通过 tipsHeadAreaCurrentIndexPlusOneRequested(tipsHeadUsageSelfLocation) 信号回调到界面层
     QString tipsHeadCmd = QString("AAtipsHeadAreaCurrentIndexPlusOne:%1").arg(tipsHeadUsageSelfLocation);
     messageQueue.enqueue(MessageQueueItem(tipsHeadCmd.toUtf8(), true));
+
+
 
 
 
@@ -694,7 +651,7 @@ bool MainWindow::getLiquid(const QString& liquidName, double volumeMl, QQueue<Me
     QSqlQuery balanceAreaQuery = dbm->query(balanceAreaSql);
     int balanceAreaForTipsAreaX=0, balanceAreaForTipsAreaY=0,  balanceAreaForTipsAreaZ=0;
     if (balanceAreaQuery.next()) {
-        balanceAreaForTipsAreaX = balanceAreaQuery.value("originX").toInt()+291;
+        balanceAreaForTipsAreaX = balanceAreaQuery.value("originX").toInt();
         balanceAreaForTipsAreaY = balanceAreaQuery.value("originY").toInt()+6246;
         balanceAreaForTipsAreaZ = balanceAreaQuery.value("tipsZ").toInt();
     } else {
@@ -792,6 +749,7 @@ bool MainWindow::getLiquid(const QString& liquidName, double volumeMl, QQueue<Me
     messageQueue.enqueue(MessageQueueItem(waitRaiseMoveGripCommand.toUtf8(), true, "06d01"));
 
     return true;
+
 }
 
 // 取固体 - 重载版本
@@ -830,20 +788,18 @@ bool MainWindow::getSolid(const QString& solidName, double mass, QQueue<MessageQ
     }
     
     // 使用 calculateSlotPosition 函数计算目标槽位坐标
-    // 固体盘：X方向往右(xReverse=true)
-    SlotPositionConfig config(solidAreaX, solidAreaY, cols, rows, rightSpacing, bottomSpacing, true);
+    SlotPositionConfig config(solidAreaX, solidAreaY, cols, rows, rightSpacing, bottomSpacing);
     
     QPoint targetPos = calculateSlotPosition(config, solidCurrentIndex);  // 使用表中的 currentIndex
     int solidAreaTargetX = targetPos.x();
     int solidAreaTargetY = targetPos.y();
     
+    qDebug() << QString("固体盘槽位计算: currentIndex=%1, targetX=%2, targetY=%3")
+                .arg(solidCurrentIndex).arg(solidAreaTargetX).arg(solidAreaTargetY);
+    
     // 使用计算后的坐标
     solidAreaX = solidAreaTargetX;
     solidAreaY = solidAreaTargetY;
-
-    qDebug() << QString("固体盘槽位计算: currentIndex=%1, targetX=%2, targetY=%3, rightSpacing=%4, bottomSpacing=%5")
-                .arg(solidCurrentIndex).arg(solidAreaTargetX).arg(solidAreaTargetY).arg(rightSpacing).arg(bottomSpacing);
-    qDebug() << "solidAreaX: " << solidAreaX << "solidAreaY: " << solidAreaY;
 
     // 移动0A电机到100处
     QString moveToZeroACommand = tcpCore->buildDeviceCommand("0A", "D", 100, 8);
@@ -933,61 +889,34 @@ bool MainWindow::getSolid(const QString& solidName, double mass, QQueue<MessageQ
     /************** 分成3份，使用余弦平滑过渡速度控制 *******************/
     // 根据目标重量确定最大速度（三个等级）
     int maxSpeed;
-    if (mass < 0.0010)
-    {
-        maxSpeed = 100;  // 100
-    }
-    else if (mass < 0.0100)
-    {
-        maxSpeed = 200; // 150
-    }
-    else if(mass < 0.0300)
-    {
-        maxSpeed = 500; // 200
-    }
-    else
-    {
-        maxSpeed = 800; // 500
+    if (mass < 0.001) {
+        maxSpeed = 100;  // 小于0.001g：最大速度200
+    } else if (mass < 0.01) {
+        maxSpeed = 500;  // 0.001g到0.01g：最大速度300
+    } else {
+        maxSpeed = 800; // 大于等于0.01g：最大速度500
     }
     qDebug() << "速度最大值用：" << maxSpeed;
     
-    // ========== 方式1：固定三级速度（当前使用）==========
-    // 第1级：根据重量动态计算的最大速度
-    // 第2级：固定100
-    // 第3级：固定50
-    const int totalSegments = 3;
-    
+    // 辅助函数：返回三级速度（最大值、余弦计算的中间值、最小值50）
     auto calculateSmoothSpeed = [maxSpeed](int segment) -> int {
         if (segment == 0) {
-            return maxSpeed;  // 第1次：最大速度（根据重量动态计算）
+            return maxSpeed;  // 第1次：最大速度
         } else if (segment == 1) {
-            return 100;       // 第2次：固定中间速度100
+            // 第2次：使用余弦函数 0 到 π/2 的中点计算中间值
+            // cos(π/4) ≈ 0.707
+            double smooth = cos(M_PI / 4.0);
+            return static_cast<int>(50 + (maxSpeed - 50) * smooth);
         } else {
-            return 50;        // 第3次：固定最小速度50
+            return 50;  // 第3次：最小速度
         }
     };
-    
-    // ========== 方式2：余弦平滑过渡（已屏蔽）==========
-    // 使用余弦函数 π/2 到 π 实现速度平滑过渡
-    // const int minSpeed = 50;
-    // auto calculateSmoothSpeed = [maxSpeed, minSpeed, totalSegments](int segment) -> int {
-    //     // 将 segment 映射到 π/2 到 π 的角度范围
-    //     // segment=0 → π/2 (cos=0, 最大速度)
-    //     // segment=1 → 3π/4 (cos≈-0.707, 中间速度)
-    //     // segment=2 → π (cos=-1, 最小速度)
-    //     double angle = M_PI / 2.0 + segment * (M_PI / 2.0) / (totalSegments - 1);
-    //     double cosValue = cos(angle);
-    //     
-    //     // cos从0到-1，映射到速度从maxSpeed到minSpeed
-    //     // speed = maxSpeed + cosValue × (maxSpeed - minSpeed)
-    //     int speed = static_cast<int>(maxSpeed + cosValue * (maxSpeed - minSpeed));
-    //     
-    //     return speed;
-    // };
 
-    qDebug() << "将称重过程分成3份，固定三级速度。" << "  速度最大值用：" << maxSpeed;
+
+    qDebug() << "将称重过程分成3份，根据进度计算余弦平滑速度。" << "  速度最大值用：" << maxSpeed;
+    const int totalSegments = 3;
     for (int segment = 0; segment < totalSegments; segment++) {
-        // 根据 segment 计算速度（固定三级）
+        // 根据 segment 计算速度（0=最大, 1=中间, 2=最小）
         int m_Speed = calculateSmoothSpeed(segment);
 
         qDebug() << "●●●●●●●●●●●●●●●●●●●●●●●●●●●●●●●●●●●●●●●●改速度：" << m_Speed;
@@ -995,7 +924,7 @@ bool MainWindow::getSolid(const QString& solidName, double mass, QQueue<MessageQ
         int m_needHZ = m_Speed * 320 / 3;  // 或者 m_Speed * 106.6667 但保持整数运算
         QString m_needHZ16Command = QString("%1%2")
                                         .arg(m_needHZ, 8, 16, QLatin1Char('0'))
-                                        .arg("640A")
+                                        .arg("0A0A")
                                         .toUpper();
         bool ok;
         qint64  m_needHZ16to10Command = m_needHZ16Command.toLongLong(&ok, 16);
@@ -1008,25 +937,24 @@ bool MainWindow::getSolid(const QString& solidName, double mass, QQueue<MessageQ
 
         QString setSpeedCommand = tcpCore->buildDeviceCommand("01", "B", m_needHZ16to10Command, 20);
         messageQueue.enqueue(MessageQueueItem(setSpeedCommand.toUtf8(), true));
-
+        
+        // 转起来（使用较大的旋转距离，当重量达到时会自动停止）
         QString changeSpeedCommand = tcpCore->buildDeviceCommand("01", "D", -1000000000, 8);
         messageQueue.enqueue(MessageQueueItem(changeSpeedCommand.toUtf8(), true));
-
-        // 在 TcpClientCore 里面有静态变量 g_isWeightPauseActiv e 控制天平暂停，
-        // 这里通过发送一个特殊 AA 命令，让 TcpClientCore 将该变量设置为 true（表示进入“暂停称重触发”状态）
-        // 注意：这个命令只在本地拦截，不会真正发送到下位机
-        messageQueue.enqueue(MessageQueueItem("AAEnableWeightCheck", true));
-
+        // 等待旋转完成或重量到达（重量到达时会通过信号自动停止）
         QString waitChangeSpeedCommand = tcpCore->buildDeviceCommand("01", "d", 0, 0);
         messageQueue.enqueue(MessageQueueItem(waitChangeSpeedCommand.toUtf8(), true, "01d01"));
         
-        qDebug() << "=====一个循环结束=====" << segment ;
-
+        qDebug() << "==========" << segment ;
+        // 暂停，机器需要暂停再开始（重量到达时会自动跳到下一段）
+        QString stopMachineCommand = tcpCore->buildDeviceCommand("01", "K", 0, 1);
+        messageQueue.enqueue(MessageQueueItem(stopMachineCommand.toUtf8(), true, "01K"));
+        messageQueue.enqueue(MessageQueueItem(stopMachineCommand.toUtf8(), true, "01K"));
+        messageQueue.enqueue(MessageQueueItem(stopMachineCommand.toUtf8(), true, "01K"));
+        messageQueue.enqueue(MessageQueueItem(stopMachineCommand.toUtf8(), true, "01K"));
+        messageQueue.enqueue(MessageQueueItem(stopMachineCommand.toUtf8(), true, "01K"));
+        messageQueue.enqueue(MessageQueueItem(stopMachineCommand.toUtf8(), true, "01K"));
     }
-
-    // 接用f去确认暂停
-    QString fCommand = tcpCore->buildDeviceCommand("01", "f", 0, 0);
-    messageQueue.enqueue(MessageQueueItem(fCommand.toUtf8(), true));
 
     // 回零
     messageQueue.enqueue(MessageQueueItem(zeroMotorCommand.toUtf8(), true));
@@ -1049,14 +977,14 @@ bool MainWindow::getSolid(const QString& solidName, double mass, QQueue<MessageQ
 
 
     // 崴脚大法
-    QString moveSolidXleftCommand = tcpCore->buildDeviceCommand("04", "D", solidAreaX-100, 8);
-    messageQueue.enqueue(MessageQueueItem(moveSolidXleftCommand.toUtf8(), true));
-    QString moveSolidXUpCommand = tcpCore->buildDeviceCommand("03", "D", solidAreaY-150, 8);
-    messageQueue.enqueue(MessageQueueItem(moveSolidXUpCommand.toUtf8(), true));
-    QString waitmoveSolidXUpCommand = tcpCore->buildDeviceCommand("03", "d", 0, 0);
-    messageQueue.enqueue(MessageQueueItem(waitmoveSolidXUpCommand.toUtf8(), true, "03d01"));
-    QString waitmoveSolidXleftCommand = tcpCore->buildDeviceCommand("04", "d", 0, 0);
-    messageQueue.enqueue(MessageQueueItem(waitmoveSolidXleftCommand.toUtf8(), true, "04d01"));
+    // QString moveSolidXleftCommand = tcpCore->buildDeviceCommand("04", "D", solidAreaX-100, 8);
+    // messageQueue.enqueue(MessageQueueItem(moveSolidXleftCommand.toUtf8(), true));
+    // QString moveSolidXUpCommand = tcpCore->buildDeviceCommand("03", "D", solidAreaY-150, 8);
+    // messageQueue.enqueue(MessageQueueItem(moveSolidXUpCommand.toUtf8(), true));
+    // QString waitmoveSolidXUpCommand = tcpCore->buildDeviceCommand("03", "d", 0, 0);
+    // messageQueue.enqueue(MessageQueueItem(waitmoveSolidXUpCommand.toUtf8(), true, "03d01"));
+    // QString waitmoveSolidXleftCommand = tcpCore->buildDeviceCommand("04", "d", 0, 0);
+    // messageQueue.enqueue(MessageQueueItem(waitmoveSolidXleftCommand.toUtf8(), true, "04d01"));
 
 
 
@@ -1283,8 +1211,8 @@ void MainWindow::tightenBottle(QQueue<MessageQueueItem>& messageQueue)
     // 启动摇床
     messageQueue.enqueue(MessageQueueItem("AAopenShakeBed", true));
     
-    // 记录摇床时间信息（传递selfLocation和摇床持续时间，默认15秒），确认已经使用值自加1（此时为3）
-    QString recordCmd = QString("AArecordShakeBedTime:%1:%2").arg(shakeBedAreaSelfLocation).arg(15);
+    // 记录摇床时间信息（传递selfLocation和摇床持续时间，默认30秒），确认已经使用值自加1（此时为3）
+    QString recordCmd = QString("AArecordShakeBedTime:%1:%2").arg(shakeBedAreaSelfLocation).arg(30);
     messageQueue.enqueue(MessageQueueItem(recordCmd.toUtf8(), true));
 }
 
@@ -1397,6 +1325,7 @@ void MainWindow::closeBottleCap(QQueue<MessageQueueItem>& messageQueue)
     QString rotateInitCommand = tcpCore->buildDeviceCommand("05", "06", "0101", 1, 4);
     messageQueue.enqueue(MessageQueueItem(rotateInitCommand.toUtf8(), false));
     QString waitRotateInitCommand = tcpCore->buildDeviceCommand("05", "03", "0201", 1, 4);
+    tcpCore->sendMessageAsync(waitRotateInitCommand.toUtf8(), false);
     messageQueue.enqueue(MessageQueueItem(waitRotateInitCommand.toUtf8(), false));
 
     /**

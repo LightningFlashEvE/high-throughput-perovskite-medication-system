@@ -86,20 +86,15 @@ void MainWindow::initializeSystemComponents()
 
     // connetct tcpBalanceCore发出weightReached信号时，tcpCore发送停止命令
     connect(tcpBalanceCore, &TcpClientCore::weightReached, this, [=](double weight) {
- 
-        
         qDebug() << "★★★★★★★★★★★★★★★★★★★★★★★★★打断重量值:" << weight << "g\n\n\n";
-        
-
         // 暂停队列
         tcpCore->pauseQueue();
 
         // 先发送停止命令
         tcpCore->writeBalanceTareCommand(">01K0EE65", TcpClientCore::AsciiMode);
         
-        // 5秒后继续队列
+        // 10秒后继续队列
         QTimer::singleShot(10000, this, [=]() {
-            qDebug() << "⏰ 10秒暂停结束，恢复队列";
             tcpCore->resumeQueue();
         });
     });
@@ -497,7 +492,7 @@ void MainWindow::testRecipeSend(const QJsonObject& recipePacket)
     qDebug() << "化学方程式:" << equation;
 
     // ============ 步骤2：设置配方信息 ============
-    newRecipe.recipeName = "equation";                     // 使用化学方程式作为配方名称
+    newRecipe.recipeName = equation;                     // 使用化学方程式作为配方名称
     newRecipe.createTime = QDateTime::currentDateTime(); // 记录创建时间
     newRecipe.processState = RecipeNotProcessed;         // 配方初始为“未处理”
 
@@ -545,6 +540,20 @@ void MainWindow::testRecipeSend(const QJsonObject& recipePacket)
     // 打开空瓶
     takeEmptyBottle("Box_Transfer_Area_Right", newRecipe.messageQueue);
 
+    // 取液体：遍历溶剂，传入名称与体积（ml）
+    for (const auto &v : std::as_const(solvents)) {
+        const QJsonObject o = v.toObject();
+        const QString name = o.value("名称").toString();
+        const double volume = o.value("用量").toDouble();
+        if (name.isEmpty() || qFuzzyIsNull(volume)) {
+            qWarning() << "溶剂参数不完整，跳过：" << o;
+            continue;
+        }
+        qDebug() << "准备取液体:" << name << "目标体积(ml):" << volume;
+        getLiquid(name, volume, newRecipe.messageQueue);
+    }
+
+    resetXYZMotorsToZero(newRecipe.messageQueue);
 
     // 取固体：遍历溶质，传入名称与质量（g）
     for (const auto &v : std::as_const(solutes)) {
@@ -557,21 +566,6 @@ void MainWindow::testRecipeSend(const QJsonObject& recipePacket)
         }
         qDebug() << "准备取固体:" << name << "目标质量(g):" << mass/1000;
         getSolid(name, mass/1000, newRecipe.messageQueue);
-    }
-
-    resetXYZMotorsToZero(newRecipe.messageQueue);
-
-    // 取液体：遍历溶剂，传入名称与体积（ml）
-    for (const auto &v : std::as_const(solvents)) {
-        const QJsonObject o = v.toObject();
-        const QString name = o.value("名称").toString();
-        const double volume = o.value("用量").toDouble();
-        if (name.isEmpty() || qFuzzyIsNull(volume)) {
-            qWarning() << "溶剂参数不完整，跳过：" << o;
-            continue;
-        }
-        qDebug() << "准备取液体:" << name << "目标体积(ml):" << volume;
-        getLiquid(name, volume, newRecipe.messageQueue);
     }
 
     // 拧紧瓶子放置去摇床
@@ -1021,13 +1015,10 @@ QPoint MainWindow::calculateSlotPosition(const SlotPositionConfig& config, int i
     int colIndex = index % config.cols;
 
     // 计算目标坐标
-    // X方向：根据 xDirectionReverse 决定：false=往左(减法，默认), true=往右(加法)
-    // Y方向：始终往下(加法)
-    double targetX = config.xDirectionReverse 
-                     ? (config.sourceX + colIndex * config.spacingX)  // 往右：加法
-                     : (config.sourceX - colIndex * config.spacingX); // 往左：减法（默认）
-    
-    double targetY = config.sourceY + rowIndex * config.spacingY;     // 往下：加法（固定）
+    // X = 原点X - 列号 * 横向间距（往左移动，所以是减法）
+    // Y = 原点Y + 行号 * 纵向间距（往下移动，所以是加法）
+    double targetX = config.sourceX - colIndex * config.spacingX;
+    double targetY = config.sourceY + rowIndex * config.spacingY;
 
     // 抹除小数点后面的部分（直接截断，不四舍五入）
     int resultX = static_cast<int>(targetX);
@@ -1138,7 +1129,6 @@ void MainWindow::saveAndExecuteRecipe(const RecipeQueueItem& recipe, bool insert
         qWarning() << "保存配方到数据库失败";
         return;
     }
-
     if (!loadAndExecuteNextRecipeFromDatabase()) {
         qDebug() << "没有可执行的配方或当前有配方正在执行";
     }

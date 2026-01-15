@@ -39,6 +39,7 @@ class QGraphicsPixmapItem;
 class QResizeEvent;
 class QShowEvent;
 class QCloseEvent;
+class QLabel;
 class RtspPlayer;
 class Box;
 class ReagentBottle;
@@ -128,6 +129,7 @@ private:
     QTimer *timer;
     QTimer *shakeBedCheckTimer;  // 摇床检查定时器
     QTimer *shakeBedEmptyCheckTimer;  // 摇床为空检查定时器（10秒执行一次，当摇床为空时停止摇床）
+    QLabel *sliderValueLabel;  // 滑块值显示标签
 
     /**
      * 初始化data.ini文件

@@ -11,7 +11,6 @@
 #include <QDateTime>
 #include <QVector>
 #include <QMap>
-#include <QMutex>
 
 
 
@@ -312,28 +311,15 @@ public:
     QString m_currentExpectedNormalized;      // 当前等待的标准化期望前缀
     bool m_currentAsciiMode;                  // 当前等待是否ASCII模式
     
-    // 天平称重相关（静态变量使用 g_ 前缀表示全局共享）
-    static double g_expectedWeight;            // 期望重量值（用于对比，默认为0，所有对象共用）
-    static bool g_balancePrintEnabled;         // 是否打印天平接收数据（默认关闭，所有对象共用）
-    static double g_weightThresholds[3];       // 3个重量阈值（所有对象共用）
-    static bool g_thresholdTriggered[3];       // 标记每个阈值是否已触发（所有对象共用）
-    static bool g_isWeightPauseActive;         // 重量暂停标志位（防止重复触发，所有对象共用）
-    static QMutex g_weightCheckMutex;          // 称重检测互斥锁（防止多线程同时访问）
+    // 天平称重相关
+    static double m_expectedWeight;            // 期望重量值（用于对比，默认为0，所有对象共用）
+    static bool m_balancePrintEnabled;         // 是否打印天平接收数据（默认关闭，所有对象共用）
+    static double m_weightThresholds[3];       // 3个重量阈值（所有对象共用）
+    static bool m_thresholdTriggered[3];       // 标记每个阈值是否已触发（所有对象共用）
     
     // 计时器相关
     QMap<QString, QDateTime> m_timerStartTimes;  // 存储各个计时器的开始时间（timerName -> startTime）
     QMap<QString, qint64> m_timerResults;        // 存储各个计时器的耗时结果（timerName -> elapsedMs）
-    
-    // 自动重连相关
-    QString m_lastRemoteIP;                       // 上次连接的远程IP
-    quint16 m_lastRemotePort;                     // 上次连接的远程端口
-    QString m_lastLocalIP;                        // 上次连接的本地IP
-    bool m_lastProxyDisabled;                     // 上次连接是否禁用代理
-    bool m_autoReconnectEnabled;                  // 是否启用自动重连
-    bool m_manualDisconnect;                      // 是否手动断开（手动断开时不自动重连）
-    int m_reconnectAttempts;                      // 当前重连尝试次数
-    static const int MAX_RECONNECT_ATTEMPTS = 5;  // 最大重连尝试次数
-    QTimer* m_reconnectTimer;                     // 重连定时器
     
     /**
      * @brief 检查收到的数据是否是到位响应（XYZ电机）
@@ -360,17 +346,6 @@ public:
      * @brief 停止轮询机制
      */
     void stopPolling();
-    
-    /**
-     * @brief 尝试重连
-     */
-    void attemptReconnect();
-    
-    /**
-     * @brief 设置是否启用自动重连
-     * @param enabled 是否启用
-     */
-    void setAutoReconnectEnabled(bool enabled) { m_autoReconnectEnabled = enabled; }
     
     /**
      * @brief 处理消息队列
