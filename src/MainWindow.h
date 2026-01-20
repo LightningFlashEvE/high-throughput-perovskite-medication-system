@@ -12,5 +12,6 @@ public:
 
 private slots:
     void clickAction();
+    void clickDebugAction();
 };
 #endif // MAINWINDOW_H

@@ -1,6 +1,12 @@
 cmake_minimum_required(VERSION 3.19)
 project(PhenoLabHT LANGUAGES CXX)
 
+include_directories(
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/dialogs
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/common
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/ui_components
+)
+
 find_package(Qt6 6.5 REQUIRED COMPONENTS Core Widgets)
 find_package(Qt6 REQUIRED COMPONENTS Core Widgets Network)
 
@@ -9,12 +15,9 @@ qt_standard_project_setup()
 qt_add_executable(PhenoLabHT
     WIN32 MACOSX_BUNDLE
     src/main.cpp
-    src/MainWindow.cpp
-    src/MainWindow.h
-    src/common/StringUtils.cpp
-    src/common/StringUtils.h
-    src/dialogs/CommuInfoDialog.cpp
-    src/dialogs/CommuInfoDialog.h
+    src/MainWindow.h src/MainWindow.cpp
+    src/common/StringUtils.h src/common/StringUtils.cpp
+    src/dialogs/CommuInfoDialog.h src/dialogs/CommuInfoDialog.cpp
     src/ui_components/ControlPannel.h src/ui_components/ControlPannel.cpp
 )
 
