@@ -76,7 +76,7 @@ CommuInfoDialog::CommuInfoDialog(QWidget* parent) :
     connect(tagBtn, &QPushButton::clicked, this, &CommuInfoDialog::clickTagBtn);
     connect(testBtn, &QPushButton::clicked, this, &CommuInfoDialog::clickConnectionBtn);
     connect(testBtn2, &QPushButton::clicked, this, &CommuInfoDialog::clickBtn_ResetPos);
-    connect(testBtn3, &QPushButton::clicked, this, &CommuInfoDialog::clickTestBtn3);
+    connect(testBtn3, &QPushButton::clicked, this, &CommuInfoDialog::clickDisconnectBtn);
 
     connect(testBtn_Y_Rel_P, &QPushButton::clicked, this, &CommuInfoDialog::clickBtn_Y_Rel_P);
     connect(testBtn_Y_Rel_N, &QPushButton::clicked, this, &CommuInfoDialog::clickBtn_Y_Rel_N);
@@ -142,12 +142,13 @@ void CommuInfoDialog::clickBtn_Y_Rel_N() {
     printMsg(data, MSG_READ);
 }
 
-void CommuInfoDialog::clickTestBtn3() {
-    tcpSocket->disconnectFromHost();
-    tcpStatusLabel->setText("离线");
-    printMsg("断开连接...");
+void CommuInfoDialog::clickDisconnectBtn() {
+    if (tcpStatusLabel->text() == "在线") {
+        tcpSocket->disconnectFromHost();
+        tcpStatusLabel->setText("离线");
+        printMsg("断开连接...");
+    }
 }
-
 
 void CommuInfoDialog::onConnected() {
     printMsg("TCP连接成功");

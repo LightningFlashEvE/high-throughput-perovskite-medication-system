@@ -30,7 +30,7 @@ private slots:
     void clickTagBtn();
     void clickConnectionBtn();
     void clickBtn_ResetPos();
-    void clickTestBtn3();
+    void clickDisconnectBtn();
 
     void clickBtn_Y_Rel_P();
     void clickBtn_Y_Rel_N();
