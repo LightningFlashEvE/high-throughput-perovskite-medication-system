@@ -3,6 +3,8 @@
 
 #include <QMainWindow>
 
+class TcpClient;
+
 class MainWindow : public QMainWindow {
     Q_OBJECT
 
@@ -13,5 +15,8 @@ public:
 private slots:
     void clickAction();
     void clickDebugAction();
+
+private:
+    TcpClient* m_tcpClient{};
 };
 #endif // MAINWINDOW_H

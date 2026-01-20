@@ -1,6 +1,7 @@
 #include "MainWindow.h"
 #include "CommuInfoDialog.h"
 #include "ControlPannel.h"
+#include "TcpClient.h"
 
 #include <QDebug>
 #include <QMenuBar>
@@ -8,14 +9,18 @@
 #include <QLabel>
 
 MainWindow::MainWindow(QWidget *parent)
-    : QMainWindow(parent)
+    : QMainWindow(parent),
+    m_tcpClient(new TcpClient)
 {
     setWindowTitle("高通量平台 V1.00");
     resize(800, 600);
 
+    m_tcpClient->init("192.168.5.201", 4196);
+    CommuInfoDialog::getInstance()->init(m_tcpClient);
+    m_tcpClient->setCommuInfoDialog(CommuInfoDialog::getInstance());
+
     QWidget* centralWgt = new QWidget;
     QHBoxLayout* hLayout = new QHBoxLayout(centralWgt);
-
 
     // 主界面菜单项
     QMenu *menuFile = menuBar()->addMenu(QStringLiteral("文件"));

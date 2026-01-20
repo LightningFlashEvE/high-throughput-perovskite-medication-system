@@ -5,7 +5,7 @@
 #include <QTextEdit>
 #include <QPushButton>
 
-class QTcpSocket;
+class TcpClient;
 class QLabel;
 
 class CommuInfoDialog : public QDialog {
@@ -23,6 +23,7 @@ public:
         MSG_READ_BALANCE,
     };
 
+    void init(TcpClient* tcpSocket);
     void printMsg(const QString& msg, MsgType msgType = NONE_TYPE) const;
 
 private slots:
@@ -41,11 +42,13 @@ private slots:
 private:
     explicit CommuInfoDialog(QWidget* parent = nullptr);
 
+    //bool sendCommand(const QString& cmd);
+
 private:
     bool isConnecting{false};
+    TcpClient* tcpSocket{};
 
     QTextEdit* textEdit{};
-    QTcpSocket* tcpSocket{};
     QLabel* tcpStatusLabel{};
 };
 

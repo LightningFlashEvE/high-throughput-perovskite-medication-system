@@ -1,4 +1,6 @@
 #include "CommuInfoDialog.h"
+#include "TcpClient.h"
+
 #include <QLayout>
 #include <QLabel>
 #include <QTcpSocket>
@@ -12,13 +14,13 @@ CommuInfoDialog* CommuInfoDialog::getInstance() {
 
 CommuInfoDialog::CommuInfoDialog(QWidget* parent) :
     QDialog(parent),
-    tcpSocket(new QTcpSocket(this))
+    tcpSocket(new TcpClient)
 {
     setWindowTitle("调试");
     resize(800, 600);
     setWindowFlags(Qt::Dialog | Qt::WindowMinMaxButtonsHint | Qt::WindowCloseButtonHint);
 
-    tcpSocket->setProxy(QNetworkProxy::NoProxy);
+    //tcpSocket->setProxy(QNetworkProxy::NoProxy);
 
     QHBoxLayout* hLayout = new QHBoxLayout;
     hLayout->setSpacing(0);
@@ -86,6 +88,10 @@ CommuInfoDialog::~CommuInfoDialog() {
     tcpSocket->disconnectFromHost();
 }
 
+void CommuInfoDialog::init(TcpClient* tcpSocket2) {
+    tcpSocket = tcpSocket2;
+}
+
 void CommuInfoDialog::clickClearMsgBtn() {
     textEdit->clear();
 }
@@ -96,51 +102,50 @@ void CommuInfoDialog::clickTagBtn() {
 }
 
 void CommuInfoDialog::clickConnectionBtn() {
-
-    if (isConnecting) {
-        return;
-    }
-
-    tcpSocket->connectToHost("192.168.5.201", 4196);
+    tcpSocket->connectToHost();
     printMsg("正连接服务器，请等待...");
     isConnecting = true;
 
     // 3秒的连接时间
-    QTimer::singleShot(3000, this, [this](){
-        if (tcpSocket->state() == QAbstractSocket::ConnectingState) {
-            tcpSocket->abort(); // 中止连接尝试
-            isConnecting = false;
-            printMsg("TCP连接失败：超时");
-        }
-    });
+    // QTimer::singleShot(3000, this, [this](){
+    //     if (tcpSocket->state() == QAbstractSocket::ConnectingState) {
+    //         tcpSocket->abort(); // 中止连接尝试
+    //         isConnecting = false;
+    //         printMsg("TCP连接失败：超时");
+    //     }
+    // });
 }
 
 void CommuInfoDialog::clickBtn_ResetPos() {
-    QString cmd = ">09GA15F";
-    tcpSocket->write(cmd.toStdString().c_str());
-    printMsg(cmd, MSG_SEND);
-
-    QByteArray data = tcpSocket->readAll();
-    printMsg(data, MSG_READ);
+    tcpSocket->sendCommand(">09GA15F");
 }
 
 void CommuInfoDialog::clickBtn_Y_Rel_P() {
-    QString cmd = ">09h0000100013883509";
-    tcpSocket->write(cmd.toStdString().c_str());
-    printMsg(cmd, MSG_SEND);
-
-    QByteArray data = tcpSocket->readAll();
-    printMsg(data, MSG_READ);
+    tcpSocket->sendCommand(">09D0000D0004E97");
 }
 
 void CommuInfoDialog::clickBtn_Y_Rel_N() {
-    QString cmd = ">09hFFFFF00013889F1E";
-    tcpSocket->write(cmd.toStdString().c_str());
-    printMsg(cmd, MSG_SEND);
-
-    QByteArray data = tcpSocket->readAll();
-    printMsg(data, MSG_READ);
+    tcpSocket->sendCommand(">09hFFFFF00013889F1E");
 }
+
+// bool CommuInfoDialog::sendCommand(const QString& cmd) {
+//     if (tcpSocket->state() != QAbstractSocket::ConnectedState) {
+//         return false;
+//     }
+
+//     tcpSocket->write(cmd.toStdString().c_str());
+//     printMsg(cmd, MSG_SEND);
+
+//     if (!tcpSocket->waitForReadyRead()) {
+//         printMsg("TCP读取超时！");
+//         Q_ASSERT(false);
+//     }
+
+//     QByteArray data = tcpSocket->readAll();
+//     printMsg(data, MSG_READ);
+
+//     return true;
+// }
 
 void CommuInfoDialog::clickDisconnectBtn() {
     if (tcpStatusLabel->text() == "在线") {
