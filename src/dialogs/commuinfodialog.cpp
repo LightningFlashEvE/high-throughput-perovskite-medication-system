@@ -3,6 +3,7 @@
 #include <QLabel>
 #include <QTcpSocket>
 #include <QNetworkProxy>
+#include <QTimer>
 
 CommuInfoDialog* CommuInfoDialog::getInstance() {
     static CommuInfoDialog instance;
@@ -13,9 +14,11 @@ CommuInfoDialog::CommuInfoDialog(QWidget* parent) :
     QDialog(parent),
     tcpSocket(new QTcpSocket(this))
 {
-    setWindowTitle("通信信息");
+    setWindowTitle("调试");
     resize(800, 600);
     setWindowFlags(Qt::Dialog | Qt::WindowMinMaxButtonsHint | Qt::WindowCloseButtonHint);
+
+    tcpSocket->setProxy(QNetworkProxy::NoProxy);
 
     QHBoxLayout* hLayout = new QHBoxLayout;
     hLayout->setSpacing(0);
@@ -66,9 +69,12 @@ CommuInfoDialog::CommuInfoDialog(QWidget* parent) :
     hLayout->addLayout(controlLayout);
     setLayout(hLayout);
 
+    connect(tcpSocket, &QTcpSocket::connected, this, &CommuInfoDialog::onConnected);
+    connect(tcpSocket, &QTcpSocket::errorOccurred, this, &CommuInfoDialog::onConnectionError);
+
     connect(clearBtn, &QPushButton::clicked, this, &CommuInfoDialog::clickClearMsgBtn);
     connect(tagBtn, &QPushButton::clicked, this, &CommuInfoDialog::clickTagBtn);
-    connect(testBtn, &QPushButton::clicked, this, &CommuInfoDialog::clickTestBtn);
+    connect(testBtn, &QPushButton::clicked, this, &CommuInfoDialog::clickConnectionBtn);
     connect(testBtn2, &QPushButton::clicked, this, &CommuInfoDialog::clickBtn_ResetPos);
     connect(testBtn3, &QPushButton::clicked, this, &CommuInfoDialog::clickTestBtn3);
 
@@ -89,18 +95,24 @@ void CommuInfoDialog::clickTagBtn() {
                      "-------------------------------------------------");
 }
 
-void CommuInfoDialog::clickTestBtn() {
-    tcpSocket->setProxy(QNetworkProxy::NoProxy);
-    tcpSocket->connectToHost("192.168.5.201", 4196);
-    printMsg("等待连接...");
+void CommuInfoDialog::clickConnectionBtn() {
 
-    // 等待连接建立（最多3秒）
-    if (tcpSocket->waitForConnected(3000)) {
-        printMsg("TCP连接成功");
-        tcpStatusLabel->setText("在线");
-    } else {
-        printMsg("TCP连接失败" + tcpSocket->errorString());
+    if (isConnecting) {
+        return;
     }
+
+    tcpSocket->connectToHost("192.168.5.201", 4196);
+    printMsg("正连接服务器，请等待...");
+    isConnecting = true;
+
+    // 3秒的连接时间
+    QTimer::singleShot(3000, this, [this](){
+        if (tcpSocket->state() == QAbstractSocket::ConnectingState) {
+            tcpSocket->abort(); // 中止连接尝试
+            isConnecting = false;
+            printMsg("TCP连接失败：超时");
+        }
+    });
 }
 
 void CommuInfoDialog::clickBtn_ResetPos() {
@@ -134,6 +146,21 @@ void CommuInfoDialog::clickTestBtn3() {
     tcpSocket->disconnectFromHost();
     tcpStatusLabel->setText("离线");
     printMsg("断开连接...");
+}
+
+
+void CommuInfoDialog::onConnected() {
+    printMsg("TCP连接成功");
+    tcpStatusLabel->setText("在线");
+    qDebug() << "CommuInfoDialog::onConnected";
+    isConnecting = false;
+}
+
+void CommuInfoDialog::onConnectionError() {
+    qDebug() << "CommuInfoDialog::onConnectionError";
+    printMsg("TCP连接失败：" + tcpSocket->errorString());
+
+    isConnecting = false;
 }
 
 void CommuInfoDialog::printMsg(const QString& msg, MsgType msgType) const {

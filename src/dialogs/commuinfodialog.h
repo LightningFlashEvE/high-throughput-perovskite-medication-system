@@ -28,15 +28,21 @@ public:
 private slots:
     void clickClearMsgBtn();
     void clickTagBtn();
-    void clickTestBtn();
+    void clickConnectionBtn();
     void clickBtn_ResetPos();
     void clickTestBtn3();
 
     void clickBtn_Y_Rel_P();
     void clickBtn_Y_Rel_N();
 
+    void onConnected();
+    void onConnectionError();
+
 private:
     explicit CommuInfoDialog(QWidget* parent = nullptr);
+
+private:
+    bool isConnecting{false};
 
     QTextEdit* textEdit{};
     QTcpSocket* tcpSocket{};

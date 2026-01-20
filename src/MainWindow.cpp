@@ -7,7 +7,7 @@
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
 {
-    //setWindowTitle("Menu Example");
+    setWindowTitle("高通量平台 V1.00");
     resize(800, 600);
 
     // 主界面菜单项
