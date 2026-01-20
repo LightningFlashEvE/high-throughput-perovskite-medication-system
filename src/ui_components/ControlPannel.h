@@ -3,11 +3,10 @@
 
 #include <QWidget>
 
-class ControlPannel
-{
+class ControlPannel : public QWidget {
     Q_OBJECT
 public:
-    ControlPannel();
+    explicit ControlPannel(QWidget* parent = nullptr);
 };
 
 #endif // CONTROLPANNEL_H
