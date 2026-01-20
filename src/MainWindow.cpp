@@ -1,14 +1,21 @@
 #include "MainWindow.h"
 #include "CommuInfoDialog.h"
+#include "ControlPannel.h"
 
-#include <QMenuBar>
 #include <QDebug>
+#include <QMenuBar>
+#include <QLayout>
+#include <QLabel>
 
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
 {
     setWindowTitle("高通量平台 V1.00");
     resize(800, 600);
+
+    QWidget* centralWgt = new QWidget;
+    QHBoxLayout* hLayout = new QHBoxLayout(centralWgt);
+
 
     // 主界面菜单项
     QMenu *menuFile = menuBar()->addMenu(QStringLiteral("文件"));
@@ -21,6 +28,13 @@ MainWindow::MainWindow(QWidget *parent)
 
     QAction *debugAction = new QAction(tr("调试"), this);
     menuTools->addAction(debugAction);
+
+    hLayout->addWidget(new QLabel("左侧"));
+
+    ControlPannel* pannel = new ControlPannel(this);
+    hLayout->addWidget(pannel);
+
+    setCentralWidget(centralWgt);
 
     connect(newAction, &QAction::triggered, this, &MainWindow::clickAction);
     connect(debugAction, &QAction::triggered, this, &MainWindow::clickDebugAction);
