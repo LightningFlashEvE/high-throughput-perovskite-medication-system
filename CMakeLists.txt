@@ -15,6 +15,7 @@ qt_add_executable(PhenoLabHT
     src/common/StringUtils.h
     src/dialogs/CommuInfoDialog.cpp
     src/dialogs/CommuInfoDialog.h
+    src/ui_components/ControlPannel.h src/ui_components/ControlPannel.cpp
 )
 
 target_link_libraries(PhenoLabHT
