@@ -2,6 +2,7 @@ cmake_minimum_required(VERSION 3.19)
 project(PhenoLabHT LANGUAGES CXX)
 
 find_package(Qt6 6.5 REQUIRED COMPONENTS Core Widgets)
+find_package(Qt6 REQUIRED COMPONENTS Core Widgets Network)
 
 qt_standard_project_setup()
 
@@ -10,12 +11,17 @@ qt_add_executable(PhenoLabHT
     src/main.cpp
     src/MainWindow.cpp
     src/MainWindow.h
+    src/common/StringUtils.cpp
+    src/common/StringUtils.h
+    src/dialogs/CommuInfoDialog.cpp
+    src/dialogs/CommuInfoDialog.h
 )
 
 target_link_libraries(PhenoLabHT
     PRIVATE
         Qt::Core
         Qt::Widgets
+        Qt6::Network
 )
 
 include(GNUInstallDirs)
