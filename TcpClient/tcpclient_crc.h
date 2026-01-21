@@ -86,7 +86,7 @@ public:
     QString formatCrcByProtocol(quint16 crc);
 
 private:
-    TcpClient* m_tcpClient;  ///< TcpClient实例指针
+    TcpClient* m_tcpSocket;  ///< TcpClient实例指针
 
     /**
      * @brief 获取当前协议名称

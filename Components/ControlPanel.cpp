@@ -98,12 +98,30 @@ ControlPanel::ControlPanel(QTcpSocket* tcpSocket, QWidget* parent) :
 
     setLayout(vLayout);
 
+    registerBtn(btn01, MOV_Y_N);
+    registerBtnRelease(btn01, STOP_Y);
     registerBtn(btn21, MOV_Y_P);
+    registerBtnRelease(btn21, STOP_Y);
+
+    registerBtn(btn10, MOV_X_P);
+    registerBtn(btn12, MOV_X_N);
+
+    registerBtn(btn31, MOV_Z_UP);
+    registerBtn(btn41, MOV_Z_DOWN);
+
+    registerBtn(btn51, RESET_POS_X);
+    registerBtn(btn61, RESET_POS_Y);
+    registerBtn(btn71, RESET_POS_Z);
 }
 
-void ControlPanel::registerBtn(QPushButton* btn, ButtonType btnType) {
-    m_buttons[btn] = btnType;
-    connect(btn, &QPushButton::clicked, this, &ControlPanel::clickAnyBtn);
+void ControlPanel::registerBtn(QPushButton* btn, ActionType pressType) {
+    m_buttons[btn] = pressType;
+    connect(btn, &QPushButton::pressed, this, &ControlPanel::clickAnyBtn);
+}
+
+void ControlPanel::registerBtnRelease(QPushButton* btn, ActionType pressType) {
+    m_buttonRelease[btn] = pressType;
+    connect(btn, &QPushButton::released, this, &ControlPanel::releaseAnyBtn);
 }
 
 void ControlPanel::clickAnyBtn() {
@@ -116,10 +134,68 @@ void ControlPanel::clickAnyBtn() {
     QPushButton* clickedBtn = qobject_cast<QPushButton*>(sender());
     if (!clickedBtn) return;
 
-    ButtonType btnType = m_buttons[clickedBtn];
-    switch(btnType) {
+    CID::getInstance()->printMsg("1");
+    ActionType btnType1 = NODE;
+    if (m_buttons.contains(clickedBtn)) {
+        CID::getInstance()->printMsg("2");
+        btnType1 = m_buttons[clickedBtn];
+    }
+
+    switch(btnType1) {
     case MOV_Y_P:
         sendCommand(">09D0000D0004E97");
+        break;
+    case MOV_Y_N:
+        sendCommand(">09D00000000BE8C");
+        break;
+    case MOV_X_P:
+        sendCommand(">0AD00006000F70F");
+        break;
+    case MOV_X_N:
+        sendCommand(">0AD000000007F0F");
+        break;
+    case MOV_Z_UP:
+        sendCommand(">06D000000008EBC");
+        break;
+    case MOV_Z_DOWN:
+        sendCommand(">06D00035FD158FF");
+        break;
+    case RESET_POS_X:
+        sendCommand(">0AGA17D");
+        break;
+    case RESET_POS_Y:
+        sendCommand(">09GA15F");
+        break;
+    case RESET_POS_Z:
+        sendCommand(">06G515A");
+        break;
+    default:
+        break;
+    }
+}
+
+void ControlPanel::releaseAnyBtn() {
+    CID::getInstance()->printMsg("3");
+
+    if (m_tcpSocket->state() != QAbstractSocket::ConnectedState) {
+        // tcp未连接，不做任何处理
+        return;
+    }
+
+    // 根据发送者判断是哪个按钮
+    QPushButton* clickedBtn = qobject_cast<QPushButton*>(sender());
+    if (!clickedBtn) return;
+
+    ActionType btnType2  = NODE;
+    if (m_buttonRelease.contains(clickedBtn)) {
+        CID::getInstance()->printMsg("4");
+        btnType2 = m_buttonRelease[clickedBtn];
+    }
+    CID::getInstance()->printMsg("5");
+
+    switch(btnType2) {
+    case STOP_Y:
+        sendCommand("09K02CE4");
         break;
     default:
         break;
@@ -131,11 +207,11 @@ void ControlPanel::sendCommand(const QString& cmd) {
     m_tcpSocket->write(cmd.toStdString().c_str());
     CID::getInstance()->printMsg(cmd, CommuInfoDialog::MSG_SEND);
 
-    if (!m_tcpSocket->waitForReadyRead()) {
-        CID::getInstance()->printMsg("TCP读取超时！");
-        return;
-        //Q_ASSERT(false);
-    }
+    // if (!m_tcpSocket->waitForReadyRead()) {
+    //     CID::getInstance()->printMsg("TCP读取超时！");
+    //     return;
+    //     //Q_ASSERT(false);
+    // }
 
     QByteArray data = m_tcpSocket->readAll();
     CID::getInstance()->printMsg(data, CommuInfoDialog::MSG_READ);

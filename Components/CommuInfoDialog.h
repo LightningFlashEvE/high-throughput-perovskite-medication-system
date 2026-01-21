@@ -13,7 +13,7 @@ class CommuInfoDialog : public QDialog {
     Q_OBJECT
 public:
     static CommuInfoDialog* getInstance();
-    CommuInfoDialog(QTcpSocket* tcpClient, QWidget* parent = nullptr);
+    CommuInfoDialog(QTcpSocket* tcpSocket, QWidget* parent = nullptr);
     ~CommuInfoDialog();
 
     enum MsgType {
@@ -25,7 +25,7 @@ public:
         MSG_READ_BALANCE,
     };
 
-    enum ButtonType {
+    enum ActionType {
 
     };
 
@@ -43,16 +43,20 @@ private slots:
     void clickBtn_Y_Rel_P();
     void clickBtn_Y_Rel_N();
 
+    void onConnected();
+    void onConnectionError();
+    void onDisconnected();
+
 private:
     void registerBtn(QPushButton* btn);
     void sendCommand(const QString& cmd);
 
 private:
     static CommuInfoDialog* m_instance;
-    QMap<QPushButton*, ButtonType> m_buttons;
+    QMap<QPushButton*, ActionType> m_buttons;
 
     bool isConnecting{false};
-    QTcpSocket* m_tcpClient{};
+    QTcpSocket* m_tcpSocket{};
 
     QTextEdit* textEdit{};
     QLabel* tcpStatusLabel{};

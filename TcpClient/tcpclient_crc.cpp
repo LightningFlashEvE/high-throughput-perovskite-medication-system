@@ -5,7 +5,7 @@
 #include <QLineEdit>
 
 TcpClientCrc::TcpClientCrc(TcpClient* tcpClient)
-    : m_tcpClient(tcpClient)
+    : m_tcpSocket(tcpClient)
 {
 }
 
@@ -20,9 +20,9 @@ void TcpClientCrc::updateCrcDisplay()
     // 3. 计算并显示CRC
     if (!frameContent.isEmpty()) {
         QString crcStr = calculateAndFormatCrc(frameContent);
-        m_tcpClient->setLineEdit5Text(crcStr);
+        m_tcpSocket->setLineEdit5Text(crcStr);
     } else {
-        m_tcpClient->clearLineEdit5();
+        m_tcpSocket->clearLineEdit5();
     }
 }
 
@@ -31,17 +31,17 @@ void TcpClientCrc::updateCrcDisplay()
 // 2/9
 QString TcpClientCrc::getCurrentProtocolName() const
 {
-    return m_tcpClient->getCurrentProtocolName();
+    return m_tcpSocket->getCurrentProtocolName();
 }
 
 // 3/9
 TcpClientCrc::FrameData TcpClientCrc::collectFrameData()
 {
     FrameData data;
-    data.field1 = m_tcpClient->getComboBox1Text();
-    data.field2 = m_tcpClient->getComboBox2Text();
+    data.field1 = m_tcpSocket->getComboBox1Text();
+    data.field2 = m_tcpSocket->getComboBox2Text();
     data.field3 = extractFunctionCode();
-    data.field4 = m_tcpClient->getLineEdit4Text();
+    data.field4 = m_tcpSocket->getLineEdit4Text();
     return data;
 }
 
@@ -49,11 +49,11 @@ TcpClientCrc::FrameData TcpClientCrc::collectFrameData()
 QString TcpClientCrc::extractFunctionCode()
 {
     // 优先使用存储的数据值
-    QString functionCode = m_tcpClient->getComboBox3Data();
+    QString functionCode = m_tcpSocket->getComboBox3Data();
     
     if (functionCode.isEmpty()) {
         // 从显示文本中解析 (格式: "A:读取软件版本" -> "A")
-        QString displayText = m_tcpClient->getComboBox3Text();
+        QString displayText = m_tcpSocket->getComboBox3Text();
         functionCode = displayText.contains(':') ? 
                       displayText.split(':').first() : displayText;
     }
@@ -150,10 +150,10 @@ QString TcpClientCrc::buildFrameContentDirect()
     // 直接收集并处理字段数据，合并 collectFrameData + buildFrameContent
     
     // 1) 收集原始数据
-    QString field1 = m_tcpClient->getComboBox1Text();
-    QString field2 = m_tcpClient->getComboBox2Text();
+    QString field1 = m_tcpSocket->getComboBox1Text();
+    QString field2 = m_tcpSocket->getComboBox2Text();
     QString field3 = extractFunctionCode();
-    QString field4 = m_tcpClient->getLineEdit4Text();
+    QString field4 = m_tcpSocket->getLineEdit4Text();
     
     // 2) 处理帧头标准化 (3E -> >)
     QString normalizedField1 = (field1 == "3E") ? QString(">") : field1;

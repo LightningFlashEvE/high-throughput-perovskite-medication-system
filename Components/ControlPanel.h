@@ -13,21 +13,34 @@ class ControlPanel : public QWidget
 public:
     ControlPanel(QTcpSocket* tcpSocket, QWidget* parent = nullptr);
 
-    enum ButtonType {
+    enum ActionType {
+        NODE,
         MOV_Y_P,
-        MOV_Y_N
+        MOV_Y_N,
+        MOV_X_P,
+        MOV_X_N,
+        MOV_Z_UP,
+        MOV_Z_DOWN,
+        RESET_POS_X,
+        RESET_POS_Y,
+        RESET_POS_Z,
+        STOP_Y
     };
 
 private slots:
     void clickAnyBtn();
+    void releaseAnyBtn();
 
 private:
-    void registerBtn(QPushButton* btn, ButtonType btnType);
+    void registerBtn(QPushButton* btn, ActionType pressType);
+    void registerBtnRelease(QPushButton* btn, ActionType actionType);
+
     void sendCommand(const QString& cmd);
 
 private:
     QTcpSocket* m_tcpSocket{};
-    QMap<QPushButton*, ButtonType> m_buttons;
+    QMap<QPushButton*, ActionType> m_buttons;
+    QMap<QPushButton*, ActionType> m_buttonRelease;
 };
 
 #endif // CONTROLPANEL_H

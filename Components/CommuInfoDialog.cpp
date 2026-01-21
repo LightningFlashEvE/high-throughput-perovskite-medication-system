@@ -12,9 +12,9 @@ CommuInfoDialog* CommuInfoDialog::getInstance() {
     return m_instance;
 }
 
-CommuInfoDialog::CommuInfoDialog(QTcpSocket* tcpClient, QWidget* parent) :
+CommuInfoDialog::CommuInfoDialog(QTcpSocket* tcpSocket, QWidget* parent) :
     QDialog(parent),
-    m_tcpClient(tcpClient)
+    m_tcpSocket(tcpSocket)
 {
     m_instance = this;
     setWindowTitle("调试");
@@ -78,6 +78,10 @@ CommuInfoDialog::CommuInfoDialog(QTcpSocket* tcpClient, QWidget* parent) :
 
     connect(testBtn_Y_Rel_P, &QPushButton::clicked, this, &CommuInfoDialog::clickBtn_Y_Rel_P);
     connect(testBtn_Y_Rel_N, &QPushButton::clicked, this, &CommuInfoDialog::clickBtn_Y_Rel_N);
+
+    connect(m_tcpSocket, &QTcpSocket::connected, this, &CommuInfoDialog::onConnected);
+    connect(m_tcpSocket, &QTcpSocket::errorOccurred, this, &CommuInfoDialog::onConnectionError);
+    connect(m_tcpSocket, &QTcpSocket::disconnected, this, &CommuInfoDialog::onDisconnected);
 }
 
 CommuInfoDialog::~CommuInfoDialog() {
@@ -103,6 +107,14 @@ void CommuInfoDialog::clickTagBtn() {
 
 void CommuInfoDialog::clickConnectionBtn() {
     //connectToHost();
+    printMsg("clickConnectionBtn");
+    m_tcpSocket->connectToHost("192.168.5.201", 4196);
+    // 等待连接建立（最多3秒）
+    if (m_tcpSocket->waitForConnected(3000)) {
+        printMsg("TCP连接成功");
+    } else {
+        qWarning() << "TCP连接失败:" << m_tcpSocket->errorString();
+    }
 }
 
 void CommuInfoDialog::clickBtn_ResetPos() {
@@ -119,7 +131,7 @@ void CommuInfoDialog::clickBtn_Y_Rel_N() {
 
 void CommuInfoDialog::clickDisconnectBtn() {
     if (tcpStatusLabel->text() == "在线") {
-        m_tcpClient->disconnectFromHost();
+        m_tcpSocket->disconnectFromHost();
         tcpStatusLabel->setText("离线");
         printMsg("断开连接...");
     }
@@ -144,13 +156,26 @@ void CommuInfoDialog::printMsg(const QString& msg, MsgType msgType) const {
 
 void CommuInfoDialog::sendCommand(const QString& cmd) {
     qDebug() << "T:" << cmd;
-    m_tcpClient->write(cmd.toStdString().c_str());
+    m_tcpSocket->write(cmd.toStdString().c_str());
 
-    if (!m_tcpClient->waitForReadyRead()) {
+    if (!m_tcpSocket->waitForReadyRead()) {
         Q_ASSERT(false);
     }
 
-    QByteArray data = m_tcpClient->readAll();
+    QByteArray data = m_tcpSocket->readAll();
     qDebug() << "R:" << data;
 }
+
+void CommuInfoDialog::onConnected() {
+    tcpStatusLabel->setText("在线");
+}
+
+void CommuInfoDialog::onConnectionError() {
+
+}
+
+void CommuInfoDialog::onDisconnected() {
+    tcpStatusLabel->setText("离线");
+}
+
 
