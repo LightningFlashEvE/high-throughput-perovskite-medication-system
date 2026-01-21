@@ -84,11 +84,13 @@ CommuInfoDialog::~CommuInfoDialog() {
 
 }
 
-// void CommuInfoDialog::init(TcpClient* tcpSocket2) {
-//     tcpSocket = tcpSocket2;
-//     // connect(tcpSocket, &QTcpSocket::connected, this, &CommuInfoDialog::onConnected);
-//     // connect(tcpSocket, &QTcpSocket::errorOccurred, this, &CommuInfoDialog::onConnectionError);
-// }
+void CommuInfoDialog::registerBtn(QPushButton* btn) {
+    connect(btn, &QPushButton::clicked, this, &CommuInfoDialog::clickAnyBtn);
+}
+
+void CommuInfoDialog::clickAnyBtn() {
+
+}
 
 void CommuInfoDialog::clickClearMsgBtn() {
     textEdit->clear();
@@ -122,20 +124,6 @@ void CommuInfoDialog::clickDisconnectBtn() {
         printMsg("断开连接...");
     }
 }
-
-// void CommuInfoDialog::onConnected() {
-//     printMsg("TCP连接成功");
-//     tcpStatusLabel->setText("在线");
-//     qDebug() << "CommuInfoDialog::onConnected";
-//     isConnecting = false;
-// }
-
-// void CommuInfoDialog::onConnectionError() {
-//     qDebug() << "CommuInfoDialog::onConnectionError";
-//     printMsg("TCP连接失败：" + tcpSocket->errorString());
-
-//     isConnecting = false;
-// }
 
 void CommuInfoDialog::printMsg(const QString& msg, MsgType msgType) const {
     if (msgType == NONE_TYPE) {

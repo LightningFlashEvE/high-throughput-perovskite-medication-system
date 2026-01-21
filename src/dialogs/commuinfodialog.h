@@ -4,6 +4,7 @@
 #include <QDialog>
 #include <QTextEdit>
 #include <QPushButton>
+#include <QMap>
 
 class TcpClient;
 class QLabel;
@@ -24,11 +25,15 @@ public:
         MSG_READ_BALANCE,
     };
 
+    enum ButtonType {
 
-    //void init(TcpClient* tcpSocket);
+    };
+
     void printMsg(const QString& msg, MsgType msgType = NONE_TYPE) const;
 
 private slots:
+    void clickAnyBtn();
+
     void clickClearMsgBtn();
     void clickTagBtn();
     void clickConnectionBtn();
@@ -38,15 +43,13 @@ private slots:
     void clickBtn_Y_Rel_P();
     void clickBtn_Y_Rel_N();
 
-    // void onConnected();
-    // void onConnectionError();
-
 private:
-
-    //bool sendCommand(const QString& cmd);
+    void registerBtn(QPushButton* btn);
 
 private:
     static CommuInfoDialog* m_instance;
+    QMap<QPushButton*, ButtonType> m_buttons;
+
     bool isConnecting{false};
     TcpClient* m_tcpClient{};
 
