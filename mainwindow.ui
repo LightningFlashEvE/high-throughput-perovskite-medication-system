@@ -487,6 +487,9 @@
             </layout>
            </widget>
           </item>
+          <item row="2" column="0">
+           <layout class="QVBoxLayout" name="controlPanelLayout"/>
+          </item>
          </layout>
         </widget>
         <widget class="QWidget" name="scanPage">

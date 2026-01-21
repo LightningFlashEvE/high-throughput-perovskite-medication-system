@@ -17,12 +17,14 @@ CONFIG += c++17
 #DEFINES += QT_DISABLE_DEPRECATED_BEFORE=0x060000    # disables all the APIs deprecated before Qt 6.0.0
 
 SOURCES += \
+    Components/ControlPanel.cpp \
     main.cpp \
     mainwindow.cpp \
     mainwindow_Test.cpp \
     mainwindow_xyz.cpp
 
 HEADERS += \
+    Components/ControlPanel.h \
     mainwindow.h
 
 FORMS += \
@@ -65,6 +67,7 @@ INCLUDEPATH += $$PWD/RecipeQueue
 include($$PWD/QSqlDatabase/qsqldatabase.pri)
 INCLUDEPATH += $$PWD/QSqlDatabase
 
+INCLUDEPATH += $$PWD/Components
 
 RESOURCES += \
     picture.qrc

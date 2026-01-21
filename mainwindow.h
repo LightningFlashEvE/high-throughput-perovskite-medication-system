@@ -45,6 +45,7 @@ class Box;
 class ReagentBottle;
 class TcpClientCore;
 class AppSqlDatabase;
+class ControlPanel;
 
 /**
  * MainWindow
@@ -326,6 +327,8 @@ public slots:
     // 测试配方发送功能（接收JSON对象和JSON字符串）
     void testRecipeSendWithString(const QJsonObject& recipePacket, const QString& jsonString);
 
+private:
+    ControlPanel* m_controlPanel{};
 };
 #endif // MAINWINDOW_H
 

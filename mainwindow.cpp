@@ -1,5 +1,7 @@
 #include "mainwindow.h"
 #include "ui_mainwindow.h"
+#include "ControlPanel.h"
+
 #include <QTimer>
 #include <QDateTime>
 #include <QGraphicsView>
@@ -43,6 +45,11 @@ MainWindow::MainWindow(QWidget *parent)
     
     // 初始化data.ini文件。1.检查是否存在文件，不存在则创建文件并且提供默认值。
     initializeDataIni();
+
+    // 修改当前碰撞处理
+    ui->groupBox_2->setVisible(false);
+    m_controlPanel = new ControlPanel(tcpCore->m_tcpSocket, this);
+    ui->controlPanelLayout->addWidget(m_controlPanel);
 
     /*** 显示logo ***/
     QPixmap logo(":/main/pic/logo.png");
