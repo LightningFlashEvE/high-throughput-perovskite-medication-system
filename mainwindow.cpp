@@ -1,6 +1,7 @@
 #include "mainwindow.h"
 #include "ui_mainwindow.h"
 #include "ControlPanel.h"
+#include "CommuInfoDialog.h"
 
 #include <QTimer>
 #include <QDateTime>
@@ -48,6 +49,8 @@ MainWindow::MainWindow(QWidget *parent)
 
     // 修改当前碰撞处理
     ui->groupBox_2->setVisible(false);
+    CommuInfoDialog* commuInfoDialog = new CommuInfoDialog(tcpCore->m_tcpSocket, this);
+    commuInfoDialog->show();
     m_controlPanel = new ControlPanel(tcpCore->m_tcpSocket, this);
     ui->controlPanelLayout->addWidget(m_controlPanel);
 
