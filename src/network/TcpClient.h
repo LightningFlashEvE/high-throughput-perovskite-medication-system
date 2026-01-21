@@ -10,10 +10,10 @@ class TcpClient : public QTcpSocket {
     Q_OBJECT
 public:
     static TcpClient* getInstance();
-    TcpClient();
+    TcpClient(const QString& ip, int port);
     ~TcpClient();
 
-    void init(const QString& ip, int port);
+    //void init(const QString& ip, int port);
     void setCommuInfoDialog(CommuInfoDialog* dialog);
 
     void connectToHost();

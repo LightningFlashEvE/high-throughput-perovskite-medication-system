@@ -7,20 +7,19 @@
 #include <QNetworkProxy>
 #include <QTimer>
 
+CommuInfoDialog* CommuInfoDialog::m_instance = nullptr;
 CommuInfoDialog* CommuInfoDialog::getInstance() {
-    static CommuInfoDialog instance;
-    return &instance;
+    return m_instance;
 }
 
-CommuInfoDialog::CommuInfoDialog(QWidget* parent) :
+CommuInfoDialog::CommuInfoDialog(TcpClient* tcpClient, QWidget* parent) :
     QDialog(parent),
-    tcpSocket(new TcpClient)
+    m_tcpClient(tcpClient)
 {
+    m_instance = this;
     setWindowTitle("调试");
     resize(800, 600);
     setWindowFlags(Qt::Dialog | Qt::WindowMinMaxButtonsHint | Qt::WindowCloseButtonHint);
-
-    //tcpSocket->setProxy(QNetworkProxy::NoProxy);
 
     QHBoxLayout* hLayout = new QHBoxLayout;
     hLayout->setSpacing(0);
@@ -71,9 +70,6 @@ CommuInfoDialog::CommuInfoDialog(QWidget* parent) :
     hLayout->addLayout(controlLayout);
     setLayout(hLayout);
 
-    connect(tcpSocket, &QTcpSocket::connected, this, &CommuInfoDialog::onConnected);
-    connect(tcpSocket, &QTcpSocket::errorOccurred, this, &CommuInfoDialog::onConnectionError);
-
     connect(clearBtn, &QPushButton::clicked, this, &CommuInfoDialog::clickClearMsgBtn);
     connect(tagBtn, &QPushButton::clicked, this, &CommuInfoDialog::clickTagBtn);
     connect(testBtn, &QPushButton::clicked, this, &CommuInfoDialog::clickConnectionBtn);
@@ -85,12 +81,14 @@ CommuInfoDialog::CommuInfoDialog(QWidget* parent) :
 }
 
 CommuInfoDialog::~CommuInfoDialog() {
-    tcpSocket->disconnectFromHost();
+
 }
 
-void CommuInfoDialog::init(TcpClient* tcpSocket2) {
-    tcpSocket = tcpSocket2;
-}
+// void CommuInfoDialog::init(TcpClient* tcpSocket2) {
+//     tcpSocket = tcpSocket2;
+//     // connect(tcpSocket, &QTcpSocket::connected, this, &CommuInfoDialog::onConnected);
+//     // connect(tcpSocket, &QTcpSocket::errorOccurred, this, &CommuInfoDialog::onConnectionError);
+// }
 
 void CommuInfoDialog::clickClearMsgBtn() {
     textEdit->clear();
@@ -102,72 +100,42 @@ void CommuInfoDialog::clickTagBtn() {
 }
 
 void CommuInfoDialog::clickConnectionBtn() {
-    tcpSocket->connectToHost();
-    printMsg("正连接服务器，请等待...");
-    isConnecting = true;
-
-    // 3秒的连接时间
-    // QTimer::singleShot(3000, this, [this](){
-    //     if (tcpSocket->state() == QAbstractSocket::ConnectingState) {
-    //         tcpSocket->abort(); // 中止连接尝试
-    //         isConnecting = false;
-    //         printMsg("TCP连接失败：超时");
-    //     }
-    // });
+    m_tcpClient->connectToHost();
 }
 
 void CommuInfoDialog::clickBtn_ResetPos() {
-    tcpSocket->sendCommand(">09GA15F");
+    m_tcpClient->sendCommand(">09GA15F");
 }
 
 void CommuInfoDialog::clickBtn_Y_Rel_P() {
-    tcpSocket->sendCommand(">09D0000D0004E97");
+    m_tcpClient->sendCommand(">09D0000D0004E97");
 }
 
 void CommuInfoDialog::clickBtn_Y_Rel_N() {
-    tcpSocket->sendCommand(">09hFFFFF00013889F1E");
+    m_tcpClient->sendCommand(">09hFFFFF00013889F1E");
 }
-
-// bool CommuInfoDialog::sendCommand(const QString& cmd) {
-//     if (tcpSocket->state() != QAbstractSocket::ConnectedState) {
-//         return false;
-//     }
-
-//     tcpSocket->write(cmd.toStdString().c_str());
-//     printMsg(cmd, MSG_SEND);
-
-//     if (!tcpSocket->waitForReadyRead()) {
-//         printMsg("TCP读取超时！");
-//         Q_ASSERT(false);
-//     }
-
-//     QByteArray data = tcpSocket->readAll();
-//     printMsg(data, MSG_READ);
-
-//     return true;
-// }
 
 void CommuInfoDialog::clickDisconnectBtn() {
     if (tcpStatusLabel->text() == "在线") {
-        tcpSocket->disconnectFromHost();
+        m_tcpClient->disconnectFromHost();
         tcpStatusLabel->setText("离线");
         printMsg("断开连接...");
     }
 }
 
-void CommuInfoDialog::onConnected() {
-    printMsg("TCP连接成功");
-    tcpStatusLabel->setText("在线");
-    qDebug() << "CommuInfoDialog::onConnected";
-    isConnecting = false;
-}
+// void CommuInfoDialog::onConnected() {
+//     printMsg("TCP连接成功");
+//     tcpStatusLabel->setText("在线");
+//     qDebug() << "CommuInfoDialog::onConnected";
+//     isConnecting = false;
+// }
 
-void CommuInfoDialog::onConnectionError() {
-    qDebug() << "CommuInfoDialog::onConnectionError";
-    printMsg("TCP连接失败：" + tcpSocket->errorString());
+// void CommuInfoDialog::onConnectionError() {
+//     qDebug() << "CommuInfoDialog::onConnectionError";
+//     printMsg("TCP连接失败：" + tcpSocket->errorString());
 
-    isConnecting = false;
-}
+//     isConnecting = false;
+// }
 
 void CommuInfoDialog::printMsg(const QString& msg, MsgType msgType) const {
     if (msgType == NONE_TYPE) {

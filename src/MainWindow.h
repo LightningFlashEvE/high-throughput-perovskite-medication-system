@@ -4,6 +4,7 @@
 #include <QMainWindow>
 
 class TcpClient;
+class CommuInfoDialog;
 
 class MainWindow : public QMainWindow {
     Q_OBJECT
@@ -18,5 +19,6 @@ private slots:
 
 private:
     TcpClient* m_tcpClient{};
+    CommuInfoDialog* m_CommuInfoDialog{};
 };
 #endif // MAINWINDOW_H

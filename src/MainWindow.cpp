@@ -9,15 +9,14 @@
 #include <QLabel>
 
 MainWindow::MainWindow(QWidget *parent)
-    : QMainWindow(parent),
-    m_tcpClient(new TcpClient)
+    : QMainWindow(parent)
 {
     setWindowTitle("高通量平台 V1.00");
     resize(800, 600);
 
-    m_tcpClient->init("192.168.5.201", 4196);
-    CommuInfoDialog::getInstance()->init(m_tcpClient);
-    m_tcpClient->setCommuInfoDialog(CommuInfoDialog::getInstance());
+    m_tcpClient = new TcpClient("192.168.5.201", 4196);
+    m_CommuInfoDialog = new CommuInfoDialog(m_tcpClient);
+    m_tcpClient->setCommuInfoDialog(m_CommuInfoDialog);
 
     QWidget* centralWgt = new QWidget;
     QHBoxLayout* hLayout = new QHBoxLayout(centralWgt);

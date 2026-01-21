@@ -5,6 +5,7 @@ include_directories(
     ${CMAKE_CURRENT_SOURCE_DIR}/src/dialogs
     ${CMAKE_CURRENT_SOURCE_DIR}/src/common
     ${CMAKE_CURRENT_SOURCE_DIR}/src/ui_components
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/network
 )
 
 find_package(Qt6 6.5 REQUIRED COMPONENTS Core Widgets)
@@ -19,6 +20,8 @@ qt_add_executable(PhenoLabHT
     src/common/StringUtils.h src/common/StringUtils.cpp
     src/dialogs/CommuInfoDialog.h src/dialogs/CommuInfoDialog.cpp
     src/ui_components/ControlPannel.h src/ui_components/ControlPannel.cpp
+    src/network/TcpClient.h src/network/TcpClient.cpp
+    src/network/TcpClient.cpp src/network/TcpClient.h
 )
 
 target_link_libraries(PhenoLabHT

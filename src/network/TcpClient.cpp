@@ -2,25 +2,25 @@
 #include "CommuInfoDialog.h"
 
 #include <QTimer>
+#include <QNetworkProxy>
 
 TcpClient* TcpClient::m_instance = nullptr;
-
 TcpClient* TcpClient::getInstance() {
     return m_instance;
 }
 
-TcpClient::TcpClient() {
+TcpClient::TcpClient(const QString& ip, int port) {
+    m_ip = ip;
+    m_port = port;
+
+    setProxy(QNetworkProxy::NoProxy);
+
     connect(this, &QTcpSocket::connected, this, &TcpClient::onConnected);
     connect(this, &QTcpSocket::errorOccurred, this, &TcpClient::onConnectionError);
 }
 
 TcpClient::~TcpClient() {
-    //disconnectFromHost();
-}
 
-void TcpClient::init(const QString& ip, int port) {
-    m_ip = ip;
-    m_port = port;
 }
 
 void TcpClient::setCommuInfoDialog(CommuInfoDialog* dialog) {
@@ -33,7 +33,8 @@ void TcpClient::connectToHost() {
 
     // 3秒的连接时间
     QTimer::singleShot(3000, this, [this](){
-        if (state() == QAbstractSocket::ConnectingState) {
+        qDebug() << "singleShot";
+        if (state() != QAbstractSocket::ConnectedState) {
             abort(); // 中止连接尝试
             m_commuInfoDialog->printMsg("TCP连接失败：超时");
         }
@@ -60,10 +61,12 @@ void TcpClient::sendCommand(const QString& cmd) {
 
 void TcpClient::onConnected() {
     m_commuInfoDialog->printMsg("TCP连接成功");
-    qDebug() << "CommuInfoDialog::onConnected";
+    //qDebug() << "CommuInfoDialog::onConnected";
 }
 
 void TcpClient::onConnectionError() {
-
+    //m_commuInfoDialog->printMsg("TCP连接错误！");
+    qDebug() << "onConnectionError: " << errorString();
+    m_commuInfoDialog->printMsg(errorString());
 }
 
