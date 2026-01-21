@@ -49,11 +49,11 @@ MainWindow::MainWindow(QWidget *parent)
 
     // 修改当前碰撞处理
     ui->groupBox_2->setVisible(false);
-    //QTcpSocket* currentTcpSocket = tcpCore->m_tcpSocket;
-    QTcpSocket* currentTcpSocket = new QTcpSocket;
+    QTcpSocket* currentTcpSocket = tcpCore->m_tcpSocket;
+    //QTcpSocket* currentTcpSocket = new QTcpSocket;
     currentTcpSocket->setProxy(QNetworkProxy::NoProxy);
     CommuInfoDialog* commuInfoDialog = new CommuInfoDialog(currentTcpSocket, this);
-    commuInfoDialog->show();
+    //commuInfoDialog->show();
     m_controlPanel = new ControlPanel(currentTcpSocket, this);
     ui->controlPanelLayout->addWidget(m_controlPanel);
 

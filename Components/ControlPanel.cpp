@@ -18,22 +18,30 @@ ControlPanel::ControlPanel(QTcpSocket* tcpSocket, QWidget* parent) :
     //setStyleSheet("background-color: #11ffff00;");
 
     QGroupBox* groupBox = new QGroupBox("操控面板");
-    QVBoxLayout* vLayout = new QVBoxLayout;
+    QVBoxLayout* groupLayout = new QVBoxLayout;
 
+    QHBoxLayout* tcpStatusHLayout = new QHBoxLayout;
+    tcpStatusHLayout->addWidget(new QLabel("TCP状态："));
+    m_tcpStatusLabel = new QLabel("离线");
+    m_tcpStatusLabel->setStyleSheet("color: red;");
+    tcpStatusHLayout->addWidget(m_tcpStatusLabel);
+    tcpStatusHLayout->addStretch();
+
+    QVBoxLayout* vLayout = new QVBoxLayout;
     QGridLayout* gridLayout = new QGridLayout;
 
     QLabel* label00 = new QLabel("xy平面：");
-    QLabel* label01 = new QLabel("ControlPannel");
-    QLabel* label02 = new QLabel("ControlPannel");
+    //QLabel* label01 = new QLabel("ControlPannel");
+    //QLabel* label02 = new QLabel("ControlPannel");
 
-    QLabel* label10 = new QLabel("ControlPannel");
-    QLabel* label11 = new QLabel("ControlPannel");
-    QLabel* label12 = new QLabel("ControlPannel");
+    // QLabel* label10 = new QLabel("ControlPannel");
+    // QLabel* label11 = new QLabel("ControlPannel");
+    // QLabel* label12 = new QLabel("ControlPannel");
 
 
-    QLabel* label20 = new QLabel("ControlPannel");
-    QLabel* label21 = new QLabel("ControlPannel");
-    QLabel* label22 = new QLabel("ControlPannel");
+    // QLabel* label20 = new QLabel("ControlPannel");
+    // QLabel* label21 = new QLabel("ControlPannel");
+    // QLabel* label22 = new QLabel("ControlPannel");
 
     QPushButton* btn01 = new QPushButton("上");
     QPushButton* btn10 = new QPushButton("左");
@@ -41,8 +49,8 @@ ControlPanel::ControlPanel(QTcpSocket* tcpSocket, QWidget* parent) :
     QPushButton* btn21 = new QPushButton("下");
 
     QLabel* label30 = new QLabel("z爪：");
-    QLabel* label31 = new QLabel("ControlPannel");
-    QLabel* label41 = new QLabel("ControlPannel");
+    // QLabel* label31 = new QLabel("ControlPannel");
+    // QLabel* label41 = new QLabel("ControlPannel");
 
     QPushButton* btn31 = new QPushButton("上");
     QPushButton* btn41 = new QPushButton("下");
@@ -68,13 +76,13 @@ ControlPanel::ControlPanel(QTcpSocket* tcpSocket, QWidget* parent) :
 
     gridLayout->addWidget(label00, 0, 0);
     gridLayout->addWidget(btn01, 0, 1);
-    gridLayout->addWidget(label02, 0, 2);
+    //gridLayout->addWidget(label02, 0, 2);
     gridLayout->addWidget(btn10, 1, 0);
-    gridLayout->addWidget(label11, 1, 1);
+    //gridLayout->addWidget(label11, 1, 1);
     gridLayout->addWidget(btn12, 1, 2);
-    gridLayout->addWidget(label20, 2, 0);
+    //gridLayout->addWidget(label20, 2, 0);
     gridLayout->addWidget(btn21, 2, 1);
-    gridLayout->addWidget(label22, 2, 2);
+    //gridLayout->addWidget(label22, 2, 2);
 
     gridLayout->addWidget(label30, 3, 0);
     gridLayout->addWidget(btn31, 3, 1);
@@ -91,27 +99,44 @@ ControlPanel::ControlPanel(QTcpSocket* tcpSocket, QWidget* parent) :
     gridLayout->addWidget(btn71, 7, 1);
 
     //vLayout->addLayout(gridLayout);
-    vLayout->addWidget(groupBox);
-    vLayout->addStretch();
 
-    groupBox->setLayout(gridLayout);
+    //groupBox->setLayout(gridLayout);
+    vLayout->addLayout(tcpStatusHLayout);
+    vLayout->addLayout(gridLayout);
+    groupBox->setLayout(vLayout);
 
-    setLayout(vLayout);
+    groupLayout->addWidget(groupBox);
+
+
+    groupLayout->addStretch();
+
+    setLayout(groupLayout);
 
     registerBtn(btn01, MOV_Y_N);
-    registerBtnRelease(btn01, STOP_Y);
     registerBtn(btn21, MOV_Y_P);
+    registerBtnRelease(btn01, STOP_Y);
     registerBtnRelease(btn21, STOP_Y);
 
     registerBtn(btn10, MOV_X_P);
     registerBtn(btn12, MOV_X_N);
+    registerBtnRelease(btn10, STOP_X);
+    registerBtnRelease(btn12, STOP_X);
 
     registerBtn(btn31, MOV_Z_UP);
     registerBtn(btn41, MOV_Z_DOWN);
+    registerBtnRelease(btn31, STOP_Z);
+    registerBtnRelease(btn41, STOP_Z);
 
     registerBtn(btn51, RESET_POS_X);
     registerBtn(btn61, RESET_POS_Y);
     registerBtn(btn71, RESET_POS_Z);
+
+    registerBtn(btn32, CLAW_OPEN);
+    registerBtn(btn42, CLAW_CLOSED);
+
+    connect(m_tcpSocket, &QTcpSocket::connected, this, &ControlPanel::onConnected);
+    connect(m_tcpSocket, &QTcpSocket::errorOccurred, this, &ControlPanel::onConnectionError);
+    connect(m_tcpSocket, &QTcpSocket::disconnected, this, &ControlPanel::onDisconnected);
 }
 
 void ControlPanel::registerBtn(QPushButton* btn, ActionType pressType) {
@@ -134,10 +159,8 @@ void ControlPanel::clickAnyBtn() {
     QPushButton* clickedBtn = qobject_cast<QPushButton*>(sender());
     if (!clickedBtn) return;
 
-    CID::getInstance()->printMsg("1");
     ActionType btnType1 = NODE;
     if (m_buttons.contains(clickedBtn)) {
-        CID::getInstance()->printMsg("2");
         btnType1 = m_buttons[clickedBtn];
     }
 
@@ -169,14 +192,18 @@ void ControlPanel::clickAnyBtn() {
     case RESET_POS_Z:
         sendCommand(">06G515A");
         break;
+    case CLAW_OPEN:
+        //sendCommand("05060105000099B3");
+        break;
+    case CLAW_CLOSED:
+        //sendCommand(">09K02CE4");
+        break;
     default:
         break;
     }
 }
 
 void ControlPanel::releaseAnyBtn() {
-    CID::getInstance()->printMsg("3");
-
     if (m_tcpSocket->state() != QAbstractSocket::ConnectedState) {
         // tcp未连接，不做任何处理
         return;
@@ -188,14 +215,18 @@ void ControlPanel::releaseAnyBtn() {
 
     ActionType btnType2  = NODE;
     if (m_buttonRelease.contains(clickedBtn)) {
-        CID::getInstance()->printMsg("4");
         btnType2 = m_buttonRelease[clickedBtn];
     }
-    CID::getInstance()->printMsg("5");
 
     switch(btnType2) {
+    case STOP_X:
+        sendCommand(">0AK03564");
+        break;
     case STOP_Y:
-        sendCommand("09K02CE4");
+        sendCommand(">09K02CE4");
+        break;
+    case STOP_Z:
+        sendCommand(">06K02FD4");
         break;
     default:
         break;
@@ -217,3 +248,16 @@ void ControlPanel::sendCommand(const QString& cmd) {
     CID::getInstance()->printMsg(data, CommuInfoDialog::MSG_READ);
     //qDebug() << "R:" << data;
 }
+
+void ControlPanel::onConnected() {
+    m_tcpStatusLabel->setText("在线");
+    m_tcpStatusLabel->setStyleSheet("color: #11FF11;");
+}
+void ControlPanel::onConnectionError() {
+
+}
+void ControlPanel::onDisconnected() {
+    m_tcpStatusLabel->setText("离线");
+    m_tcpStatusLabel->setStyleSheet("color: red;");
+}
+

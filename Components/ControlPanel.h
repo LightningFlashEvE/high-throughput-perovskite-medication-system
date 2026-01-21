@@ -2,6 +2,7 @@
 #define CONTROLPANEL_H
 
 #include <QWidget>
+#include <QLabel>
 #include <QMap>
 
 class QTcpSocket;
@@ -21,15 +22,23 @@ public:
         MOV_X_N,
         MOV_Z_UP,
         MOV_Z_DOWN,
+        CLAW_OPEN,
+        CLAW_CLOSED,
         RESET_POS_X,
         RESET_POS_Y,
         RESET_POS_Z,
-        STOP_Y
+        STOP_X,
+        STOP_Y,
+        STOP_Z
     };
 
 private slots:
     void clickAnyBtn();
     void releaseAnyBtn();
+
+    void onConnected();
+    void onConnectionError();
+    void onDisconnected();
 
 private:
     void registerBtn(QPushButton* btn, ActionType pressType);
@@ -39,6 +48,7 @@ private:
 
 private:
     QTcpSocket* m_tcpSocket{};
+    QLabel* m_tcpStatusLabel{};
     QMap<QPushButton*, ActionType> m_buttons;
     QMap<QPushButton*, ActionType> m_buttonRelease;
 };
