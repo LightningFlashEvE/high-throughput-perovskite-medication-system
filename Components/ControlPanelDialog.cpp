@@ -1,4 +1,5 @@
 #include "ControlPanelDialog.h"
+#include "ControlPanel_L.h"
 #include "ControlPanel.h"
 
 #include <QLayout>
@@ -23,11 +24,11 @@ ControlPanelDialog::ControlPanelDialog(QTcpSocket* tcpSocket, QWidget* parent)
     setLayout(rootLayout);
 
     QHBoxLayout* rontrolPanelLayout = new QHBoxLayout;
+    m_leftControlPanel = new ControlPanel_L(m_tcpSocket, this);
     m_rightControlPanel = new ControlPanel(m_tcpSocket, this);
-    m_leftControlPanel = new ControlPanel(m_tcpSocket, this);
 
-    rontrolPanelLayout->addWidget(m_rightControlPanel);
     rontrolPanelLayout->addWidget(m_leftControlPanel);
+    rontrolPanelLayout->addWidget(m_rightControlPanel);
 
     rootLayout->addLayout(rontrolPanelLayout);
 }

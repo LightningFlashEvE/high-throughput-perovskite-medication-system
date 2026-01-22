@@ -20,6 +20,7 @@ SOURCES += \
     Components/CommuInfoDialog.cpp \
     Components/ControlPanel.cpp \
     Components/ControlPanelDialog.cpp \
+    Components/ControlPanel_L.cpp \
     main.cpp \
     mainwindow.cpp \
     mainwindow_Test.cpp \
@@ -29,6 +30,7 @@ HEADERS += \
     Components/CommuInfoDialog.h \
     Components/ControlPanel.h \
     Components/ControlPanelDialog.h \
+    Components/ControlPanel_L.h \
     mainwindow.h
 
 FORMS += \

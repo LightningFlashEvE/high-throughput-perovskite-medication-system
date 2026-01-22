@@ -1,4 +1,4 @@
-#include "ControlPanel.h"
+#include "ControlPanel_L.h"
 #include "CommuInfoDialog.h"
 
 #include <QDebug>
@@ -11,13 +11,13 @@
 
 using CID = CommuInfoDialog;
 
-ControlPanel::ControlPanel(QTcpSocket* tcpSocket, QWidget* parent) :
+ControlPanel_L::ControlPanel_L(QTcpSocket* tcpSocket, QWidget* parent) :
     QWidget(parent),
     m_tcpSocket(tcpSocket)
 {
     //setStyleSheet("background-color: #11ffff00;");
 
-    QGroupBox* groupBox = new QGroupBox("右机械臂");
+    QGroupBox* groupBox = new QGroupBox("左机械臂");
     QVBoxLayout* groupLayout = new QVBoxLayout;
 
     QHBoxLayout* tcpStatusHLayout = new QHBoxLayout;
@@ -134,22 +134,22 @@ ControlPanel::ControlPanel(QTcpSocket* tcpSocket, QWidget* parent) :
     registerBtn(btn32, CLAW_OPEN);
     registerBtn(btn42, CLAW_CLOSED);
 
-    connect(m_tcpSocket, &QTcpSocket::connected, this, &ControlPanel::onConnected);
-    connect(m_tcpSocket, &QTcpSocket::errorOccurred, this, &ControlPanel::onConnectionError);
-    connect(m_tcpSocket, &QTcpSocket::disconnected, this, &ControlPanel::onDisconnected);
+    connect(m_tcpSocket, &QTcpSocket::connected, this, &ControlPanel_L::onConnected);
+    connect(m_tcpSocket, &QTcpSocket::errorOccurred, this, &ControlPanel_L::onConnectionError);
+    connect(m_tcpSocket, &QTcpSocket::disconnected, this, &ControlPanel_L::onDisconnected);
 }
 
-void ControlPanel::registerBtn(QPushButton* btn, ActionType pressType) {
+void ControlPanel_L::registerBtn(QPushButton* btn, ActionType pressType) {
     m_buttons[btn] = pressType;
-    connect(btn, &QPushButton::pressed, this, &ControlPanel::clickAnyBtn);
+    connect(btn, &QPushButton::pressed, this, &ControlPanel_L::clickAnyBtn);
 }
 
-void ControlPanel::registerBtnRelease(QPushButton* btn, ActionType pressType) {
+void ControlPanel_L::registerBtnRelease(QPushButton* btn, ActionType pressType) {
     m_buttonRelease[btn] = pressType;
-    connect(btn, &QPushButton::released, this, &ControlPanel::releaseAnyBtn);
+    connect(btn, &QPushButton::released, this, &ControlPanel_L::releaseAnyBtn);
 }
 
-void ControlPanel::clickAnyBtn() {
+void ControlPanel_L::clickAnyBtn() {
     if (m_tcpSocket->state() != QAbstractSocket::ConnectedState) {
         // tcp未连接，不做任何处理
         return;
@@ -166,31 +166,33 @@ void ControlPanel::clickAnyBtn() {
 
     switch(btnType1) {
     case MOV_Y_P:
-        sendCommand(">09D0000D0004E97");
+        sendCommand(">03D0000E00854B7");
         break;
     case MOV_Y_N:
-        sendCommand(">09D00000000BE8C");
+        //CID::Ptr()->printMsg("MOV_Y_N");
+        sendCommand(">03D000000009EAC");
         break;
     case MOV_X_P:
-        sendCommand(">0AD00006000F70F");
+        //CID::Ptr()->printMsg("MOV_X_P");
+        sendCommand(">04D00000000441D");
         break;
     case MOV_X_N:
-        sendCommand(">0AD000000007F0F");
+        sendCommand(">04D00006000CC1D");
         break;
     case MOV_Z_UP:
-        sendCommand(">06D000000008EBC");
+        sendCommand(">02D000000005BFD");
         break;
     case MOV_Z_DOWN:
-        sendCommand(">06D00035FD158FF");
+        sendCommand(">02D00031000A7B8");
         break;
     case RESET_POS_X:
-        sendCommand(">0AGA17D");
+        sendCommand(">04G315B");
         break;
     case RESET_POS_Y:
-        sendCommand(">09GA15F");
+        sendCommand(">03G0159");
         break;
     case RESET_POS_Z:
-        sendCommand(">06G515A");
+        sendCommand(">02G9158");
         break;
     case CLAW_OPEN:
         //sendCommand("05060105000099B3");
@@ -203,7 +205,7 @@ void ControlPanel::clickAnyBtn() {
     }
 }
 
-void ControlPanel::releaseAnyBtn() {
+void ControlPanel_L::releaseAnyBtn() {
     if (m_tcpSocket->state() != QAbstractSocket::ConnectedState) {
         // tcp未连接，不做任何处理
         return;
@@ -220,20 +222,21 @@ void ControlPanel::releaseAnyBtn() {
 
     switch(btnType2) {
     case STOP_X:
-        sendCommand(">0AK03564");
+        //CID::Ptr()->printMsg("STOP_X");
+        sendCommand(">04K0EF75");
         break;
     case STOP_Y:
-        sendCommand(">09K02CE4");
+        sendCommand(">03K02EC4");
         break;
     case STOP_Z:
-        sendCommand(">06K02FD4");
+        sendCommand(">02K0EE95");
         break;
     default:
         break;
     }
 }
 
-void ControlPanel::sendCommand(const QString& cmd) {
+void ControlPanel_L::sendCommand(const QString& cmd) {
     //qDebug() << "T:" << cmd;
     m_tcpSocket->write(cmd.toStdString().c_str());
     CID::Ptr()->printMsg(cmd, CommuInfoDialog::MSG_SEND);
@@ -249,14 +252,14 @@ void ControlPanel::sendCommand(const QString& cmd) {
     //qDebug() << "R:" << data;
 }
 
-void ControlPanel::onConnected() {
+void ControlPanel_L::onConnected() {
     m_tcpStatusLabel->setText("在线");
     m_tcpStatusLabel->setStyleSheet("color: #11FF11;");
 }
-void ControlPanel::onConnectionError() {
+void ControlPanel_L::onConnectionError() {
 
 }
-void ControlPanel::onDisconnected() {
+void ControlPanel_L::onDisconnected() {
     m_tcpStatusLabel->setText("离线");
     m_tcpStatusLabel->setStyleSheet("color: red;");
 }
