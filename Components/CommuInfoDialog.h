@@ -12,7 +12,7 @@ class QLabel;
 class CommuInfoDialog : public QDialog {
     Q_OBJECT
 public:
-    static CommuInfoDialog* getInstance();
+    static CommuInfoDialog* Ptr();
     CommuInfoDialog(QTcpSocket* tcpSocket, QWidget* parent = nullptr);
     ~CommuInfoDialog();
 
@@ -52,7 +52,7 @@ private:
     void sendCommand(const QString& cmd);
 
 private:
-    static CommuInfoDialog* m_instance;
+    static CommuInfoDialog* m_ptr;
     QMap<QPushButton*, ActionType> m_buttons;
 
     bool isConnecting{false};

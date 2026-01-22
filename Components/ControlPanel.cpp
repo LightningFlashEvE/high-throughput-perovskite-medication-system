@@ -236,7 +236,7 @@ void ControlPanel::releaseAnyBtn() {
 void ControlPanel::sendCommand(const QString& cmd) {
     //qDebug() << "T:" << cmd;
     m_tcpSocket->write(cmd.toStdString().c_str());
-    CID::getInstance()->printMsg(cmd, CommuInfoDialog::MSG_SEND);
+    CID::Ptr()->printMsg(cmd, CommuInfoDialog::MSG_SEND);
 
     // if (!m_tcpSocket->waitForReadyRead()) {
     //     CID::getInstance()->printMsg("TCP读取超时！");
@@ -245,7 +245,7 @@ void ControlPanel::sendCommand(const QString& cmd) {
     // }
 
     QByteArray data = m_tcpSocket->readAll();
-    CID::getInstance()->printMsg(data, CommuInfoDialog::MSG_READ);
+    CID::Ptr()->printMsg(data, CommuInfoDialog::MSG_READ);
     //qDebug() << "R:" << data;
 }
 

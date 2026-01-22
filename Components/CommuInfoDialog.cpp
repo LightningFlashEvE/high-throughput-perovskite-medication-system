@@ -7,16 +7,16 @@
 #include <QNetworkProxy>
 #include <QTimer>
 
-CommuInfoDialog* CommuInfoDialog::m_instance = nullptr;
-CommuInfoDialog* CommuInfoDialog::getInstance() {
-    return m_instance;
+CommuInfoDialog* CommuInfoDialog::m_ptr = nullptr;
+CommuInfoDialog* CommuInfoDialog::Ptr() {
+    return m_ptr;
 }
 
 CommuInfoDialog::CommuInfoDialog(QTcpSocket* tcpSocket, QWidget* parent) :
     QDialog(parent),
     m_tcpSocket(tcpSocket)
 {
-    m_instance = this;
+    m_ptr = this;
     setWindowTitle("调试");
     resize(800, 600);
     setWindowFlags(Qt::Dialog | Qt::WindowMinMaxButtonsHint | Qt::WindowCloseButtonHint);

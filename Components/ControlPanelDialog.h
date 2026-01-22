@@ -4,6 +4,7 @@
 #include <QDialog>
 
 class QTcpSocket;
+class ControlPanel;
 
 class ControlPanelDialog : public QDialog
 {
@@ -15,6 +16,8 @@ public:
 private:
     static ControlPanelDialog* m_ptr;
     QTcpSocket* m_tcpSocket{};
+    ControlPanel* m_rightControlPanel{};
+    ControlPanel* m_leftControlPanel{};
 };
 
 #endif // CONTROLPANNELDIALOG_H
