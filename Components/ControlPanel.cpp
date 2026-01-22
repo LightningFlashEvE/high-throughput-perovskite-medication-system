@@ -43,17 +43,17 @@ ControlPanel::ControlPanel(QTcpSocket* tcpSocket, QWidget* parent) :
     // QLabel* label21 = new QLabel("ControlPannel");
     // QLabel* label22 = new QLabel("ControlPannel");
 
-    QPushButton* btn01 = new QPushButton("上");
+    QPushButton* btn01 = new QPushButton("前");
     QPushButton* btn10 = new QPushButton("左");
     QPushButton* btn12 = new QPushButton("右");
-    QPushButton* btn21 = new QPushButton("下");
+    QPushButton* btn21 = new QPushButton("后");
 
     QLabel* label30 = new QLabel("z爪：");
     // QLabel* label31 = new QLabel("ControlPannel");
     // QLabel* label41 = new QLabel("ControlPannel");
 
-    QPushButton* btn31 = new QPushButton("上");
-    QPushButton* btn41 = new QPushButton("下");
+    QPushButton* btn31 = new QPushButton("升");
+    QPushButton* btn41 = new QPushButton("降");
     QPushButton* btn32 = new QPushButton("开爪");
     QPushButton* btn42 = new QPushButton("闭爪");
 
