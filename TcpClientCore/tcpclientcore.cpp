@@ -1,9 +1,12 @@
 #include "tcpclientcore.h"
+#include "CommuInfoDialog.h"
 #include <QHostAddress>
 #include <QDebug>
 #include <QRegularExpression>
 #include <QRegularExpressionMatch>
 #include <cmath>
+
+using CID = CommuInfoDialog;
 
 // 静态成员变量初始化
 double TcpClientCore::m_expectedWeight = 0.0;
@@ -263,7 +266,7 @@ void TcpClientCore::writeBalanceTareCommand(const QString& data, int mode)
     
     // 通过TCP发送数据，检查发送结果
     qint64 bytesWritten = m_tcpSocket->write(dataToSend);
-
+    CID::Ptr()->printMsg("writeBalance:" + dataToSend);
     
     if (bytesWritten == -1) {
         qWarning() << "发送失败:" << m_tcpSocket->errorString();
@@ -435,7 +438,8 @@ bool TcpClientCore::sendMessage(const QByteArray& content, bool asciiOrHex)
      * 写入Socket，检查发送结果，刷新缓冲区
      */
     qint64 bytesWritten = m_tcpSocket->write(dataToSend);
-    
+    CID::Ptr()->printMsg("sendMessage:" + dataToSend);
+
     if (bytesWritten == -1) {
         qWarning() << "发送失败:" << m_tcpSocket->errorString();
         return false;
@@ -771,6 +775,7 @@ void TcpClientCore::onReadyRead()
     }
     
     QByteArray data = m_tcpSocket->readAll();
+    CID::Ptr()->printMsg("TcpClientCore::onReadyRead:" + data, CID::MSG_DEBUD);
 
     qDebug() << "<<<<<<<<收到数据:" << QString::fromUtf8(data) << " " << QString(data.toHex().toUpper())  << " 期望：" << m_currentExpectedNormalized;
     
@@ -986,6 +991,8 @@ void TcpClientCore::onBalanceReadyRead()
     }
 
     QByteArray data = m_tcpSocket->readAll();
+    CID::Ptr()->printMsg("onBalanceReadyRead:" + data, CID::DEBUD_onBalanceReadyRead);
+
     QString dataStr = QString::fromUtf8(data);
     //qDebug() << "天平收到数据:" << dataStr << QString(data.toHex().toUpper());
 
@@ -1370,6 +1377,8 @@ void TcpClientCore::pollMotorPosition()
     
     if (m_tcpSocket && m_tcpSocket->state() == QAbstractSocket::ConnectedState) {
         m_tcpSocket->write(dataToSend);
+        CID::Ptr()->printMsg("pollMotorPosition:" + dataToSend, CID::DEBUG_pollMotorPosition);
+
         // qDebug() << "轮询发送:" << QString(dataToSend.toHex().toUpper());
         m_tcpSocket->flush();
     } else {
@@ -1855,7 +1864,8 @@ void TcpClientCore::sendMessageInternal(const QByteArray& content, bool asciiOrH
     
     // 通过TCP发送数据
     qint64 bytesWritten = m_tcpSocket->write(dataToSend);
-    
+    CID::Ptr()->printMsg("sendMessageInternal:" + dataToSend);
+
     if (bytesWritten == -1) {
         qWarning() << "发送失败:" << m_tcpSocket->errorString();
         return;

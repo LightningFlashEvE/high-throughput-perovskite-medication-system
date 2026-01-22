@@ -23,6 +23,10 @@ public:
         MSG_SEND_ASYNC_1,
         MSG_SEND_ASYNC_2,
         MSG_READ_BALANCE,
+
+        MSG_DEBUD,
+        DEBUD_onBalanceReadyRead,
+        DEBUG_pollMotorPosition
     };
 
     enum ActionType {
@@ -56,6 +60,7 @@ private:
     QMap<QPushButton*, ActionType> m_buttons;
 
     bool isConnecting{false};
+    bool m_isStopRecv{false};
     QTcpSocket* m_tcpSocket{};
 
     QTextEdit* textEdit{};

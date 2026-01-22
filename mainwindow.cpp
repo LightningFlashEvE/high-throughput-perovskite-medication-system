@@ -49,12 +49,12 @@ MainWindow::MainWindow(QWidget *parent)
     initializeDataIni();
 
     // 修改当前碰撞处理
-    ui->groupBox_2->setVisible(false);
+    //ui->groupBox_2->setVisible(false);
     m_currentTcpSocket = tcpCore->m_tcpSocket;
     m_currentTcpSocket->setProxy(QNetworkProxy::NoProxy);
 
-    m_controlPanel = new ControlPanel(m_currentTcpSocket, this);
-    ui->controlPanelLayout->addWidget(m_controlPanel);
+    //m_controlPanel = new ControlPanel(m_currentTcpSocket, this);
+    //ui->controlPanelLayout->addWidget(m_controlPanel);
 
     createMenuItemDialogs();
 

@@ -57,17 +57,23 @@ ControlPanel::ControlPanel(QTcpSocket* tcpSocket, QWidget* parent) :
     QPushButton* btn32 = new QPushButton("开爪");
     QPushButton* btn42 = new QPushButton("闭爪");
 
-    QLabel* label50 = new QLabel("x复位：");
-    QLabel* label60 = new QLabel("y复位：");
-    QLabel* label70 = new QLabel("z复位：");
+    QLabel* label50 = new QLabel("z吸液：");
+    QPushButton* btn51 = new QPushButton("升");
+    QPushButton* btn61 = new QPushButton("降");
 
-    QLabel* label51 = new QLabel("x");
-    QLabel* label61 = new QLabel("y");
-    QLabel* label71 = new QLabel("z");
+    QLabel* label70 = new QLabel("x复位：");
+    QLabel* label80 = new QLabel("y复位：");
+    QLabel* label90 = new QLabel("z爪复位：");
 
-    QPushButton* btn51 = new QPushButton("x复位");
-    QPushButton* btn61 = new QPushButton("y复位");
-    QPushButton* btn71 = new QPushButton("z复位");
+
+    // QLabel* label71 = new QLabel("x");
+    // QLabel* label81 = new QLabel("y");
+    // QLabel* label91 = new QLabel("z");
+
+    QPushButton* btn71 = new QPushButton("x复位");
+    QPushButton* btn81 = new QPushButton("y复位");
+    QPushButton* btn91 = new QPushButton("z爪复位");
+    QPushButton* btn92 = new QPushButton("z吸液复位");
 
     // QPushButton* btn01 = new QPushButton("上");
     // QPushButton* btn10 = new QPushButton("左");
@@ -91,12 +97,17 @@ ControlPanel::ControlPanel(QTcpSocket* tcpSocket, QWidget* parent) :
     gridLayout->addWidget(btn42, 4, 2);
 
     gridLayout->addWidget(label50, 5, 0);
-    gridLayout->addWidget(label60, 6, 0);
-    gridLayout->addWidget(label70, 7, 0);
-
     gridLayout->addWidget(btn51, 5, 1);
     gridLayout->addWidget(btn61, 6, 1);
+
+    gridLayout->addWidget(label70, 7, 0);
+    gridLayout->addWidget(label80, 8, 0);
+    gridLayout->addWidget(label90, 9, 0);
+
     gridLayout->addWidget(btn71, 7, 1);
+    gridLayout->addWidget(btn81, 8, 1);
+    gridLayout->addWidget(btn91, 9, 1);
+    gridLayout->addWidget(btn92, 9, 2);
 
     //vLayout->addLayout(gridLayout);
 
@@ -124,12 +135,18 @@ ControlPanel::ControlPanel(QTcpSocket* tcpSocket, QWidget* parent) :
 
     registerBtn(btn31, MOV_Z_UP);
     registerBtn(btn41, MOV_Z_DOWN);
+    registerBtn(btn51, MOV_Z_XIYE_UP);
+    registerBtn(btn61, MOV_Z_XIYE_DOWN);
+
     registerBtnRelease(btn31, STOP_Z);
     registerBtnRelease(btn41, STOP_Z);
+    registerBtnRelease(btn51, STOP_Z);
+    registerBtnRelease(btn61, STOP_Z_XIYE);
 
-    registerBtn(btn51, RESET_POS_X);
-    registerBtn(btn61, RESET_POS_Y);
-    registerBtn(btn71, RESET_POS_Z);
+    registerBtn(btn71, RESET_POS_X);
+    registerBtn(btn81, RESET_POS_Y);
+    registerBtn(btn91, RESET_POS_Z);
+    registerBtn(btn92, RESET_POS_Z_XIYE);
 
     registerBtn(btn32, CLAW_OPEN);
     registerBtn(btn42, CLAW_CLOSED);
@@ -183,6 +200,12 @@ void ControlPanel::clickAnyBtn() {
     case MOV_Z_DOWN:
         sendCommand(">06D00035FD158FF");
         break;
+    case MOV_Z_XIYE_UP:
+        sendCommand(">08D000000007BDD");
+        break;
+    case MOV_Z_XIYE_DOWN:
+        sendCommand(">08D0002802B9E27");
+        break;
     case RESET_POS_X:
         sendCommand(">0AGA17D");
         break;
@@ -192,8 +215,11 @@ void ControlPanel::clickAnyBtn() {
     case RESET_POS_Z:
         sendCommand(">06G515A");
         break;
+    case RESET_POS_Z_XIYE:
+        sendCommand(">08G315E");
+        break;
     case CLAW_OPEN:
-        //sendCommand("05060105000099B3");
+        sendCommand(">0506010000014872");
         break;
     case CLAW_CLOSED:
         //sendCommand(">09K02CE4");
@@ -227,6 +253,9 @@ void ControlPanel::releaseAnyBtn() {
         break;
     case STOP_Z:
         sendCommand(">06K02FD4");
+        break;
+    case STOP_Z_XIYE:
+        sendCommand(">08K0ECB5");
         break;
     default:
         break;

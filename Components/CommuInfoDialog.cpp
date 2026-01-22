@@ -34,10 +34,17 @@ CommuInfoDialog::CommuInfoDialog(QTcpSocket* tcpSocket, QWidget* parent) :
     clearBtn->setFixedWidth(80);
     QPushButton* tagBtn = new QPushButton("标记");
     tagBtn->setFixedWidth(80);
+    QPushButton* startRecvBtn = new QPushButton("开始接收");
+    startRecvBtn->setFixedWidth(80);
+    QPushButton* stopRecvBtn = new QPushButton("停止");
+    stopRecvBtn->setFixedWidth(80);
+
     QHBoxLayout* btnLayout = new QHBoxLayout;
     btnLayout->addStretch();
     btnLayout->addWidget(tagBtn);
     btnLayout->addWidget(clearBtn);
+    btnLayout->addWidget(startRecvBtn);
+    btnLayout->addWidget(stopRecvBtn);
 
     QHBoxLayout* labelLayout = new QHBoxLayout;
     QLabel* tcpStatusTitleLabel = new QLabel("TCP状态：");
@@ -75,6 +82,9 @@ CommuInfoDialog::CommuInfoDialog(QTcpSocket* tcpSocket, QWidget* parent) :
     connect(testBtn, &QPushButton::clicked, this, &CommuInfoDialog::clickConnectionBtn);
     connect(testBtn2, &QPushButton::clicked, this, &CommuInfoDialog::clickBtn_ResetPos);
     connect(testBtn3, &QPushButton::clicked, this, &CommuInfoDialog::clickDisconnectBtn);
+    connect(startRecvBtn, &QPushButton::clicked, this, [this](){m_isStopRecv = false;});
+    connect(stopRecvBtn, &QPushButton::clicked, this, [this](){m_isStopRecv = true;});
+
 
     connect(testBtn_Y_Rel_P, &QPushButton::clicked, this, &CommuInfoDialog::clickBtn_Y_Rel_P);
     connect(testBtn_Y_Rel_N, &QPushButton::clicked, this, &CommuInfoDialog::clickBtn_Y_Rel_N);
@@ -138,6 +148,13 @@ void CommuInfoDialog::clickDisconnectBtn() {
 }
 
 void CommuInfoDialog::printMsg(const QString& msg, MsgType msgType) const {
+    if (m_isStopRecv ||
+        msgType == DEBUD_onBalanceReadyRead ||
+        msgType == DEBUG_pollMotorPosition ||
+        msgType == MSG_DEBUD) {
+        return;
+    }
+
     if (msgType == NONE_TYPE) {
         textEdit->append(msg);
     } else if (msgType == MSG_SEND) {

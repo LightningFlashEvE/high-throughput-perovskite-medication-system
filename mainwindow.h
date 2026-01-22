@@ -343,7 +343,6 @@ private:
             dialog->show();
             dialog->raise();
             dialog->activateWindow();
-
         });
     }
 

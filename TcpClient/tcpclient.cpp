@@ -1,5 +1,6 @@
 #include "tcpclient.h"
 #include "ui_tcpclient.h"
+#include "CommuInfoDialog.h"
 #include <QMessageBox>
 #include <QDateTime>
 #include <QScrollBar>
@@ -16,6 +17,8 @@
 #include <utility>
 // 包含协议系统
 #include "tcpclient_crc.h"
+
+using CID = CommuInfoDialog;
 
 TcpClient::TcpClient(QWidget *parent)
     : QWidget(parent)
@@ -309,6 +312,7 @@ void TcpClient::onSendClicked()
         }
         
         m_tcpSocket->write(data);
+        CID::Ptr()->printMsg("onSendClicked:" + data);
         appendMessage(QString("发送: %1").arg(message), "send");
     }
     
@@ -363,6 +367,8 @@ void TcpClient::onDataReceived()
     if (!sender) return;
     
     QByteArray data = sender->readAll();
+    CID::Ptr()->printMsg("TcpClient::onDataReceived:" + data);
+
     QString message;
     
     if (ui->checkBox_hex_mode->isChecked()) {

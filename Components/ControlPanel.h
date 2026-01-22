@@ -22,14 +22,18 @@ public:
         MOV_X_N,
         MOV_Z_UP,
         MOV_Z_DOWN,
+        MOV_Z_XIYE_UP,
+        MOV_Z_XIYE_DOWN,
         CLAW_OPEN,
         CLAW_CLOSED,
         RESET_POS_X,
         RESET_POS_Y,
         RESET_POS_Z,
+        RESET_POS_Z_XIYE,
         STOP_X,
         STOP_Y,
-        STOP_Z
+        STOP_Z,
+        STOP_Z_XIYE,
     };
 
 private slots:
