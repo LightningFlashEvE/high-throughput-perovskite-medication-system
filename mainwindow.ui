@@ -7,7 +7,7 @@
     <x>0</x>
     <y>0</y>
     <width>967</width>
-    <height>590</height>
+    <height>613</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -744,7 +744,7 @@ QPushButton:disabled {
      <x>0</x>
      <y>0</y>
      <width>967</width>
-     <height>18</height>
+     <height>25</height>
     </rect>
    </property>
    <widget class="QMenu" name="menuStatus">
@@ -762,8 +762,14 @@ QPushButton:disabled {
      <string>设置</string>
     </property>
    </widget>
+   <widget class="QMenu" name="menuTools">
+    <property name="title">
+     <string>工具</string>
+    </property>
+   </widget>
    <addaction name="menuStatus"/>
    <addaction name="menuHistory"/>
+   <addaction name="menuTools"/>
    <addaction name="menuSettings"/>
   </widget>
   <widget class="QStatusBar" name="statusbar"/>

@@ -46,6 +46,7 @@ class ReagentBottle;
 class TcpClientCore;
 class AppSqlDatabase;
 class ControlPanel;
+class QTcpSocket;
 
 /**
  * MainWindow
@@ -328,7 +329,31 @@ public slots:
     void testRecipeSendWithString(const QJsonObject& recipePacket, const QString& jsonString);
 
 private:
+    void createMenuItemDialogs();
+    template<typename T> void createDialog(const QString& title, QAction* itemAction) {
+        QDialog* dialog = new T(m_currentTcpSocket);
+        dialog->setWindowTitle(title);
+
+        m_menuItemDialogsMap[title] = dialog;
+        connect(itemAction, &QAction::triggered, this, [this](){
+            QAction* openMenuItemDialogAction = qobject_cast<QAction*>(sender());
+            if (!openMenuItemDialogAction) return;
+
+            QDialog* dialog = m_menuItemDialogsMap[openMenuItemDialogAction->text()];
+            dialog->show();
+            dialog->raise();
+            dialog->activateWindow();
+
+        });
+    }
+
+private:
+    QTcpSocket* m_currentTcpSocket{};
     ControlPanel* m_controlPanel{};
+
+    QMap<QString, QDialog*> m_menuItemDialogsMap;
+    QDialog* m_controlPanelDialog{};
+    QDialog* m_commuInfoDialog{};
 };
 #endif // MAINWINDOW_H
 

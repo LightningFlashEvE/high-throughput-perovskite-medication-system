@@ -2,6 +2,7 @@
 #include "ui_mainwindow.h"
 #include "ControlPanel.h"
 #include "CommuInfoDialog.h"
+#include "ControlPanelDialog.h"
 
 #include <QTimer>
 #include <QDateTime>
@@ -49,13 +50,13 @@ MainWindow::MainWindow(QWidget *parent)
 
     // 修改当前碰撞处理
     ui->groupBox_2->setVisible(false);
-    QTcpSocket* currentTcpSocket = tcpCore->m_tcpSocket;
-    //QTcpSocket* currentTcpSocket = new QTcpSocket;
-    currentTcpSocket->setProxy(QNetworkProxy::NoProxy);
-    CommuInfoDialog* commuInfoDialog = new CommuInfoDialog(currentTcpSocket, this);
-    //commuInfoDialog->show();
-    m_controlPanel = new ControlPanel(currentTcpSocket, this);
+    m_currentTcpSocket = tcpCore->m_tcpSocket;
+    m_currentTcpSocket->setProxy(QNetworkProxy::NoProxy);
+
+    m_controlPanel = new ControlPanel(m_currentTcpSocket, this);
     ui->controlPanelLayout->addWidget(m_controlPanel);
+
+    createMenuItemDialogs();
 
     /*** 显示logo ***/
     QPixmap logo(":/main/pic/logo.png");
@@ -975,7 +976,14 @@ void MainWindow::initializeDataIni()
     }
 }
 
+void MainWindow::createMenuItemDialogs() {
+    QAction* ontrolPanelAction = new QAction("操控面板", this);
+    createDialog<ControlPanelDialog>("操控面板", ontrolPanelAction);
+    ui->menuTools->addAction(ontrolPanelAction);
 
-
+    QAction* commuInfoAction = new QAction("调试", this);
+    createDialog<CommuInfoDialog>("调试", commuInfoAction);
+    ui->menuTools->addAction(commuInfoAction);
+}
 
 

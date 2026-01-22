@@ -19,6 +19,7 @@ CONFIG += c++17
 SOURCES += \
     Components/CommuInfoDialog.cpp \
     Components/ControlPanel.cpp \
+    Components/ControlPanelDialog.cpp \
     main.cpp \
     mainwindow.cpp \
     mainwindow_Test.cpp \
@@ -27,6 +28,7 @@ SOURCES += \
 HEADERS += \
     Components/CommuInfoDialog.h \
     Components/ControlPanel.h \
+    Components/ControlPanelDialog.h \
     mainwindow.h
 
 FORMS += \
