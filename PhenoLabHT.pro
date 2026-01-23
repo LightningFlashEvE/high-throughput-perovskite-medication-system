@@ -21,6 +21,7 @@ SOURCES += \
     Components/ControlPanel.cpp \
     Components/ControlPanelDialog.cpp \
     Components/ControlPanel_L.cpp \
+    Components/HttpRequest.cpp \
     main.cpp \
     mainwindow.cpp \
     mainwindow_Test.cpp \
@@ -31,6 +32,7 @@ HEADERS += \
     Components/ControlPanel.h \
     Components/ControlPanelDialog.h \
     Components/ControlPanel_L.h \
+    Components/HttpRequest.h \
     mainwindow.h
 
 FORMS += \

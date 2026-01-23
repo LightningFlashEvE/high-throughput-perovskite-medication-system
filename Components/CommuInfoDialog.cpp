@@ -1,5 +1,5 @@
 #include "CommuInfoDialog.h"
-//#include "TcpClient.h"
+#include "HttpRequest.h"
 
 #include <QLayout>
 #include <QLabel>
@@ -107,6 +107,10 @@ void CommuInfoDialog::clickAnyBtn() {
 }
 
 void CommuInfoDialog::clickClearMsgBtn() {
+    // 测试http请求
+    //HttpRequest* httpRequest = new HttpRequest(this);
+    //httpRequest->sendRequest();
+
     textEdit->clear();
 }
 
