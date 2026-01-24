@@ -367,7 +367,7 @@ void TcpClient::onDataReceived()
     if (!sender) return;
     
     QByteArray data = sender->readAll();
-    CID::Ptr()->printMsg("TcpClient::onDataReceived:" + data);
+    CID::Ptr()->printMsg("TcpClient::onDataReceived:" + data, CID::MSG_ORIGIN_TCP);
 
     QString message;
     

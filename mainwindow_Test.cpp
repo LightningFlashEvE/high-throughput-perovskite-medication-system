@@ -1,6 +1,7 @@
 #include "mainwindow.h"
 #include "qsqlerror.h"
 #include "tcpclientcore.h"
+#include "CommuInfoDialog.h"
 #include <QJsonObject>
 #include <QJsonDocument>
 #include <QDebug>
@@ -17,6 +18,8 @@
 #include <QNetworkAddressEntry>
 #include <QAbstractSocket>
 #include <QHostAddress>
+
+using CID = CommuInfoDialog;
 
 // ========== 网络配置 ==========
 // 网络连接类型选择：true=使用无线网络，false=使用有线网络

@@ -330,8 +330,24 @@ public slots:
 
 private:
     void createMenuItemDialogs();
-    template<typename T> void createDialog(const QString& title, QAction* itemAction) {
+    template<typename T> void createTcpDialog(const QString& title, QAction* itemAction) {
         QDialog* dialog = new T(m_currentTcpSocket);
+        dialog->setWindowTitle(title);
+
+        m_menuItemDialogsMap[title] = dialog;
+        connect(itemAction, &QAction::triggered, this, [this](){
+            QAction* openMenuItemDialogAction = qobject_cast<QAction*>(sender());
+            if (!openMenuItemDialogAction) return;
+
+            QDialog* dialog = m_menuItemDialogsMap[openMenuItemDialogAction->text()];
+            dialog->show();
+            dialog->raise();
+            dialog->activateWindow();
+        });
+    }
+
+    template<typename T> void createDialog(const QString& title, QAction* itemAction) {
+        QDialog* dialog = new T();
         dialog->setWindowTitle(title);
 
         m_menuItemDialogsMap[title] = dialog;
@@ -351,8 +367,6 @@ private:
     ControlPanel* m_controlPanel{};
 
     QMap<QString, QDialog*> m_menuItemDialogsMap;
-    QDialog* m_controlPanelDialog{};
-    QDialog* m_commuInfoDialog{};
 };
 #endif // MAINWINDOW_H
 

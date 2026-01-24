@@ -49,7 +49,7 @@ private:
     void registerBtnRelease(QPushButton* btn, ActionType actionType);
 
     void sendCommand(const QString& cmd);
-
+    void sendCommandHex(const QByteArray& cmd);
 private:
     QTcpSocket* m_tcpSocket{};
     QLabel* m_tcpStatusLabel{};

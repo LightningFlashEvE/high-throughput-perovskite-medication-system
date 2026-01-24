@@ -151,27 +151,45 @@ void CommuInfoDialog::clickDisconnectBtn() {
     }
 }
 
+void CommuInfoDialog::setSocket(QTcpSocket* tcpSocket) {
+    m_tcpSocket = tcpSocket;
+}
+
 void CommuInfoDialog::printMsg(const QString& msg, MsgType msgType) const {
     if (m_isStopRecv ||
         msgType == DEBUD_onBalanceReadyRead ||
         msgType == DEBUG_pollMotorPosition ||
-        msgType == MSG_DEBUD) {
+        msgType == MSG_DEBUD ||
+        msgType == MSG_ORIGIN_TCP) {
         return;
     }
 
-    if (msgType == NONE_TYPE) {
-        textEdit->append(msg);
-    } else if (msgType == MSG_SEND) {
-        textEdit->append(QString("T: %1").arg(msg));
-    } else if (msgType == MSG_SEND_ASYNC_1) {
-        textEdit->append(QString("T async 1: %1").arg(msg));
-    } else if (msgType == MSG_SEND_ASYNC_2) {
-        textEdit->append(QString("T async 2: %1").arg(msg));
-    } else if (msgType == MSG_READ) {
-        QString msg2 = msg.trimmed();
-        textEdit->append(QString("R: %1").arg(msg2));
-    } else if (msgType == MSG_READ_BALANCE) {
-        textEdit->append(QString("R balance: %1").arg(msg));
+    switch (msgType) {
+        case NONE_TYPE:
+            textEdit->append(msg);
+            break;
+        case MSG_DEBUD_01:
+            textEdit->append(msg);
+            break;
+        case MSG_SEND:
+            textEdit->append(QString("T: %1").arg(msg));
+            break;
+        case MSG_SEND_ASYNC_1:
+            textEdit->append(QString("T async 1: %1").arg(msg));
+            break;
+        case MSG_SEND_ASYNC_2:
+            textEdit->append(QString("T async 2: %1").arg(msg));
+            break;
+        case MSG_READ: {
+            QString msg2 = msg.trimmed();
+            textEdit->append(QString("R: %1").arg(msg2));
+        }
+            break;
+        case MSG_READ_BALANCE:
+            textEdit->append(QString("R balance: %1").arg(msg));
+            break;
+        default:
+            break;
     }
 }
 

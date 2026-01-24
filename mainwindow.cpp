@@ -28,11 +28,17 @@
 #include <QtSql/QSqlQuery>
 #include <QSqlError>
 
+using CID = CommuInfoDialog;
+
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
     , ui(new Ui::MainWindow)
 {
     ui->setupUi(this);
+
+    QAction* commuInfoAction = new QAction("调试", this);
+    createDialog<CommuInfoDialog>("调试", commuInfoAction);
+    ui->menuTools->addAction(commuInfoAction);
 
     // 将“停止”按钮（pushButton_Stop）关联到紧急停止槽
     if (ui->pushButton_Stop) {
@@ -50,8 +56,12 @@ MainWindow::MainWindow(QWidget *parent)
 
     // 修改当前碰撞处理
     //ui->groupBox_2->setVisible(false);
+
+    //m_currentTcpSocket = new QTcpSocket;
     m_currentTcpSocket = tcpCore->m_tcpSocket;
     m_currentTcpSocket->setProxy(QNetworkProxy::NoProxy);
+
+    CID::Ptr()->setSocket(m_currentTcpSocket);
 
     //m_controlPanel = new ControlPanel(m_currentTcpSocket, this);
     //ui->controlPanelLayout->addWidget(m_controlPanel);
@@ -978,12 +988,8 @@ void MainWindow::initializeDataIni()
 
 void MainWindow::createMenuItemDialogs() {
     QAction* ontrolPanelAction = new QAction("操控面板", this);
-    createDialog<ControlPanelDialog>("操控面板", ontrolPanelAction);
+    createTcpDialog<ControlPanelDialog>("操控面板", ontrolPanelAction);
     ui->menuTools->addAction(ontrolPanelAction);
-
-    QAction* commuInfoAction = new QAction("调试", this);
-    createDialog<CommuInfoDialog>("调试", commuInfoAction);
-    ui->menuTools->addAction(commuInfoAction);
 }
 
 

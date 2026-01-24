@@ -1,6 +1,8 @@
 #include "mainwindow.h"
 #include "qsqlerror.h"
 #include "tcpclientcore.h"
+#include "CommuInfoDialog.h"
+
 #include <QJsonObject>
 #include <QJsonDocument>
 #include <QDebug>
@@ -13,6 +15,8 @@
 #include "qsqldatabase.h"
 #include <cmath>
 
+
+using CID=CommuInfoDialog;
 
 void MainWindow::on_pushButton_7_clicked()
 {

@@ -13,7 +13,7 @@ class CommuInfoDialog : public QDialog {
     Q_OBJECT
 public:
     static CommuInfoDialog* Ptr();
-    CommuInfoDialog(QTcpSocket* tcpSocket, QWidget* parent = nullptr);
+    CommuInfoDialog(QTcpSocket* tcpSocket = nullptr, QWidget* parent = nullptr);
     ~CommuInfoDialog();
 
     enum MsgType {
@@ -25,6 +25,9 @@ public:
         MSG_READ_BALANCE,
 
         MSG_DEBUD,
+        MSG_DEBUD_01,
+        MSG_ORIGIN_TCP,
+        MSG_ORIGIN_WRITE,
         DEBUD_onBalanceReadyRead,
         DEBUG_pollMotorPosition
     };
@@ -34,6 +37,7 @@ public:
     };
 
     void printMsg(const QString& msg, MsgType msgType = NONE_TYPE) const;
+    void setSocket(QTcpSocket* tcpSocket);
 
 private slots:
     void clickAnyBtn();

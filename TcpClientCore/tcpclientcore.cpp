@@ -438,7 +438,7 @@ bool TcpClientCore::sendMessage(const QByteArray& content, bool asciiOrHex)
      * 写入Socket，检查发送结果，刷新缓冲区
      */
     qint64 bytesWritten = m_tcpSocket->write(dataToSend);
-    CID::Ptr()->printMsg("sendMessage:" + dataToSend);
+    CID::Ptr()->printMsg("sendMessage:" + dataToSend, CID::MSG_ORIGIN_WRITE);
 
     if (bytesWritten == -1) {
         qWarning() << "发送失败:" << m_tcpSocket->errorString();
@@ -775,9 +775,9 @@ void TcpClientCore::onReadyRead()
     }
     
     QByteArray data = m_tcpSocket->readAll();
-    CID::Ptr()->printMsg("TcpClientCore::onReadyRead:" + data, CID::MSG_DEBUD);
+    CID::Ptr()->printMsg("TcpClientCore::onReadyRead:" + data, CID::MSG_ORIGIN_TCP);
 
-    qDebug() << "<<<<<<<<收到数据:" << QString::fromUtf8(data) << " " << QString(data.toHex().toUpper())  << " 期望：" << m_currentExpectedNormalized;
+    //qDebug() << "<<<<<<<<收到数据:" << QString::fromUtf8(data) << " " << QString(data.toHex().toUpper())  << " 期望：" << m_currentExpectedNormalized;
     
     // 如果正在轮询，检查是否收到目标响应
     if (m_isPolling) {
@@ -991,7 +991,7 @@ void TcpClientCore::onBalanceReadyRead()
     }
 
     QByteArray data = m_tcpSocket->readAll();
-    CID::Ptr()->printMsg("onBalanceReadyRead:" + data, CID::DEBUD_onBalanceReadyRead);
+    CID::Ptr()->printMsg("onBalanceReadyRead:" + data, CID::MSG_ORIGIN_TCP);
 
     QString dataStr = QString::fromUtf8(data);
     //qDebug() << "天平收到数据:" << dataStr << QString(data.toHex().toUpper());
@@ -1522,7 +1522,7 @@ void TcpClientCore::processMessageQueue()
     // 取出队列中的第一条消息
     MessageQueueItem item = m_messageQueue.dequeue();
     qDebug() << "▲▲▲正在处理消息:" << item.content << " | 剩余队列长度:" << m_messageQueue.size();
-    
+    CID::Ptr()->printMsg("消息 dear with msg:" + item.content);
 
 
 
@@ -1864,7 +1864,7 @@ void TcpClientCore::sendMessageInternal(const QByteArray& content, bool asciiOrH
     
     // 通过TCP发送数据
     qint64 bytesWritten = m_tcpSocket->write(dataToSend);
-    CID::Ptr()->printMsg("sendMessageInternal:" + dataToSend);
+    CID::Ptr()->printMsg("sendMessageInternal:" + dataToSend, CID::MSG_ORIGIN_TCP);
 
     if (bytesWritten == -1) {
         qWarning() << "发送失败:" << m_tcpSocket->errorString();

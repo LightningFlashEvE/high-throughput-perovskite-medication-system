@@ -219,10 +219,12 @@ void ControlPanel::clickAnyBtn() {
         sendCommand(">08G315E");
         break;
     case CLAW_OPEN:
-        sendCommand(">0506010000014872");
+        //sendCommand(">0506010000014872");
+        //sendCommand(">0506010800000870");
+        sendCommandHex("05060105000099B3");
         break;
     case CLAW_CLOSED:
-        //sendCommand(">09K02CE4");
+        sendCommandHex("0506010500649858");
         break;
     default:
         break;
@@ -276,6 +278,15 @@ void ControlPanel::sendCommand(const QString& cmd) {
     QByteArray data = m_tcpSocket->readAll();
     CID::Ptr()->printMsg(data, CommuInfoDialog::MSG_READ);
     //qDebug() << "R:" << data;
+}
+
+void ControlPanel::sendCommandHex(const QByteArray& hexData) {
+    //m_tcpSocket->write(QByteArray::fromHex(cmd.toStdString().c_str()));
+    m_tcpSocket->write(QByteArray::fromHex(hexData));
+    CID::Ptr()->printMsg(hexData, CommuInfoDialog::MSG_SEND);
+
+    QByteArray data = m_tcpSocket->readAll();
+    CID::Ptr()->printMsg(data, CommuInfoDialog::MSG_READ);
 }
 
 void ControlPanel::onConnected() {
