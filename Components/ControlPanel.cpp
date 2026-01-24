@@ -112,7 +112,7 @@ ControlPanel::ControlPanel(QTcpSocket* tcpSocket, QWidget* parent) :
     //vLayout->addLayout(gridLayout);
 
     //groupBox->setLayout(gridLayout);
-    vLayout->addLayout(tcpStatusHLayout);
+    //vLayout->addLayout(tcpStatusHLayout);
     vLayout->addLayout(gridLayout);
     groupBox->setLayout(vLayout);
 

@@ -329,11 +329,11 @@ public slots:
     void testRecipeSendWithString(const QJsonObject& recipePacket, const QString& jsonString);
 
 private:
-    void createMenuItemDialogs();
+    void initMenuItemDialogs();
     template<typename T> void createTcpDialog(const QString& title, QAction* itemAction) {
         QDialog* dialog = new T(m_currentTcpSocket);
+        dialog->setAttribute(Qt::WA_DeleteOnClose, true);
         dialog->setWindowTitle(title);
-
         m_menuItemDialogsMap[title] = dialog;
         connect(itemAction, &QAction::triggered, this, [this](){
             QAction* openMenuItemDialogAction = qobject_cast<QAction*>(sender());
@@ -344,6 +344,11 @@ private:
             dialog->raise();
             dialog->activateWindow();
         });
+
+        // connect(this, &QObject::destroyed, this, [dialog] {
+        //     delete dialog;
+        //     qDebug() << "vvvv";
+        // });
     }
 
     template<typename T> void createDialog(const QString& title, QAction* itemAction) {

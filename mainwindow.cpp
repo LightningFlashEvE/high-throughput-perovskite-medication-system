@@ -66,7 +66,7 @@ MainWindow::MainWindow(QWidget *parent)
     //m_controlPanel = new ControlPanel(m_currentTcpSocket, this);
     //ui->controlPanelLayout->addWidget(m_controlPanel);
 
-    createMenuItemDialogs();
+    initMenuItemDialogs();
 
     /*** 显示logo ***/
     QPixmap logo(":/main/pic/logo.png");
@@ -986,7 +986,7 @@ void MainWindow::initializeDataIni()
     }
 }
 
-void MainWindow::createMenuItemDialogs() {
+void MainWindow::initMenuItemDialogs() {
     QAction* ontrolPanelAction = new QAction("操控面板", this);
     createTcpDialog<ControlPanelDialog>("操控面板", ontrolPanelAction);
     ui->menuTools->addAction(ontrolPanelAction);
