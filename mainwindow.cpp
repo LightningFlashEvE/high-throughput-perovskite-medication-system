@@ -580,7 +580,7 @@ void MainWindow::onShakeBedEmptyCheckTimeout()
 
     // 如果表中有记录且所有记录的isEmpty都为1，则停止摇床
     if (hasRecords && allEmpty) {
-        qDebug() << "摇床区域全部为空，正在停止摇床...";
+        //qDebug() << "摇床区域全部为空，正在停止摇床...";
         controlShakeBed(false, true);
     }
 }

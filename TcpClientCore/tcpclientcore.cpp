@@ -595,14 +595,14 @@ void TcpClientCore::sendMessageAsync(const QByteArray& content, bool asciiOrHex,
 
     MessageQueueItem item(content, asciiOrHex, expectedSignature);
     m_messageQueue.enqueue(item);
-    qDebug() << "【添加消息到队列】" << content << "当前队列长度:" << m_messageQueue.size();
+    //qDebug() << "【添加消息到队列】" << content << "当前队列长度:" << m_messageQueue.size();
 
     if (!m_isProcessingQueue && !m_isWaitingForResponse) {
         m_queueTimer->start(0);
-        qDebug() << "   └─ 调用 start(0)：向事件队列投递定时器事件（0毫秒后超时）";
-        qDebug() << "   └─ 注意：processMessageQueue() 还没被调用！必须等当前函数返回";
+        // qDebug() << "   └─ 调用 start(0)：向事件队列投递定时器事件（0毫秒后超时）";
+        // qDebug() << "   └─ 注意：processMessageQueue() 还没被调用！必须等当前函数返回";
     } else {
-        qDebug() << "   └─ 定时器未启动（m_isProcessingQueue=" << m_isProcessingQueue << " m_isWaitingForResponse=" << m_isWaitingForResponse << ")";
+        //qDebug() << "   └─ 定时器未启动（m_isProcessingQueue=" << m_isProcessingQueue << " m_isWaitingForResponse=" << m_isWaitingForResponse << ")";
     }
 
 }
@@ -814,7 +814,7 @@ void TcpClientCore::onReadyRead()
             }
             else // 如果有报错的都走这里，遗弃当前菜单，暂停操作等待恢复。
             { // 队列要暂停，清除当前的m_messageQueue，等待确认完毕则继续执行下一个配方
-                qDebug() << "⚠️⚠️⚠️ 收到错误响应（意外碰撞）";
+                //qDebug() << "⚠️⚠️⚠️ 收到错误响应（意外碰撞）";
                 // qDebug() << "错误数据:" << QString::fromUtf8(data) << " | HEX:" << QString(data.toHex().toUpper());
                 
                 // // 1. 停止轮询
@@ -861,8 +861,8 @@ void TcpClientCore::onReadyRead()
         }
         
         if (conditionMet) {
-            qDebug() << "匹配成功，匹配成功的命令。" << data;
-            qDebug() << "结束轮询。";
+            //qDebug() << "匹配成功，匹配成功的命令。" << data;
+            //qDebug() << "结束轮询。";
             // 停止轮询
             stopPolling();
             m_currentExpectedNormalized.clear();
@@ -1143,7 +1143,7 @@ QString TcpClientCore::buildMessageWithCrc(const QString& data)
     // 拼接原始数据和CRC
     QString fullMessage = data + crcHex;
     
-    qDebug() << "构建消息:" << data << "+" << crcHex << "完整消息:" << fullMessage;
+    //qDebug() << "构建消息:" << data << "+" << crcHex << "完整消息:" << fullMessage;
     
     return fullMessage;
 }
@@ -1180,7 +1180,7 @@ QString TcpClientCore::buildGripperMessageWithCrc(const QString& data)
     // 拼接原始数据和CRC
     QString fullMessage = data + crcStr;
     
-    qDebug() << "构建消息:" << data << "-> CRC:" << (crcStr) << "-> 完整消息:" << fullMessage;
+    //qDebug() << "构建消息:" << data << "-> CRC:" << (crcStr) << "-> 完整消息:" << fullMessage;
     
     return fullMessage;
 }
@@ -1500,7 +1500,7 @@ bool TcpClientCore::checkIfGripperInitialized(const QByteArray& data)
 // 处理消息队列
 void TcpClientCore::processMessageQueue()
 {
-    qDebug() << "●●●●●●processMessageQueue() 被调用，★★★★★当前队列长度:" << m_messageQueue.size() << "★★★★★";
+    //qDebug() << "●●●●●●processMessageQueue() 被调用，★★★★★当前队列长度:" << m_messageQueue.size() << "★★★★★";
     
     // 如果队列为空，停止处理
     if (m_messageQueue.isEmpty()) {
@@ -1521,13 +1521,8 @@ void TcpClientCore::processMessageQueue()
     
     // 取出队列中的第一条消息
     MessageQueueItem item = m_messageQueue.dequeue();
-    qDebug() << "▲▲▲正在处理消息:" << item.content << " | 剩余队列长度:" << m_messageQueue.size();
+    //qDebug() << "▲▲▲正在处理消息:" << item.content << " | 剩余队列长度:" << m_messageQueue.size();
     CID::Ptr()->printMsg("消息 dear with msg:" + item.content);
-
-
-
-
-
 
     /*
     * AA0  天平打印关
@@ -1655,7 +1650,7 @@ void TcpClientCore::processMessageQueue()
         bool ok = false;
         int seconds = secondsStr.toInt(&ok);
         if (ok && seconds > 0) {
-            qDebug() << "检测到AAshakeBedForSeconds命令，秒数 =" << seconds;
+            //qDebug() << "检测到AAshakeBedForSeconds命令，秒数 =" << seconds;
             emit shakeBedForSecondsRequested(seconds);
         } else {
             qWarning() << "AAshakeBedForSeconds 命令格式错误，无法解析秒数:" << secondsStr;
@@ -1794,11 +1789,11 @@ void TcpClientCore::processMessageQueue()
 
         // 打印：当前发送命令 与 期待回复
         QString contentStrLog = QString::fromUtf8(item.content);
-        qDebug() << "当前发送的命令是:" << contentStrLog << "，期待回复:" << (sig.isEmpty() || sig == "-----" ? "" : sig);
+        //qDebug() << "当前发送的命令是:" << contentStrLog << "，期待回复:" << (sig.isEmpty() || sig == "-----" ? "" : sig);
     }
     else
     {
-        qDebug() << "当前发送的命令是:" << item.content << item.asciiOrHex << needsWait;
+        //qDebug() << "当前发送的命令是:" << item.content << item.asciiOrHex << needsWait;
     }
 
     

@@ -1291,12 +1291,12 @@ bool MainWindow::loadAndExecuteNextRecipeFromDatabase()
         tcpCore->sendMessageAsync(content, asciiOrHex, expectedSignature);
          messageCount++;
     }
-    qDebug() << "════════════════════════════════════════";
-    qDebug() << "批量添加完成！配方" << recipeName << "共添加" << messageCount << "条消息";
-    qDebug() << "注意：虽然 start(0) 被调用了" << messageCount << "次，";
-    qDebug() << "      但 processMessageQueue() 还一次都没执行！";
-    qDebug() << "      现在函数即将返回，Qt事件循环将接管...";
-    qDebug() << "════════════════════════════════════════";
+    // qDebug() << "════════════════════════════════════════";
+    // qDebug() << "批量添加完成！配方" << recipeName << "共添加" << messageCount << "条消息";
+    // qDebug() << "注意：虽然 start(0) 被调用了" << messageCount << "次，";
+    // qDebug() << "      但 processMessageQueue() 还一次都没执行！";
+    // qDebug() << "      现在函数即将返回，Qt事件循环将接管...";
+    // qDebug() << "════════════════════════════════════════";
     return true;
 }
 
@@ -1401,7 +1401,7 @@ void MainWindow::controlShakeBed(bool isOn, bool sendImmediately)
         logMessage = "关闭摇床";
     }
 
-    qDebug() << logMessage << command;
+    //qDebug() << logMessage << command;
 
     if (sendImmediately) {
         // 立即发送（同步）

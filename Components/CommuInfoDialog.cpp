@@ -194,7 +194,6 @@ void CommuInfoDialog::printMsg(const QString& msg, MsgType msgType) const {
 }
 
 void CommuInfoDialog::sendCommand(const QString& cmd) {
-    qDebug() << "T:" << cmd;
     m_tcpSocket->write(cmd.toStdString().c_str());
 
     if (!m_tcpSocket->waitForReadyRead()) {
@@ -202,7 +201,6 @@ void CommuInfoDialog::sendCommand(const QString& cmd) {
     }
 
     QByteArray data = m_tcpSocket->readAll();
-    qDebug() << "R:" << data;
 }
 
 void CommuInfoDialog::onConnected() {
