@@ -332,7 +332,7 @@ private:
     void initMenuItemDialogs();
     template<typename T> void createTcpDialog(const QString& title, QAction* itemAction) {
         QDialog* dialog = new T(m_currentTcpSocket);
-        dialog->setAttribute(Qt::WA_DeleteOnClose, true);
+        //dialog->setAttribute(Qt::WA_DeleteOnClose, true);
         dialog->setWindowTitle(title);
         m_menuItemDialogsMap[title] = dialog;
         connect(itemAction, &QAction::triggered, this, [this](){

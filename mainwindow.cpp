@@ -55,7 +55,7 @@ MainWindow::MainWindow(QWidget *parent)
     initializeDataIni();
 
     // 修改当前碰撞处理
-    //ui->groupBox_2->setVisible(false);
+    ui->groupBox_2->setVisible(false);
 
     //m_currentTcpSocket = new QTcpSocket;
     m_currentTcpSocket = tcpCore->m_tcpSocket;
@@ -377,6 +377,11 @@ void MainWindow::closeEvent(QCloseEvent *event)
     
     // 清理所有资源
     cleanupResources();
+
+    // 清理所有菜单栏对话框
+    for (QDialog* dialog : m_menuItemDialogsMap.values()) {
+        delete dialog;
+    }
     
     // 接受关闭事件
     event->accept();
