@@ -31,6 +31,7 @@
 #include <QSqlError>
 
 using CID = CommuInfoDialog;
+using HRD = HistoryRecordDialog;
 
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
@@ -258,7 +259,7 @@ MainWindow::MainWindow(QWidget *parent)
             recipeAnalyzerPanel->show();
             recipeAnalyzerPanel->raise();
             recipeAnalyzerPanel->activateWindow();
-            qDebug() << "配方解析窗口已打开";
+            //qDebug() << "配方解析窗口已打开";
         });
 
         // RTSP播放器菜单项
@@ -385,6 +386,8 @@ void MainWindow::closeEvent(QCloseEvent *event)
     for (QDialog* dialog : m_menuItemDialogsMap.values()) {
         delete dialog;
     }
+
+    HRD::Ptr()->stopFlow();
     
     // 接受关闭事件
     event->accept();

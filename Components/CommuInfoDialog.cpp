@@ -115,6 +115,7 @@ void CommuInfoDialog::clickClearMsgBtn() {
     //httpRequest->sendRequest();
 
     //HRD::Ptr()->addRecord();
+    HRD::Ptr()->stopFlow();
 
     textEdit->clear();
 }

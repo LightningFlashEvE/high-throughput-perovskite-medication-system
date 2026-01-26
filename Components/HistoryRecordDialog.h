@@ -14,6 +14,8 @@ public:
     static HistoryRecordDialog* Ptr();
     explicit HistoryRecordDialog(QWidget* parent = nullptr);
 
+    void restartFlow();
+    void stopFlow();
     void addRecord();
 
 private slots:

@@ -740,7 +740,8 @@ QString RecipeAnalyzer::formatNumber(double value, int decimals)
 
 void RecipeAnalyzer::onSendRecipeClicked()
 {
-    HRD::Ptr()->addRecord();
+    //HRD::Ptr()->addRecord();
+    HRD::Ptr()->restartFlow();
 
     // 检查是否有有效的配方数据
     if (m_lastPacket.isEmpty()) {
