@@ -20,10 +20,13 @@ private slots:
     void clickClearBtn();
 
 private:
+    void initTableData();
+
+private:
     static HistoryRecordDialog* m_ptr;
     QStandardItemModel* m_model{};
     int m_row{0};
-    //QScopedPointer<QSqlDatabase> m_db;
+    QScopedPointer<QSqlDatabase> m_db;
 };
 
 #endif // HISTORYRECORDDIALOG_H
