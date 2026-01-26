@@ -344,11 +344,6 @@ private:
             dialog->raise();
             dialog->activateWindow();
         });
-
-        // connect(this, &QObject::destroyed, this, [dialog] {
-        //     delete dialog;
-        //     qDebug() << "vvvv";
-        // });
     }
 
     template<typename T> void createDialog(const QString& title, QAction* itemAction) {

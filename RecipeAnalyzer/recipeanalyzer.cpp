@@ -1,5 +1,7 @@
 #include "recipeanalyzer.h"
 #include "ui_recipeanalyzer.h"
+#include "HistoryRecordDialog.h"
+
 #include <QDebug>
 #include <QHeaderView>
 #include <QRegularExpression>
@@ -21,6 +23,8 @@
 #include <QRegularExpressionMatchIterator>
 #include <cmath>
 #include <QJsonDocument>
+
+using HRD = HistoryRecordDialog;
 
 // 原子量常量
 const QMap<QString, double> RecipeAnalyzer::ATOMIC_WEIGHTS = {
@@ -154,10 +158,6 @@ void RecipeAnalyzer::onFormulaChanged()
         // 可以添加实时验证逻辑
     }
 }
-
-
-
-
 
 QJsonObject RecipeAnalyzer::buildRecipePacket(const QString& formula,
                                              double molarity,
@@ -740,6 +740,8 @@ QString RecipeAnalyzer::formatNumber(double value, int decimals)
 
 void RecipeAnalyzer::onSendRecipeClicked()
 {
+    HRD::Ptr()->addRecord();
+
     // 检查是否有有效的配方数据
     if (m_lastPacket.isEmpty()) {
         QMessageBox::warning(this, "发送失败", "请先计算配方，然后再发送！");

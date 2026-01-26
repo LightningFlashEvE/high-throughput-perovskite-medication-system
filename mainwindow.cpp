@@ -3,6 +3,8 @@
 #include "ControlPanel.h"
 #include "CommuInfoDialog.h"
 #include "ControlPanelDialog.h"
+#include "HistoryRecordDialog.h"
+#include "StatusRequest.h"
 
 #include <QTimer>
 #include <QDateTime>
@@ -40,11 +42,12 @@ MainWindow::MainWindow(QWidget *parent)
     createDialog<CommuInfoDialog>("调试", commuInfoAction);
     ui->menuTools->addAction(commuInfoAction);
 
+    new StatusRequest(this);
+
     // 将“停止”按钮（pushButton_Stop）关联到紧急停止槽
     if (ui->pushButton_Stop) {
         connect(ui->pushButton_Stop, &QPushButton::clicked, this, &MainWindow::onEmergencyStopButtonClicked);
     }
-
 
     // 初始化系统组件（转移区域、试剂、TCP通信等）
     initializeSystemComponents();
@@ -275,13 +278,13 @@ MainWindow::MainWindow(QWidget *parent)
         });
     }
 
-    if (ui->menuHistory) {
-        QAction *sthAction = new QAction("历史按键", this);
-        ui->menuHistory->addAction(sthAction);
-        connect(sthAction, &QAction::triggered, this, [] {
-            qDebug() << "xixihaha";
-        });
-    }
+    // if (ui->menuHistory) {
+    //     QAction *sthAction = new QAction("历史按键", this);
+    //     ui->menuHistory->addAction(sthAction);
+    //     connect(sthAction, &QAction::triggered, this, [] {
+    //         qDebug() << "xixihaha";
+    //     });
+    // }
 
     // 初始化滑块值显示标签
     if (ui->horizontalSliderTight) {
@@ -995,6 +998,10 @@ void MainWindow::initMenuItemDialogs() {
     QAction* ontrolPanelAction = new QAction("操控面板", this);
     createTcpDialog<ControlPanelDialog>("操控面板", ontrolPanelAction);
     ui->menuTools->addAction(ontrolPanelAction);
+
+    QAction* historyRecordAction = new QAction("历史记录", this);
+    createDialog<HistoryRecordDialog>("历史记录", historyRecordAction);
+    ui->menuView->addAction(historyRecordAction);
 }
 
 

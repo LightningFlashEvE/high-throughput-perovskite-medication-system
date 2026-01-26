@@ -21,7 +21,9 @@ SOURCES += \
     Components/ControlPanel.cpp \
     Components/ControlPanelDialog.cpp \
     Components/ControlPanel_L.cpp \
+    Components/HistoryRecordDialog.cpp \
     Components/HttpRequest.cpp \
+    Components/StatusRequest.cpp \
     main.cpp \
     mainwindow.cpp \
     mainwindow_Test.cpp \
@@ -32,7 +34,9 @@ HEADERS += \
     Components/ControlPanel.h \
     Components/ControlPanelDialog.h \
     Components/ControlPanel_L.h \
+    Components/HistoryRecordDialog.h \
     Components/HttpRequest.h \
+    Components/StatusRequest.h \
     mainwindow.h
 
 FORMS += \

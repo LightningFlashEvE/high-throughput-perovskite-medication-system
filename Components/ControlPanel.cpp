@@ -175,7 +175,7 @@ void ControlPanel::registerBtnRelease(QPushButton* btn, ActionType pressType) {
 
 void ControlPanel::registerBtnClick(QPushButton* btn, ActionType actionType) {
     m_clickButtons[btn] = actionType;
-    connect(btn, &QPushButton::released, this, &ControlPanel::clickAnyBtn);
+    connect(btn, &QPushButton::clicked, this, &ControlPanel::clickAnyBtn);
 }
 
 void ControlPanel::clickAnyBtn() {

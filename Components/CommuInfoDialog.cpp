@@ -1,11 +1,14 @@
 #include "CommuInfoDialog.h"
 #include "HttpRequest.h"
+#include "HistoryRecordDialog.h"
 
 #include <QLayout>
 #include <QLabel>
 #include <QTcpSocket>
 #include <QNetworkProxy>
 #include <QTimer>
+
+using HRD = HistoryRecordDialog;
 
 CommuInfoDialog* CommuInfoDialog::m_ptr = nullptr;
 CommuInfoDialog* CommuInfoDialog::Ptr() {
@@ -110,6 +113,8 @@ void CommuInfoDialog::clickClearMsgBtn() {
     // 测试http请求
     //HttpRequest* httpRequest = new HttpRequest(this);
     //httpRequest->sendRequest();
+
+    //HRD::Ptr()->addRecord();
 
     textEdit->clear();
 }

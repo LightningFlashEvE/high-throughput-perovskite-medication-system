@@ -752,9 +752,9 @@ QPushButton:disabled {
      <string>状态</string>
     </property>
    </widget>
-   <widget class="QMenu" name="menuHistory">
+   <widget class="QMenu" name="menuView">
     <property name="title">
-     <string>历史记录</string>
+     <string>查看</string>
     </property>
    </widget>
    <widget class="QMenu" name="menuSettings">
@@ -768,7 +768,7 @@ QPushButton:disabled {
     </property>
    </widget>
    <addaction name="menuStatus"/>
-   <addaction name="menuHistory"/>
+   <addaction name="menuView"/>
    <addaction name="menuTools"/>
    <addaction name="menuSettings"/>
   </widget>
