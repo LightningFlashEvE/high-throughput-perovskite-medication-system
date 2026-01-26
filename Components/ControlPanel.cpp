@@ -48,6 +48,8 @@ ControlPanel::ControlPanel(QTcpSocket* tcpSocket, QWidget* parent) :
     QPushButton* btn12 = new QPushButton("右");
     QPushButton* btn21 = new QPushButton("后");
 
+    QPushButton* btn02 = new QPushButton("释放使能");
+
     QLabel* label30 = new QLabel("z爪：");
     // QLabel* label31 = new QLabel("ControlPannel");
     // QLabel* label41 = new QLabel("ControlPannel");
@@ -89,6 +91,8 @@ ControlPanel::ControlPanel(QTcpSocket* tcpSocket, QWidget* parent) :
     //gridLayout->addWidget(label20, 2, 0);
     gridLayout->addWidget(btn21, 2, 1);
     //gridLayout->addWidget(label22, 2, 2);
+
+    gridLayout->addWidget(btn02, 0, 2);
 
     gridLayout->addWidget(label30, 3, 0);
     gridLayout->addWidget(btn31, 3, 1);
@@ -133,6 +137,9 @@ ControlPanel::ControlPanel(QTcpSocket* tcpSocket, QWidget* parent) :
     registerBtnRelease(btn10, STOP_X);
     registerBtnRelease(btn12, STOP_X);
 
+    registerBtnClick(btn02, RELEASE_ENABEL_XY);
+
+
     registerBtn(btn31, MOV_Z_UP);
     registerBtn(btn41, MOV_Z_DOWN);
     registerBtn(btn51, MOV_Z_XIYE_UP);
@@ -158,7 +165,7 @@ ControlPanel::ControlPanel(QTcpSocket* tcpSocket, QWidget* parent) :
 
 void ControlPanel::registerBtn(QPushButton* btn, ActionType pressType) {
     m_buttons[btn] = pressType;
-    connect(btn, &QPushButton::pressed, this, &ControlPanel::clickAnyBtn);
+    connect(btn, &QPushButton::pressed, this, &ControlPanel::pressAnyBtn);
 }
 
 void ControlPanel::registerBtnRelease(QPushButton* btn, ActionType pressType) {
@@ -166,7 +173,37 @@ void ControlPanel::registerBtnRelease(QPushButton* btn, ActionType pressType) {
     connect(btn, &QPushButton::released, this, &ControlPanel::releaseAnyBtn);
 }
 
+void ControlPanel::registerBtnClick(QPushButton* btn, ActionType actionType) {
+    m_clickButtons[btn] = actionType;
+    connect(btn, &QPushButton::released, this, &ControlPanel::clickAnyBtn);
+}
+
 void ControlPanel::clickAnyBtn() {
+    if (m_tcpSocket->state() != QAbstractSocket::ConnectedState) {
+        // tcp未连接，不做任何处理
+        return;
+    }
+
+    // 根据发送者判断是哪个按钮
+    QPushButton* clickedBtn = qobject_cast<QPushButton*>(sender());
+    if (!clickedBtn) return;
+
+    ActionType btnType = NODE;
+    if (m_clickButtons.contains(clickedBtn)) {
+        btnType = m_clickButtons[clickedBtn];
+    }
+
+    switch(btnType) {
+    case RELEASE_ENABEL_XY:
+        //sendCommand(">03D0000E00854B7");
+        break;
+    default:
+        break;
+    }
+}
+
+
+void ControlPanel::pressAnyBtn() {
     if (m_tcpSocket->state() != QAbstractSocket::ConnectedState) {
         // tcp未连接，不做任何处理
         return;

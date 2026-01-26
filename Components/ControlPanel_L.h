@@ -29,12 +29,14 @@ public:
         RESET_POS_Z,
         STOP_X,
         STOP_Y,
-        STOP_Z
+        STOP_Z,
+        RELEASE_ENABEL_XY
     };
 
 private slots:
-    void clickAnyBtn();
+    void pressAnyBtn();
     void releaseAnyBtn();
+    void clickAnyBtn();
 
     void onConnected();
     void onConnectionError();
@@ -43,6 +45,7 @@ private slots:
 private:
     void registerBtn(QPushButton* btn, ActionType pressType);
     void registerBtnRelease(QPushButton* btn, ActionType actionType);
+    void registerClickBtn(QPushButton* btn, ActionType pressType);
 
     void sendCommand(const QString& cmd);
 
@@ -51,6 +54,7 @@ private:
     QLabel* m_tcpStatusLabel{};
     QMap<QPushButton*, ActionType> m_buttons;
     QMap<QPushButton*, ActionType> m_buttonRelease;
+    QMap<QPushButton*, ActionType> m_clickButtons;
 };
 
 #endif // CONTROLPANEL_L_H
