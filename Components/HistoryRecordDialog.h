@@ -3,9 +3,11 @@
 
 #include <QDialog>
 #include <QSqlDatabase>
+#include "RecipeData.h"
 
 class QStandardItemModel;
 class QSqlDatabase;
+class QTableView;
 
 class HistoryRecordDialog : public QDialog
 {
@@ -15,9 +17,12 @@ public:
     explicit HistoryRecordDialog(QWidget* parent = nullptr);
     ~HistoryRecordDialog();
 
-    void restartFlow();
-    void stopFlow();
     void startFlow();
+    void restartFlow();
+    void interruptFlow();
+    void completeFlow();
+
+    void setRecipeData(const RecipeData& recipeData);
 
 private slots:
     void clickClearBtn();
@@ -25,13 +30,19 @@ private slots:
 private:
     void initTableData();
     void initDatebase();
+    void queryCurrentRecord(const QString& curStartDatetime);
+
+    void updateCurrentState(const QString& curStartDatetime,
+                            const QString& stateStr,
+                            const QString& formattedTime);
 
 private:
     static HistoryRecordDialog* m_ptr;
     QStandardItemModel* m_model{};
     int m_row{0};
-    //QScopedPointer<QSqlDatabase> m_db;
     QSqlDatabase m_db;
+    QTableView* tableView{};
+    RecipeData m_recipeData;
 };
 
 #endif // HISTORYRECORDDIALOG_H

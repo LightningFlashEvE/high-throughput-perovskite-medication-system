@@ -40,6 +40,7 @@ HEADERS += \
     Components/HistoryRecordDialog.h \
     Components/HttpRequest.h \
     Components/MyDelegate.h \
+    Components/RecipeData.h \
     Components/StatusRequest.h \
     mainwindow.h
 

@@ -16,6 +16,8 @@ public:
             newOption.palette.setColor(QPalette::Text, QColor(Qt::red));
         } else if (str == "进行中"){
             newOption.palette.setColor(QPalette::Text, QColor(Qt::blue));
+        } else if (str == "成功"){
+            newOption.palette.setColor(QPalette::Text, QColor(Qt::green));
         }
 
         QStyledItemDelegate::paint(painter, newOption, index);

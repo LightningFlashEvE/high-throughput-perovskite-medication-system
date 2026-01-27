@@ -1,6 +1,7 @@
 #include "recipeanalyzer.h"
 #include "ui_recipeanalyzer.h"
 #include "HistoryRecordDialog.h"
+#include "RecipeData.h"
 
 #include <QDebug>
 #include <QHeaderView>
@@ -133,6 +134,9 @@ void RecipeAnalyzer::onCalculateClicked()
         // 收集溶剂配置并打包数据
         m_lastPacket = buildRecipePacket(formula, molarity, volume, results, validation);
         
+        // 历史记录中添加配方数据
+        HRD::Ptr()->setRecipeData(buildRecipeData(formula, volume, results));
+
         // 同时生成JSON字符串格式（紧凑）并存储到成员变量
         m_lastPacketJsonString = QString::fromUtf8(
             QJsonDocument(m_lastPacket).toJson(QJsonDocument::Compact)
@@ -199,6 +203,37 @@ QJsonObject RecipeAnalyzer::buildRecipePacket(const QString& formula,
     obj["溶剂"] = solvents;
 
     return obj;
+}
+
+RecipeData RecipeAnalyzer::buildRecipeData(const QString& formula,
+                                           double volume,
+                                           const QList<PrecursorResult>& results) const
+{
+    RecipeData recipeData;
+
+    // 溶剂（体积分配，单位mL）
+    QMap<QString, QString> solvent;
+    QList<QPair<QString,double>> advancedSolvents = collectAdvancedSolvents();
+    for (const auto& pair : std::as_const(advancedSolvents)) {
+
+        QString solventName = pair.first;
+        QString volumeStr =  QString::number(volume * pair.second / 100.0, 'f', 2);
+        solvent[solventName] = volumeStr;
+    }
+
+    // 溶质（前驱体固体/溶质，单位mg）
+    QMap<QString, QString> precursor;
+    for (const auto &r : results) {
+        QString name = r.name;
+        QString dosage = QString::number(std::round(r.grams * 10.0) / 10.0, 'f', 2);
+        precursor[name] = dosage;
+    }
+
+    recipeData.formula = formula;
+    recipeData.solvent = solvent;
+    recipeData.precursor = precursor;
+
+    return recipeData;
 }
 
 // ==================== 新增：高级溶剂选择系统 ====================
@@ -740,9 +775,6 @@ QString RecipeAnalyzer::formatNumber(double value, int decimals)
 
 void RecipeAnalyzer::onSendRecipeClicked()
 {
-    //HRD::Ptr()->startFlow();
-    HRD::Ptr()->restartFlow();
-
     // 检查是否有有效的配方数据
     if (m_lastPacket.isEmpty()) {
         QMessageBox::warning(this, "发送失败", "请先计算配方，然后再发送！");
@@ -775,6 +807,14 @@ void RecipeAnalyzer::onSendRecipeClicked()
         // 发射信号，传递配方数据包
         emit recipeReadyToSend(m_lastPacket);
         
+        for (int i = 0; i < m_dynamicSolvents.size(); ++i) {
+            const QString& name = m_dynamicSolvents[i].first;
+            double volume = ui->doubleSpinBox_volume->value();
+
+            qDebug() << "name:" << name;
+        }
+        HRD::Ptr()->restartFlow();
+
         // 显示成功消息
         QMessageBox::information(this, "发送成功", "配方已发送！");
     }

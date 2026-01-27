@@ -387,8 +387,6 @@ void MainWindow::closeEvent(QCloseEvent *event)
         delete dialog;
     }
 
-    HRD::Ptr()->stopFlow();
-    
     // 接受关闭事件
     event->accept();
     qDebug() << "主窗口关闭完成";

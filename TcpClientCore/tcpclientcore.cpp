@@ -237,7 +237,7 @@ void TcpClientCore::writeBalanceTareCommand(const QString& data, int mode)
     }
     
     if (m_tcpSocket->state() != QAbstractSocket::ConnectedState) {
-        qWarning() << "未连接到服务器，无法发送命令";
+        //qWarning() << "未连接到服务器，无法发送命令";
         return;
     }
     
@@ -370,7 +370,7 @@ bool TcpClientCore::sendMessage(const QByteArray& content, bool asciiOrHex)
     }
     
     if (m_tcpSocket->state() != QAbstractSocket::ConnectedState) {
-        qWarning() << "未连接到服务器，无法发送消息";
+        //qWarning() << "未连接到服务器，无法发送消息";
         return false;
     }
     
@@ -490,7 +490,7 @@ void TcpClientCore::sendMessage(QVector<RecipeQueueItem>& recipeMessageQueues)
 
     // 1. 检查 TCP 连接是否正常（和 sendMessageAsync 保持一致）
     if (!m_tcpSocket || m_tcpSocket->state() != QAbstractSocket::ConnectedState) {
-        qWarning() << "未连接到服务器，无法发送配方消息队列";
+        //qWarning() << "未连接到服务器，无法发送配方消息队列";
         return;
     }
 
@@ -545,7 +545,7 @@ void TcpClientCore::sendMessageAsync(const QByteArray& content, bool asciiOrHex)
 {
     // 检查连接状态
     if (!m_tcpSocket || m_tcpSocket->state() != QAbstractSocket::ConnectedState) {
-        qWarning() << "未连接到服务器，无法发送消息";
+        //qWarning() << "未连接到服务器，无法发送消息";
         return;
     }
     
@@ -580,7 +580,7 @@ void TcpClientCore::sendMessageAsync(const QByteArray& content, bool asciiOrHex,
 {
     // 基础校验保持一致
     if (!m_tcpSocket || m_tcpSocket->state() != QAbstractSocket::ConnectedState) {
-        qWarning() << "未连接到服务器，无法发送消息";
+        //qWarning() << "未连接到服务器，无法发送消息";
         return;
     }
     if (content.isEmpty()) {
@@ -1844,7 +1844,7 @@ void TcpClientCore::sendMessageInternal(const QByteArray& content, bool asciiOrH
 {
     // 检查连接状态
     if (!m_tcpSocket || m_tcpSocket->state() != QAbstractSocket::ConnectedState) {
-        qWarning() << "未连接到服务器，无法发送消息";
+        //qWarning() << "未连接到服务器，无法发送消息";
         return;
     }
     

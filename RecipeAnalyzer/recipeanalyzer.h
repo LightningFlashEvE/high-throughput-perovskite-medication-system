@@ -19,6 +19,8 @@ namespace Ui {
 class RecipeAnalyzer;
 }
 
+class RecipeData;
+
 // 前驱体结果结构
 struct PrecursorResult {
     QString name;           // 前驱体名称 (如 "FAI", "MAI")
@@ -85,6 +87,8 @@ private:
                                   const QList<PrecursorResult>& results,
                                   const ValidationInfo& info) const;
     
+    RecipeData buildRecipeData(const QString& formula, double volume, const QList<PrecursorResult>& results) const;
+
     // 核心计算功能
     QMap<QString, double> parseFormula(const QString& formula);
     double calculateMolecularWeight(const QMap<QString, double>& elements);
