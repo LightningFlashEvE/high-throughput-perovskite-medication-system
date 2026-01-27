@@ -16,7 +16,7 @@ public:
 
     void restartFlow();
     void stopFlow();
-    void addRecord();
+    void startFlow();
 
 private slots:
     void clickClearBtn();

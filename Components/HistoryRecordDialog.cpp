@@ -1,4 +1,6 @@
 #include "HistoryRecordDialog.h"
+#include "Common.h"
+#include "MyDelegate.h"
 
 #include <QLabel>
 #include <QPushButton>
@@ -6,49 +8,11 @@
 #include <QTableView>
 #include <QStandardItemModel>
 #include <QHeaderView>
-#include <QDateTime>
 #include <QSqlDatabase>
 #include <QSqlQuery>
 #include <QSqlError>
 #include <QScopedPointer>
-#include <QMessageBox>
-#include <QStyledItemDelegate>
 #include <QPainter>
-
-static int showMessageBox(const QString& title, const QString& text)
-{
-    // 创建消息框
-    QMessageBox msgBox;
-    msgBox.setWindowTitle(title);
-    msgBox.setText(text);
-    msgBox.setIcon(QMessageBox::Question);
-    msgBox.setStandardButtons(QMessageBox::Ok | QMessageBox::Cancel);
-
-    return msgBox.exec();
-}
-
-static QString getCurDateTime() {
-    return QDateTime::currentDateTime().toString("yyyy-MM-dd HH:mm:ss");
-}
-
-class MyDelegate : public QStyledItemDelegate
-{
-public:
-    MyDelegate(QObject *parent = nullptr) : QStyledItemDelegate(parent) {}
-
-    void paint(QPainter *painter, const QStyleOptionViewItem &option, const QModelIndex &index) const override
-    {
-        QStyleOptionViewItem newOption = option;
-        QString str = index.data().toString();
-        if (str == "失败") {
-            newOption.palette.setColor(QPalette::Text, QColor(Qt::red));
-        } else if (str == "进行中"){
-            newOption.palette.setColor(QPalette::Text, QColor(Qt::blue));
-        }
-
-        QStyledItemDelegate::paint(painter, newOption, index);
-    }
-};
 
 HistoryRecordDialog* HistoryRecordDialog::m_ptr = nullptr;
 
@@ -145,7 +109,7 @@ void HistoryRecordDialog::restartFlow() {
     stopFlow();
 
     // 新增一条记录
-    addRecord();
+    startFlow();
 }
 
 void HistoryRecordDialog::stopFlow() {
@@ -158,7 +122,7 @@ void HistoryRecordDialog::stopFlow() {
     QString curStartDatetime = m_model->data(m_model->index(0, 0)).toString();
 
     // 如果最近一条记录状态是还在进行中，则将状态修改为失败。
-    QString formattedTime = getCurDateTime();
+    QString formattedTime = Common::getCurDateTime();
     QString stateStr = "失败";
     m_model->setData(m_model->index(0, 3), stateStr);
     m_model->setData(m_model->index(0, 4), formattedTime);
@@ -192,8 +156,8 @@ void HistoryRecordDialog::stopFlow() {
     }
 }
 
-void HistoryRecordDialog::addRecord(){
-    QString formattedTime = getCurDateTime();
+void HistoryRecordDialog::startFlow(){
+    QString formattedTime = Common::getCurDateTime();
     QString stateStr = "进行中";
 
     m_model->insertRow(0);
@@ -222,7 +186,7 @@ void HistoryRecordDialog::clickClearBtn() {
         return;
     }
 
-    int ret = showMessageBox("提示", "删除后不可恢复，您确定要继续吗?");
+    int ret = Common::showMessageBox("提示", "删除后不可恢复，您确定要继续吗?");
     if (ret == QMessageBox::Ok) {
         //qDebug() << "用户点击了 确定";
     } else if (ret == QMessageBox::Cancel) {

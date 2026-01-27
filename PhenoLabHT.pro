@@ -17,12 +17,14 @@ CONFIG += c++17
 #DEFINES += QT_DISABLE_DEPRECATED_BEFORE=0x060000    # disables all the APIs deprecated before Qt 6.0.0
 
 SOURCES += \
+    Components/Common.cpp \
     Components/CommuInfoDialog.cpp \
     Components/ControlPanel.cpp \
     Components/ControlPanelDialog.cpp \
     Components/ControlPanel_L.cpp \
     Components/HistoryRecordDialog.cpp \
     Components/HttpRequest.cpp \
+    Components/MyDelegate.cpp \
     Components/StatusRequest.cpp \
     main.cpp \
     mainwindow.cpp \
@@ -30,12 +32,14 @@ SOURCES += \
     mainwindow_xyz.cpp
 
 HEADERS += \
+    Components/Common.h \
     Components/CommuInfoDialog.h \
     Components/ControlPanel.h \
     Components/ControlPanelDialog.h \
     Components/ControlPanel_L.h \
     Components/HistoryRecordDialog.h \
     Components/HttpRequest.h \
+    Components/MyDelegate.h \
     Components/StatusRequest.h \
     mainwindow.h
 
