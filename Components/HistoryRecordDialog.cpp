@@ -47,16 +47,16 @@ HistoryRecordDialog::HistoryRecordDialog(QWidget* parent) :
 
     // 设置表头
     m_model->setHeaderData(0, Qt::Horizontal, "开始时间");
-    m_model->setHeaderData(1, Qt::Horizontal, "配方(名称/用量)");
-    m_model->setHeaderData(2, Qt::Horizontal, "体积");
-    m_model->setHeaderData(3, Qt::Horizontal, "状态");
+    m_model->setHeaderData(1, Qt::Horizontal, "状态");
+    m_model->setHeaderData(2, Qt::Horizontal, "配方(名称/用量)");
+    m_model->setHeaderData(3, Qt::Horizontal, "备注");
     m_model->setHeaderData(4, Qt::Horizontal, "结束时间");
 
     // 设置每一列的宽度
     tableView->setColumnWidth(0, 130);
-    tableView->setColumnWidth(1, 450);
-    tableView->setColumnWidth(2, 50);
-    tableView->setColumnWidth(3, 80);
+    tableView->setColumnWidth(1, 70);
+    tableView->setColumnWidth(2, 450);
+    tableView->setColumnWidth(3, 50);
     tableView->setColumnWidth(4, 130);
 
     tableLayout->addWidget(tableView);
@@ -82,7 +82,7 @@ void HistoryRecordDialog::setRecipeData(const RecipeData& recipeData) {
 }
 
 void HistoryRecordDialog::completeFlow() {
-    QString curState = m_model->data(m_model->index(0, 3)).toString();
+    QString curState = m_model->data(m_model->index(0, 1)).toString();
     if (curState != "进行中") {
         return;
     }
@@ -94,7 +94,7 @@ void HistoryRecordDialog::completeFlow() {
     QString stateStr = "成功";
 
     // 修改表格数据
-    m_model->setData(m_model->index(0, 3), stateStr);
+    m_model->setData(m_model->index(0, 1), stateStr);
     m_model->setData(m_model->index(0, 4), formattedTime);
 
     // 修改数据库数据
@@ -108,7 +108,7 @@ void HistoryRecordDialog::restartFlow() {
 
 void HistoryRecordDialog::interruptFlow() {
     // 获取对应单元格的值
-    QString curState = m_model->data(m_model->index(0, 3)).toString();
+    QString curState = m_model->data(m_model->index(0, 1)).toString();
     if (curState != "进行中") {
         return;
     }
@@ -120,7 +120,7 @@ void HistoryRecordDialog::interruptFlow() {
     QString stateStr = "失败";
 
     // 修改表格数据
-    m_model->setData(m_model->index(0, 3), stateStr);
+    m_model->setData(m_model->index(0, 1), stateStr);
     m_model->setData(m_model->index(0, 4), formattedTime);
 
     // 修改数据库数据
@@ -154,18 +154,18 @@ void HistoryRecordDialog::startFlow(){
     QString recipe = formula + "\n" + precursor + "\n" +solvent;
 
     m_model->setData(m_model->index(0, 0), formattedTime);
-    m_model->setData(m_model->index(0, 1), recipe);
-    m_model->setData(m_model->index(0, 3), stateStr);
+    m_model->setData(m_model->index(0, 1), stateStr);
+    m_model->setData(m_model->index(0, 2), recipe);
     m_model->setData(m_model->index(0, 4), "---");
 
     // 插入数据
     QSqlQuery query;
     QString insertQuery = QString("INSERT INTO tab_history_record "
-                                  "(start_datetime, solvent, height, state, end_datetime) "
-                                  "VALUES ('%1', '%2', 5.9, '%3', '---')")
+                                  "(start_datetime, state, recipe, note_message, end_datetime) "
+                                  "VALUES ('%1', '%2', '%3', '---', '---')")
                               .arg(formattedTime)
-                              .arg(recipe)
-                              .arg(stateStr);
+                              .arg(stateStr)
+                              .arg(recipe);
 
     if (!query.exec(insertQuery)) {
         qDebug() << "Error: Unable to insert data" << query.lastError().text();
@@ -196,8 +196,8 @@ void HistoryRecordDialog::clickClearBtn() {
     // 对数据库进行优化（压缩空闲空间）
     query.exec("VACUUM");
 
-    m_model->removeRows(0, m_row);
-    m_model->removeRows(3, m_row);
+    //m_model->removeRows(0, m_row);
+    //m_model->removeRows(3, m_row);
     m_row = 0;
     m_model->setRowCount(0);
 }
@@ -206,26 +206,22 @@ void HistoryRecordDialog::initTableData() {
     QSqlQuery query;
 
     // 执行 SQL 查询
-    if (!query.exec("SELECT start_datetime, solvent, height, state, end_datetime FROM tab_history_record")) {
+    if (!query.exec("SELECT start_datetime, state, recipe, note_message, end_datetime FROM tab_history_record")) {
         qDebug() << "Error: Unable to execute query" << query.lastError().text();
     }
 
     // 迭代查询结果
     while (query.next()) {
         QString dateTime = query.value(0).toString();
-        QString solvent = query.value(1).toString();
-        int name = query.value(2).toInt();
-        QString state = query.value(3).toString();
+        QString state = query.value(1).toString();
+        QString recipe = query.value(2).toString();
         QString endDateTime = query.value(4).toString();
-
-        // 打印每一行的数据
-        //qDebug() << "ID:" << id << ", Name:" << name << ", Age:" << solvent << ", Height:" << height;
 
         m_model->insertRow(0);
         tableView->setRowHeight(0, 80);
         m_model->setData(m_model->index(0, 0), dateTime);
-        m_model->setData(m_model->index(0, 1), solvent);
-        m_model->setData(m_model->index(0, 3), state);
+        m_model->setData(m_model->index(0, 1), state);
+        m_model->setData(m_model->index(0, 2), recipe);
         m_model->setData(m_model->index(0, 4), endDateTime);
 
         m_row++;
@@ -246,9 +242,9 @@ void HistoryRecordDialog::initDatebase() {
     QString createTableQuery = "CREATE TABLE IF NOT EXISTS tab_history_record ("
                                "id INTEGER PRIMARY KEY AUTOINCREMENT, "
                                "start_datetime TEXT, "
-                               "solvent TEXT, "
-                               "height REAL,"
                                "state TEXT,"
+                               "recipe TEXT, "
+                               "note_message TEXT,"
                                "end_datetime TEXT)";
     if (!query.exec(createTableQuery)) {
         qDebug() << "Error: Unable to create table" << query.lastError().text();
