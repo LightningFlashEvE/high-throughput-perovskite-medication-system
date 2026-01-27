@@ -13,6 +13,7 @@ class HistoryRecordDialog : public QDialog
 public:
     static HistoryRecordDialog* Ptr();
     explicit HistoryRecordDialog(QWidget* parent = nullptr);
+    ~HistoryRecordDialog();
 
     void restartFlow();
     void stopFlow();
@@ -23,12 +24,14 @@ private slots:
 
 private:
     void initTableData();
+    void initDatebase();
 
 private:
     static HistoryRecordDialog* m_ptr;
     QStandardItemModel* m_model{};
     int m_row{0};
-    QScopedPointer<QSqlDatabase> m_db;
+    //QScopedPointer<QSqlDatabase> m_db;
+    QSqlDatabase m_db;
 };
 
 #endif // HISTORYRECORDDIALOG_H

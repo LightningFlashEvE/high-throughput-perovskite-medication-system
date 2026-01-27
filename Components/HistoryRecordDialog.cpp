@@ -27,38 +27,7 @@ HistoryRecordDialog::HistoryRecordDialog(QWidget* parent) :
     resize(900, 600);
     setWindowFlags(Qt::Dialog | Qt::WindowMinMaxButtonsHint | Qt::WindowCloseButtonHint);
 
-    // 创建一个 SQLite 数据库连接
-    QScopedPointer<QSqlDatabase> db(new QSqlDatabase);
-    m_db.reset(db.take());
-
-    QSqlDatabase m_db = QSqlDatabase::addDatabase("QSQLITE");
-    //m_db->addDatabase("HistoryRecordDialog");
-
-    // 设置数据库文件路径
-    m_db.setDatabaseName("data.db");
-
-    // 打开数据库
-    if (!m_db.open()) {
-        qDebug() << "Error: Unable to open database" << m_db.lastError().text();
-    }
-
-    // 创建表
-    QSqlQuery query;
-    QString createTableQuery = "CREATE TABLE IF NOT EXISTS tab_history_record ("
-                               "id INTEGER PRIMARY KEY AUTOINCREMENT, "
-                               "start_datetime TEXT, "
-                               "age INTEGER, "
-                               "height REAL,"
-                               "state TEXT,"
-                               "end_datetime TEXT)";
-    if (!query.exec(createTableQuery)) {
-        qDebug() << "Error: Unable to create table" << query.lastError().text();
-    }
-
-    // 关闭数据库
-    //m_db.close();
-
-    //qDebug() << "Database created and data inserted successfully.";
+    initDatebase();
 
     QVBoxLayout* rootVLayout = new QVBoxLayout(this);
 
@@ -74,10 +43,7 @@ HistoryRecordDialog::HistoryRecordDialog(QWidget* parent) :
     QTableView* tableView = new QTableView();
     m_model = new QStandardItemModel(0, 5);
     tableView->setModel(m_model);
-    // 设置代理
     tableView->setItemDelegate(new MyDelegate());
-
-    // 禁用编辑功能
     tableView->setEditTriggers(QAbstractItemView::NoEditTriggers);
 
     // 设置表头
@@ -99,9 +65,15 @@ HistoryRecordDialog::HistoryRecordDialog(QWidget* parent) :
     rootVLayout->addLayout(buttonsLayout);
     rootVLayout->addLayout(tableLayout);
 
+    // 需数据连接与model创建好了，才能执行，从数据库中读取数据写入model
     initTableData();
 
     connect(clearBtn, &QPushButton::clicked, this, &HistoryRecordDialog::clickClearBtn);
+}
+
+HistoryRecordDialog::~HistoryRecordDialog() {
+    // 关闭数据库
+    m_db.close();
 }
 
 void HistoryRecordDialog::restartFlow() {
@@ -233,5 +205,28 @@ void HistoryRecordDialog::initTableData() {
         m_model->setData(m_model->index(0, 4), endDateTime);
 
         m_row++;
+    }
+}
+
+void HistoryRecordDialog::initDatebase() {
+    // 创建一个 SQLite 数据库连接
+    m_db = QSqlDatabase::addDatabase("QSQLITE");
+    //m_db->addDatabase("HistoryRecordDialog");
+    m_db.setDatabaseName("data.db");
+    if (!m_db.open()) {
+        qDebug() << "Error: Unable to open database" << m_db.lastError().text();
+    }
+
+    // 创建表
+    QSqlQuery query;
+    QString createTableQuery = "CREATE TABLE IF NOT EXISTS tab_history_record ("
+                               "id INTEGER PRIMARY KEY AUTOINCREMENT, "
+                               "start_datetime TEXT, "
+                               "age INTEGER, "
+                               "height REAL,"
+                               "state TEXT,"
+                               "end_datetime TEXT)";
+    if (!query.exec(createTableQuery)) {
+        qDebug() << "Error: Unable to create table" << query.lastError().text();
     }
 }
