@@ -75,6 +75,24 @@ public:
     /** 析构函数：释放 UI 资源 */
     ~MainWindow();
 
+    /**
+     * 获取MainWindow单例
+     * @return MainWindow实例指针
+     */
+    static MainWindow* getInstance();
+
+    /**
+     * 获取TCP核心对象
+     * @return tcpCore指针
+     */
+    TcpClientCore* getTcpCore() const { return tcpCore; }
+
+    /**
+     * 获取天平TCP核心对象
+     * @return tcpBalanceCore指针
+     */
+    TcpClientCore* getTcpBalanceCore() const { return tcpBalanceCore; }
+
 private slots:
     /**
      * 定时回调：每秒更新一次日期与时间标签
@@ -92,8 +110,6 @@ private slots:
      * 定时回调：每秒检查一次摇床区域，如果endTime已到则停止摇床
      */
     void checkShakeBedTimeout();
-
-    void on_pushButton_6_clicked();
 
     void on_pushButton_7_clicked();
 
@@ -125,6 +141,8 @@ protected:
     void closeEvent(QCloseEvent *event) override;
 
 private:
+    static MainWindow* instance;  // 单例实例
+
     Ui::MainWindow *ui;
     QTimer *timer;
     QTimer *shakeBedCheckTimer;  // 摇床检查定时器
@@ -142,6 +160,12 @@ private:
      * 在窗口关闭时调用，确保所有资源正确释放
      */
     void cleanupResources();
+
+    /**
+     * 检查TCP连接状态和对象有效性
+     * @return 如果TCP核心对象存在且已连接，返回true；否则返回false
+     */
+    bool checkTcpConnection();
 
     // 棋盘封装类
     ChessBoardView *chessBoard = nullptr;
@@ -172,6 +196,12 @@ private:
     TcpClientCore *tcpCore = nullptr;        // TCP通信核心对象
     // TCP负责接收天平的串口信息
     TcpClientCore *tcpBalanceCore = nullptr;        // 天平TCP通信核心对象
+
+    // 称量达标暂停队列：每次 weightReached 入队，按顺序逐个处理（每个暂停10s）
+    QQueue<double> m_pendingWeightPauses;
+    bool m_isProcessingWeightPause = false;
+
+    void processNextWeightPause();
 
     // 数据库管理
     AppSqlDatabase *dbm = nullptr;           // 数据库管理对象

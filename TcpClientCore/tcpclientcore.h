@@ -277,6 +277,9 @@ signals:
     // MainWindow 可以在此信号中调用 sendMessage(m_recipeMessageQueues) 导入下一个配方
     void messageQueueEmpty();
 
+    // 配方被放弃信号（当发生错误时，当前配方被放弃，等待用户确认后继续下一个配方）
+    void recipeAborted(const QString& errorMsg);
+
 private slots:
     void onConnected();
     void onDisconnected();

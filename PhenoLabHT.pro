@@ -20,13 +20,16 @@ SOURCES += \
     main.cpp \
     mainwindow.cpp \
     mainwindow_Test.cpp \
-    mainwindow_xyz.cpp
+    mainwindow_xyz.cpp \
+    collisionrecoverydialog.cpp
 
 HEADERS += \
-    mainwindow.h
+    mainwindow.h \
+    collisionrecoverydialog.h
 
 FORMS += \
-    mainwindow.ui
+    mainwindow.ui \
+    collisionrecoverydialog.ui
 
 # Default rules for deployment.
 qnx: target.path = /tmp/$${TARGET}/bin
@@ -64,6 +67,12 @@ INCLUDEPATH += $$PWD/RecipeQueue
 
 include($$PWD/QSqlDatabase/qsqldatabase.pri)
 INCLUDEPATH += $$PWD/QSqlDatabase
+
+include($$PWD/tcpCamera/tcpCamera.pri)
+INCLUDEPATH += $$PWD/tcpCamera
+
+include($$PWD/DatabaseOnline/DatabaseOnline.pri)
+INCLUDEPATH += $$PWD/DatabaseOnline
 
 
 RESOURCES += \

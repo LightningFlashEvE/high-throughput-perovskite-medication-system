@@ -615,7 +615,7 @@ void TcpClientCore::clearMessageQueue()
 void TcpClientCore::pauseQueue()
 {
     qDebug() << "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━";
-    qDebug() << "⏸ ⏸ ⏸  暂停队列";
+    qDebug() << "暂停队列";
     qDebug() << "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━";
     
     // 设置暂停标志（优先级最高！）
@@ -809,7 +809,7 @@ void TcpClientCore::onReadyRead()
             }
             else // 如果有报错的都走这里，遗弃当前菜单，暂停操作等待恢复。
             { // 队列要暂停，清除当前的m_messageQueue，等待确认完毕则继续执行下一个配方
-                qDebug() << "⚠️⚠️⚠️ 收到错误响应（意外碰撞）";
+                // qDebug() << "⚠️⚠️⚠️ 收到错误响应（意外碰撞），停止轮询并暂停队列";
                 // qDebug() << "错误数据:" << QString::fromUtf8(data) << " | HEX:" << QString(data.toHex().toUpper());
                 
                 // // 1. 停止轮询
@@ -833,6 +833,7 @@ void TcpClientCore::onReadyRead()
                 // m_isProcessingQueue = false;
                 
                 // // 6. 暂停队列（设置暂停标志，等待用户确认）
+                // //    注意：必须先暂停队列，再发出信号，确保新配方的消息不会立即执行
                 // m_isQueuePaused = true;
                 // m_isWaitingForResponse = true;
                 
@@ -841,17 +842,19 @@ void TcpClientCore::onReadyRead()
                 //     m_queueTimer->stop();
                 // }
                 
-                // // 7. 通知上层：当前配方已完成（被放弃），可以继续下一个配方
-                // //    但队列已暂停，需要用户确认后才能继续
-                // emit messageQueueEmpty();
+                // // 7. 构建错误消息
+                // QString errorMsg = QString("收到错误响应（意外碰撞）: %1 (HEX: %2)").arg(QString::fromUtf8(data)).arg(QString(data.toHex().toUpper()));
                 
-                // // 8. 发出错误信号，通知上层处理错误（等待用户确认）
-                // QString errorMsg = QString("收到错误响应（意外碰撞）: %1 (HEX: %2)，当前配方已放弃，等待确认后继续下一个配方")
-                //     .arg(QString::fromUtf8(data))
-                //     .arg(QString(data.toHex().toUpper()));
-                // emit errorOccurred(errorMsg);
+                // // 8. 发出配方放弃信号，通知上层当前配方被放弃
+                // //    上层应该：标记当前配方为完成，但不立即导入下一个配方
+                // //    等待用户确认后，再导入下一个配方并调用 resumeQueue()
+                // emit recipeAborted(errorMsg);
                 
-                // qDebug() << "✓ 错误处理完成：当前配方已放弃，队列已暂停，等待用户确认后继续下一个配方";
+                // // 9. 发出错误信号，通知上层处理错误（用于显示错误信息）
+                // emit errorOccurred(QString("当前配方已放弃，等待确认后继续下一个配方: %1").arg(errorMsg));
+                
+                // qDebug() << "✓ 错误处理完成：当前配方已放弃，队列已暂停";
+                // qDebug() << "  等待用户确认后，上层应导入下一个配方并调用 resumeQueue() 继续执行";
             }
         }
         

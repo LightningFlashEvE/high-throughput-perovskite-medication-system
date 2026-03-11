@@ -1,6 +1,7 @@
 #include "mainwindow.h"
 #include "qsqlerror.h"
 #include "tcpclientcore.h"
+#include "collisionrecoverydialog.h"
 #include <QJsonObject>
 #include <QJsonDocument>
 #include <QDebug>
@@ -22,9 +23,17 @@
 // 网络连接类型选择：true=使用无线网络，false=使用有线网络
 const bool USE_WIRELESS_NETWORK = false;  // 您可以修改这个值来切换网络类型
 
+// 初始化静态单例指针
+MainWindow* MainWindow::instance = nullptr;
+
+// 获取单例实例
+MainWindow* MainWindow::getInstance()
+{
+    return instance;
+}
 void MainWindow::initializeSystemComponents()
 {
-    // ========== 初始化数据库表==========
+    // ========== 初始化数据库表 ==========
     {
         dbm = new AppSqlDatabase("liquid.db", this);
         // 默认表结构与初始数据由 AppSqlDatabase 构造函数自动完成
@@ -32,7 +41,6 @@ void MainWindow::initializeSystemComponents()
 
     // ========== 检查并重置中断的配方（开机时调用）==========
     checkAndResetInterruptedRecipes();
-
 
 
     // ========== 初始化转移区左边区域（15槽位）==========
@@ -84,19 +92,14 @@ void MainWindow::initializeSystemComponents()
     tcpBalanceCore = new TcpClientCore(this);
     tcpBalanceCore->initializeConnectionsForBalance();
 
-    // connetct tcpBalanceCore发出weightReached信号时，tcpCore发送停止命令
+    // 每次 weightReached 都入队；若当前没有在处理暂停流程，则立即启动（只暂停一次队列）
     connect(tcpBalanceCore, &TcpClientCore::weightReached, this, [=](double weight) {
-        qDebug() << "★★★★★★★★★★★★★★★★★★★★★★★★★打断重量值:" << weight << "g\n\n\n";
-        // 暂停队列
-        tcpCore->pauseQueue();
-
-        // 先发送停止命令
-        tcpCore->writeBalanceTareCommand(">01K0EE65", TcpClientCore::AsciiMode);
-        
-        // 10秒后继续队列
-        QTimer::singleShot(10000, this, [=]() {
-            tcpCore->resumeQueue();
-        });
+        m_pendingWeightPauses.enqueue(weight);
+        if (!m_isProcessingWeightPause) {
+            m_isProcessingWeightPause = true;
+            tcpCore->pauseQueue();
+            processNextWeightPause();
+        }
     });
     
     // 连接 tcpCore 的 balancePrintOffRequested 信号，让 tcpBalanceCore 【【【断开接收】】】
@@ -242,7 +245,7 @@ void MainWindow::initializeSystemComponents()
                 qDebug() << QString("已切换tipsHeadArea的currentIndex从 %1 到 %2").arg(currentIndex).arg(newCurrentIndex);
             }
 
-            // 重置tipsHeadUsage表所有记录的status为1
+            // 重置tipsHeadUsage表所有记录的status为 1
             QString resetTipsHeadUsageSql = "UPDATE tipsHeadUsage SET status = 1";
             QSqlQuery resetTipsHeadUsageQuery = dbm->query(resetTipsHeadUsageSql);
             if (resetTipsHeadUsageQuery.lastError().isValid()) {
@@ -314,6 +317,32 @@ void MainWindow::initializeSystemComponents()
         }
     });
 
+    // 连接 tcpCore 的 recipeAborted 信号：当前配方因错误被放弃，等待用户确认后再继续下一个配方
+    connect(tcpCore, &TcpClientCore::recipeAborted, this, [=](const QString& errorMsg) {
+        qDebug() << "⚠️ TcpClientCore 配方被放弃（错误）:" << errorMsg;
+        
+        // 1. 将数据库中当前正在执行的配方标记为"执行完毕"（被放弃）
+        if (dbm) {
+            QString updateSql = QString("UPDATE recipeQueue SET processState = %1 WHERE processState = %2")
+                .arg(RecipeFinished).arg(RecipeProcessing);
+            QSqlQuery updateQuery = dbm->query(updateSql);
+            if (updateQuery.lastError().isValid()) {
+                qWarning() << "更新配方状态为执行完毕失败:" << updateQuery.lastError().text();
+            } else {
+                int rowsAffected = updateQuery.numRowsAffected();
+                if (rowsAffected > 0) {
+                    qDebug() << "已将" << rowsAffected << "个配方标记为执行完毕（被放弃）";
+                }
+            }
+        }
+        
+        // 2. 注意：不立即导入下一个配方，等待用户确认
+        //    用户确认后，应调用 loadAndExecuteNextRecipeFromDatabase() 导入下一个配方
+        //    然后调用 tcpCore->resumeQueue() 继续执行
+        qDebug() << "⚠️ 配方已放弃，队列已暂停，等待用户确认后继续下一个配方";
+        qDebug() << "   用户确认后，请调用 loadAndExecuteNextRecipeFromDatabase() 和 resumeQueue()";
+    });
+
 
 
     // ========== 按钮连接 ==========
@@ -382,6 +411,14 @@ void MainWindow::initializeSystemComponents()
 
     });
     
+
+    // 菜单项：碰撞恢复
+    connect(ui->actionCollisionRecovery, &QAction::triggered, this, [=]() {
+        CollisionRecoveryDialog *dialog = new CollisionRecoveryDialog(this);
+        dialog->setAttribute(Qt::WA_DeleteOnClose);  // 关闭时自动删除
+        dialog->show();
+    });
+
     // 按钮2：断开连接
     connect(ui->pushButton_2, &QPushButton::clicked, this, [=] {
 
@@ -723,14 +760,7 @@ void MainWindow::initializeAllDevices(QQueue<MessageQueueItem>& messageQueue)
 }
 
 
-// 用于tcpBalanceCore，发送T\r\n（十六进制：54 0D 0A），这是天平去皮命令。单纯发送就行->write(dataToSend); 
-void MainWindow::on_pushButton_6_clicked()
-{
-    // 使用十六进制模式发送：54 0D 0A (T\r\n)
-    // tcpBalanceCore->writeBalanceTareCommand("540D0A", TcpClientCore::HexMode);
-    // tcpCore->writeBalanceTareCommand(">01K0EE65", TcpClientCore::AsciiMode);
-    tcpBalanceCore->disconnectReceiveForBalance();
-}
+
 
 
 
@@ -1027,6 +1057,24 @@ QPoint MainWindow::calculateSlotPosition(const SlotPositionConfig& config, int i
     return QPoint(resultX, resultY);
 }
 
+// 检查TCP连接状态和对象有效性
+bool MainWindow::checkTcpConnection()
+{
+    // 检查 tcpCore 对象是否存在
+    if (!tcpCore) {
+        qWarning() << "TCP核心对象未初始化，无法发送命令";
+        return false;
+    }
+    
+    // 检查网络是否连接
+    if (!tcpCore->isConnected()) {
+        qWarning() << "TCP未连接，无法发送命令";
+        return false;
+    }
+    
+    return true;
+}
+
 bool MainWindow::saveRecipeToDatabase(const RecipeQueueItem& recipe, bool insertBeforeFirstPending)
 {
     if (!dbm) {
@@ -1045,9 +1093,9 @@ bool MainWindow::saveRecipeToDatabase(const RecipeQueueItem& recipe, bool insert
         
         if (findQuery.next() && !findQuery.value("minOrder").isNull()) {
             int targetOrder = findQuery.value("minOrder").toInt();
-            // 将所有 executionOrder >= targetOrder 的配方都 +1
-            QString shiftSql = QString("UPDATE recipeQueue SET executionOrder = executionOrder + 1 WHERE executionOrder >= %1").arg(targetOrder);
-            dbm->query(shiftSql);
+            // 将所有 executionOrder >= targetOrder 的配方都 +1（使用参数化查询）
+            QString shiftSql = "UPDATE recipeQueue SET executionOrder = executionOrder + 1 WHERE executionOrder >= ?";
+            dbm->preparedUpdate(shiftSql, {targetOrder});
             executionOrder = targetOrder;
             qDebug() << "插队模式：新配方将插入到 executionOrder =" << executionOrder;
         } else {
@@ -1297,6 +1345,9 @@ bool MainWindow::loadAndExecuteNextRecipeFromDatabase()
     return true;
 }
 
+// 将数据库表中指定字段的值自动加1
+// ⚠️ 注意：whereClause 必须是安全的字符串，不能包含用户输入（避免SQL注入）
+// ⚠️ 建议：如果 whereClause 包含变量，请改用 preparedUpdate() 方法
 bool MainWindow::incrementDatabaseField(const QString& tableName, const QString& fieldName, const QString& whereClause)
 {
     if (!dbm) {
@@ -1305,6 +1356,7 @@ bool MainWindow::incrementDatabaseField(const QString& tableName, const QString&
     }
 
     // 构建UPDATE SQL语句
+    // 注意：表名和字段名不能使用参数化查询（SQL限制），必须确保来自可信源
     QString updateSql;
     if (whereClause.isEmpty()) {
         // 如果没有WHERE条件，更新所有记录（通常不推荐，但保留此功能）
@@ -1333,6 +1385,8 @@ bool MainWindow::incrementDatabaseField(const QString& tableName, const QString&
 }
 
 // 将数据库表中指定字段的值自动减1
+// ⚠️ 注意：whereClause 必须是安全的字符串，不能包含用户输入（避免SQL注入）
+// ⚠️ 建议：如果 whereClause 包含变量，请改用 preparedUpdate() 方法
 bool MainWindow::decrementDatabaseField(const QString& tableName, const QString& fieldName, const QString& whereClause)
 {
     if (!dbm) {
@@ -1341,6 +1395,7 @@ bool MainWindow::decrementDatabaseField(const QString& tableName, const QString&
     }
 
     // 构建UPDATE SQL语句
+    // 注意：表名和字段名不能使用参数化查询（SQL限制），必须确保来自可信源
     QString updateSql;
     if (whereClause.isEmpty()) {
         // 如果没有WHERE条件，更新所有记录（通常不推荐，但保留此功能）
@@ -1681,6 +1736,41 @@ void MainWindow::testRecipeSendWithString(const QJsonObject& recipePacket, const
     qDebug() << "================================";
 
 
+}
+
+// 逐级处理称量达标暂停：每次取队列头部一个重量，发送停止命令，等待10秒后处理下一个；
+// 队列清空后恢复主命令队列。
+// 这样即使重量从0直接跳到最高阈值，每个阈值仍然各等待10秒，不会被跳过。
+void MainWindow::processNextWeightPause()
+{
+    if (m_pendingWeightPauses.isEmpty()) {
+        m_isProcessingWeightPause = false;
+        tcpCore->resumeQueue();
+        qDebug() << "所有称量阈值已处理完毕，恢复队列";
+        return;
+    }
+
+    double weight = m_pendingWeightPauses.dequeue();
+    qDebug() << QString("★★★ 称量达标，发送停止命令，当前重量: %1g，剩余待处理阈值: %2 个")
+                    .arg(weight).arg(m_pendingWeightPauses.size());
+    tcpCore->writeBalanceTareCommand(">01K0EE65", TcpClientCore::AsciiMode);
+
+    auto remaining = std::make_shared<int>(10);
+    qDebug() << QString("⏱ 倒计时: %1 秒").arg(*remaining);
+
+    QTimer *countTimer = new QTimer(this);
+    countTimer->setInterval(1000);
+    connect(countTimer, &QTimer::timeout, this, [=]() {
+        (*remaining)--;
+        if (*remaining <= 0) {
+            countTimer->stop();
+            countTimer->deleteLater();
+            processNextWeightPause();
+        } else {
+            qDebug() << QString("⏱ 倒计时: %1 秒").arg(*remaining);
+        }
+    });
+    countTimer->start();
 }
 
 

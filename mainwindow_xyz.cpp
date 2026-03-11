@@ -322,6 +322,9 @@ bool MainWindow::takeEmptyBottle(const QString& trayName, QQueue<MessageQueueIte
     QString moveToGripAreaZCommand = tcpCore->buildDeviceCommand("06", "D", gripAreaZ, 8);
     messageQueue.enqueue(MessageQueueItem(moveToGripAreaZCommand.toUtf8(), true));
     QString waitGripAreaZCommand = tcpCore->buildDeviceCommand("06", "d", 0, 0);
+
+
+
     messageQueue.enqueue(MessageQueueItem(waitGripAreaZCommand.toUtf8(), true, "06d01"));
 
     // 调整电爪的夹紧与松开的力矩
@@ -349,8 +352,8 @@ bool MainWindow::takeEmptyBottle(const QString& trayName, QQueue<MessageQueueIte
     QString setGripAreaTorqueCommand = tcpCore->buildDeviceCommand("0B", "06", "0103", "003C");
     messageQueue.enqueue(MessageQueueItem(setGripAreaTorqueCommand.toUtf8(), false, "0B060103003C"));
 
-    // 移动到放瓶盖区域
-    QString moveToCapDropXCommand = tcpCore->buildDeviceCommand("0A", "D", 17464, 8);
+    // 移动到放瓶盖区域 
+    QString moveToCapDropXCommand = tcpCore->buildDeviceCommand(  "0A", "D", 17464, 8);
     messageQueue.enqueue(MessageQueueItem(moveToCapDropXCommand.toUtf8(), true));
     QString waitCapDropXCommand = tcpCore->buildDeviceCommand("0A", "d", 0, 0);
     messageQueue.enqueue(MessageQueueItem(waitCapDropXCommand.toUtf8(), true, "0Ad01"));
@@ -441,13 +444,13 @@ bool MainWindow::getLiquid(const QString& liquidName, double volumeMl, QQueue<Me
     Q_UNUSED(volumeMl);
     Q_UNUSED(messageQueue);
 
-    // 移动到liquidName的xyz坐标
-    QString liquidNameSql = "SELECT originX, originY, gripperZ, rightSpacing, bottomSpacing, cols, rows, selfLocation FROM LiquidMaterialArea WHERE liquidName = '" + liquidName + "'";
-    QSqlQuery liquidNameQuery = dbm->query(liquidNameSql);
+    // 移动到liquidName的xyz坐标（使用参数化查询防止SQL注入）
+    QString liquidNameSql = "SELECT originX, originY, gripperZ, rightSpacing, bottomSpacing, cols, rows, selfLocation FROM LiquidMaterialArea WHERE liquidName = ?";
+    QSqlQuery liquidNameQuery = dbm->preparedQuery(liquidNameSql, {liquidName});
     int liquidNameX=0, liquidNameY=0, liquidNameZ=0, liquidNameRightSpacing=0, liquidNameBottomSpacing=0, liquidNameCols=0, liquidNameRows=0, liquidNameSelfLocation=0;
     if (liquidNameQuery.next()) {
         liquidNameX = liquidNameQuery.value("originX").toInt();
-        liquidNameY = liquidNameQuery.value("originY").toInt();
+         liquidNameY = liquidNameQuery.value("originY").toInt();
         liquidNameZ = liquidNameQuery.value("gripperZ").toInt();
         liquidNameRightSpacing = liquidNameQuery.value("rightSpacing").toDouble();
         liquidNameBottomSpacing = liquidNameQuery.value("bottomSpacing").toDouble();
@@ -462,7 +465,7 @@ bool MainWindow::getLiquid(const QString& liquidName, double volumeMl, QQueue<Me
     SlotPositionConfig liquidNameConfig(liquidNameX, liquidNameY, liquidNameCols, liquidNameRows, liquidNameRightSpacing, liquidNameBottomSpacing);
     QPoint targetPos = calculateSlotPosition(liquidNameConfig, liquidNameSelfLocation);
     int liquidNameTargetX = targetPos.x();
-    int liquidNameTargetY = targetPos.y();
+    int liquidNameTargetY = targetPos.y(); 
 
     QString moveToLiquidNameXCommand = tcpCore->buildDeviceCommand("0A", "D", liquidNameTargetX, 8);
     messageQueue.enqueue(MessageQueueItem(moveToLiquidNameXCommand.toUtf8(), true));
@@ -569,12 +572,11 @@ bool MainWindow::getLiquid(const QString& liquidName, double volumeMl, QQueue<Me
 
 
     // 去表里找到selfLocation为tipsHeadUsageSelfLocation的那一行，把status值加1（表示已使用）
-    QString tipsHeadUsageSql_update = QString("UPDATE tipsHeadUsage SET status = status + 1 WHERE selfLocation = %1").arg(tipsHeadUsageSelfLocation);  
-    QSqlQuery tipsHeadUsageQuery_update = dbm->query(tipsHeadUsageSql_update);
-    if (tipsHeadUsageQuery_update.lastError().isValid()) {
-        qWarning() << "更新tipsHeadUsage表失败:" << tipsHeadUsageQuery_update.lastError().text();
-    } else {
+    QString tipsHeadUsageSql_update = "UPDATE tipsHeadUsage SET status = status + 1 WHERE selfLocation = ?";
+    if (dbm->preparedUpdate(tipsHeadUsageSql_update, {tipsHeadUsageSelfLocation})) {
         qDebug() << QString("已更新tipsHeadUsage位置 %1 的status自增1").arg(tipsHeadUsageSelfLocation);
+    } else {
+        qWarning() << "更新tipsHeadUsage表失败";
     }
     
 
@@ -762,9 +764,9 @@ bool MainWindow::getSolid(const QString& solidName, double mass, QQueue<MessageQ
     messageQueue.enqueue(MessageQueueItem("AA1", true)); // 打开天平打印  
     messageQueue.enqueue(MessageQueueItem("AA2", true)); // 去皮
     
-    // 从 SolidMaterialArea 表中根据固体名称查找配置
-    QString solidAreaSql = "SELECT originX, originY, solidZ, rightSpacing, bottomSpacing, cols, rows, currentIndex FROM SolidMaterialArea WHERE solidName = '" + solidName + "'";
-    QSqlQuery solidAreaQuery = dbm->query(solidAreaSql);
+    // 从 SolidMaterialArea 表中根据固体名称查找配置（使用参数化查询防止SQL注入）
+    QString solidAreaSql = "SELECT originX, originY, solidZ, rightSpacing, bottomSpacing, cols, rows, currentIndex FROM SolidMaterialArea WHERE solidName = ?";
+    QSqlQuery solidAreaQuery = dbm->preparedQuery(solidAreaSql, {solidName});
     
     int solidAreaX = 0, solidAreaY = 0, solidAreaZ = 0;
     int rightSpacing = 0, bottomSpacing = 0, cols = 1, rows = 1;
@@ -890,11 +892,11 @@ bool MainWindow::getSolid(const QString& solidName, double mass, QQueue<MessageQ
     // 根据目标重量确定最大速度（三个等级）
     int maxSpeed;
     if (mass < 0.001) {
-        maxSpeed = 100;  // 小于0.001g：最大速度200
+        maxSpeed = 80;  // 小于
     } else if (mass < 0.01) {
-        maxSpeed = 500;  // 0.001g到0.01g：最大速度300
+        maxSpeed = 200;  // 到
     } else {
-        maxSpeed = 800; // 大于等于0.01g：最大速度500
+        maxSpeed = 500; // 大于等于
     }
     qDebug() << "速度最大值用：" << maxSpeed;
     
@@ -977,14 +979,14 @@ bool MainWindow::getSolid(const QString& solidName, double mass, QQueue<MessageQ
 
 
     // 崴脚大法
-    // QString moveSolidXleftCommand = tcpCore->buildDeviceCommand("04", "D", solidAreaX-100, 8);
-    // messageQueue.enqueue(MessageQueueItem(moveSolidXleftCommand.toUtf8(), true));
-    // QString moveSolidXUpCommand = tcpCore->buildDeviceCommand("03", "D", solidAreaY-150, 8);
-    // messageQueue.enqueue(MessageQueueItem(moveSolidXUpCommand.toUtf8(), true));
-    // QString waitmoveSolidXUpCommand = tcpCore->buildDeviceCommand("03", "d", 0, 0);
-    // messageQueue.enqueue(MessageQueueItem(waitmoveSolidXUpCommand.toUtf8(), true, "03d01"));
-    // QString waitmoveSolidXleftCommand = tcpCore->buildDeviceCommand("04", "d", 0, 0);
-    // messageQueue.enqueue(MessageQueueItem(waitmoveSolidXleftCommand.toUtf8(), true, "04d01"));
+    QString moveSolidXleftCommand = tcpCore->buildDeviceCommand("04", "D", solidAreaX-100, 8);
+    messageQueue.enqueue(MessageQueueItem(moveSolidXleftCommand.toUtf8(), true));
+    QString moveSolidXUpCommand = tcpCore->buildDeviceCommand("03", "D", solidAreaY-150, 8);
+    messageQueue.enqueue(MessageQueueItem(moveSolidXUpCommand.toUtf8(), true));
+    QString waitmoveSolidXUpCommand = tcpCore->buildDeviceCommand("03", "d", 0, 0);
+    messageQueue.enqueue(MessageQueueItem(waitmoveSolidXUpCommand.toUtf8(), true, "03d01"));
+    QString waitmoveSolidXleftCommand = tcpCore->buildDeviceCommand("04", "d", 0, 0);
+    messageQueue.enqueue(MessageQueueItem(waitmoveSolidXleftCommand.toUtf8(), true, "04d01"));
 
 
 
@@ -1176,16 +1178,12 @@ void MainWindow::tightenBottle(QQueue<MessageQueueItem>& messageQueue)
         qWarning() << "数据库对象未初始化，无法更新shakeBedArea的isEmpty状态";
         return;
     }
-    QString updateShakeBedAreaSql = QString("UPDATE shakeBedArea SET isEmpty = isEmpty + 1 WHERE selfLocation = %1")
-            .arg(shakeBedAreaSelfLocation);
-    QSqlQuery updateShakeBedAreaQuery = dbm->query(updateShakeBedAreaSql);
-    if (updateShakeBedAreaQuery.lastError().isValid()) {
-        qWarning() << "更新shakeBedArea表isEmpty失败:" << updateShakeBedAreaQuery.lastError().text()
-                   << "SQL:" << updateShakeBedAreaSql;
+    QString updateShakeBedAreaSql = "UPDATE shakeBedArea SET isEmpty = isEmpty + 1 WHERE selfLocation = ?";
+    if (!dbm->preparedUpdate(updateShakeBedAreaSql, {shakeBedAreaSelfLocation})) {
+        qWarning() << "更新shakeBedArea表isEmpty失败";
         return;
-    } else {
-        qDebug() << "摇床位置立刻" << shakeBedAreaSelfLocation << "的isEmpty自加1，标记为占用";
     }
+    qDebug() << "摇床位置立刻" << shakeBedAreaSelfLocation << "的isEmpty自加1，标记为占用";
 
 
     // 移动到摇床位置
@@ -1242,19 +1240,17 @@ bool MainWindow::recordShakeBedTime(int selfLocation, int shakeDurationSeconds)
     QString startTimeStr = currentDateTime.toString("yyyy-MM-dd hh:mm:ss");
     QString endTimeStr = endDateTime.toString("yyyy-MM-dd hh:mm:ss");
 
-    // 3. 更新数据库：设置startTime、endTime和isEmpty（使用字符串格式），，这里实现自加1
-    QString updateSql = QString("UPDATE shakeBedArea SET startTime = '%1', endTime = '%2', isEmpty = isEmpty + 1 WHERE selfLocation = %3")
-        .arg(startTimeStr, endTimeStr, QString::number(selfLocation));
-
-    QSqlQuery updateQuery = dbm->query(updateSql);
-    if (updateQuery.lastError().isValid()) {
-        qWarning() << "更新shakeBedArea表失败:" << updateQuery.lastError().text() << "SQL:" << updateSql;
+    // 3. 更新数据库：设置startTime、endTime和isEmpty（使用参数化查询）
+    QString updateSql = "UPDATE shakeBedArea SET startTime = ?, endTime = ?, isEmpty = isEmpty + 1 WHERE selfLocation = ?";
+    
+    if (!dbm->preparedUpdate(updateSql, {startTimeStr, endTimeStr, selfLocation})) {
+        qWarning() << "更新shakeBedArea表失败";
         return false;
-    } else {
-        qDebug() << QString("已更新shakeBedArea表，位置%1：开始时间=%2，结束时间=%3")
-            .arg(QString::number(selfLocation), startTimeStr, endTimeStr);
-        return true;
     }
+    
+    qDebug() << QString("已更新shakeBedArea表，位置%1：开始时间=%2，结束时间=%3")
+        .arg(QString::number(selfLocation), startTimeStr, endTimeStr);
+    return true;
 
 }
 

@@ -1,4 +1,5 @@
 #include "mainwindow.h"
+#include "tcpCamera.h"
 #include "ui_mainwindow.h"
 #include <QTimer>
 #include <QDateTime>
@@ -28,6 +29,9 @@ MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
     , ui(new Ui::MainWindow)
 {
+    // 设置单例实例
+    instance = this;
+    
     ui->setupUi(this);
 
     // 将“停止”按钮（pushButton_Stop）关联到紧急停止槽
@@ -259,88 +263,24 @@ MainWindow::MainWindow(QWidget *parent)
         });
     }
 
-    // 初始化滑块值显示标签
-    if (ui->horizontalSliderTight) {
-        sliderValueLabel = new QLabel(this);
-        sliderValueLabel->setStyleSheet(
-            "QLabel {"
-            "  background-color: rgba(0, 0, 0, 200);"
-            "  color: white;"
-            "  border-radius: 4px;"
-            "  padding: 2px 6px;"
-            "  font-size: 12px;"
-            "}"
-        );
-        sliderValueLabel->setAlignment(Qt::AlignCenter);
-        sliderValueLabel->hide();  // 初始隐藏
-        
-        // 更新标签位置的辅助函数
-        auto updateLabelPosition = [this](int value) {
-            if (!sliderValueLabel || !ui->horizontalSliderTight) return;
-            
-            QSlider *slider = ui->horizontalSliderTight;
-            
-            // 更新标签文本
-            sliderValueLabel->setText(QString::number(value));
-            sliderValueLabel->adjustSize();
-            
-            // 计算滑块值对应的位置比例
-            double ratio = 0.0;
-            if (slider->maximum() != slider->minimum()) {
-                ratio = (value - slider->minimum()) / double(slider->maximum() - slider->minimum());
-            }
-            
-            // 获取滑块的几何位置（相对于父控件）
-            QRect sliderRect = slider->geometry();
-            
-            // 估算滑块的可用宽度（考虑左右边距，通常QSlider左右各留约12-15像素）
-            const int margin = 15;  // 滑块左右边距
-            int availableWidth = sliderRect.width() - 2 * margin;
-            
-            // 计算滑块拖动点在滑块控件内的相对X坐标
-            int handleXRelative = margin + int(ratio * availableWidth);
-            
-            // 将滑块内的相对坐标转换为窗口坐标
-            QPoint sliderLocalPos(handleXRelative, sliderRect.height() / 2);
-            QPoint globalPos = slider->mapToGlobal(sliderLocalPos);
-            QPoint windowPos = this->mapFromGlobal(globalPos);
-            
-            // 设置标签位置（在滑块上方居中）
-            int labelX = windowPos.x() - sliderValueLabel->width() / 2;
-            int labelY = windowPos.y() - sliderRect.height() / 2 - sliderValueLabel->height() - 8;  // 在滑块上方8像素
-            
-            sliderValueLabel->move(labelX, labelY);
-            sliderValueLabel->show();
-        };
-        
-        // 当开始拖动时显示标签
-        connect(ui->horizontalSliderTight, &QSlider::sliderPressed, this, [this, updateLabelPosition]() {
-            if (sliderValueLabel && ui->horizontalSliderTight) {
-                updateLabelPosition(ui->horizontalSliderTight->value());
-            }
-        });
-        
-        // 拖动时更新标签位置和文本
-        connect(ui->horizontalSliderTight, &QSlider::valueChanged, this, [updateLabelPosition](int value) {
-            updateLabelPosition(value);
-        });
-        
-        // 当滑块停止拖动时延迟隐藏标签
-        connect(ui->horizontalSliderTight, &QSlider::sliderReleased, this, [this]() {
-            if (sliderValueLabel) {
-                QTimer::singleShot(1000, this, [this]() {  // 1秒后隐藏
-                    if (sliderValueLabel) {
-                        sliderValueLabel->hide();
-                    }
-                });
-            }
-        });
+
+
+    // 创建实例
+    tcpCamera *camera = new tcpCamera(this);
+
+    // 连接相机
+    if (camera->tcpCameraConnect()) {
+        // 发送命令
+        camera->startTime(10000, true);
     }
 
 }
 
 MainWindow::~MainWindow()
 {
+    // 清空单例实例
+    instance = nullptr;
+    
     // 清理资源（在 closeEvent 中已经处理，这里作为保险）
     cleanupResources();
     
@@ -638,12 +578,11 @@ void MainWindow::checkShakeBedTimeout()
             saveAndExecuteRecipe(newRecipeTianPing, true);
 
             // ++++ 4.isEmpty自加1 ++++（表示已记录在流程里，值变为4，放置后4改1）
-            QString updateSql = QString("UPDATE shakeBedArea SET isEmpty = isEmpty+1 WHERE selfLocation = %1").arg(selfLocation);
-            QSqlQuery updateQuery = dbm->query(updateSql);
-            if (updateQuery.lastError().isValid()) {
-                qWarning() << "更新shakeBedArea表失败:" << updateQuery.lastError().text();
-            } else {
+            QString updateSql = "UPDATE shakeBedArea SET isEmpty = isEmpty+1 WHERE selfLocation = ?";
+            if (dbm->preparedUpdate(updateSql, {selfLocation})) {
                 qDebug() << QString("已更新摇床位置 %1 的状态为空").arg(selfLocation);
+            } else {
+                qWarning() << "更新shakeBedArea表失败";
             }
 
             break;
@@ -801,12 +740,11 @@ void MainWindow::moveShakeBedToFinishedProductArea(int selfLocation, QQueue<Mess
     //tcpCore->sendMessageAsync(waitGripperReleaseCommand.toUtf8(), false, "0503020001");
     messageQueue.enqueue(MessageQueueItem(waitGripperReleaseCommand.toUtf8(), false, "0503020001"));
     // 更新数据库：将成品区的currentIndex加1
-    QString updateSql = QString("UPDATE other SET currentIndex = currentIndex + 1 WHERE name = 'transferRightArea'");
-    QSqlQuery updateQuery = dbm->query(updateSql);
-    if (updateQuery.lastError().isValid()) {
-        qWarning() << "更新other表失败:" << updateQuery.lastError().text();
-    } else {
+    QString updateSql = "UPDATE other SET currentIndex = currentIndex + 1 WHERE name = ?";
+    if (dbm->preparedUpdate(updateSql, {"transferRightArea"})) {
         qDebug() << QString("已更新成品区的currentIndex为 %1").arg(transferRightAreaCurrentIndex + 1);
+    } else {
+        qWarning() << "更新other表失败";
     }
     // 上移Z轴
     // QString raiseTransferZCommand = tcpCore->buildDeviceCommand("06", "D", 100, 8);
