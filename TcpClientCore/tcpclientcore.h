@@ -223,6 +223,10 @@ signals:
     // 6号电机Z轴坐标信号（当收到"06E"查询响应时发出）
     void z6CoordinateReceived(int coordinate);
     
+    // 天平实时重量更新信号（每次收到天平数据都发出，用于状态栏实时显示）
+    // currentWeight: 当前天平读数; targetThreshold: 当前正在瞄准的阈值; goalWeight: 最终目标重量
+    void balanceWeightReceived(double currentWeight, double targetThreshold, double goalWeight);
+
     // 天平重量达标信号
     void weightReached(double weight);
     

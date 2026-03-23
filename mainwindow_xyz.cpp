@@ -904,6 +904,7 @@ bool MainWindow::getSolid(const QString& solidName, double mass, QQueue<MessageQ
     messageQueue.enqueue(MessageQueueItem(setExpectedWeightCommand.toUtf8(), true));
 
 
+
     // QString moveToBalanceAreaZCommand = tcpCore->buildDeviceCommand("02", "D", balanceAreasolidZ, 8);
     // messageQueue.enqueue(MessageQueueItem(moveToBalanceAreaZCommand.toUtf8(), true));
     // QString waitBalanceAreaZCommand = tcpCore->buildDeviceCommand("02", "d", 0, 0);

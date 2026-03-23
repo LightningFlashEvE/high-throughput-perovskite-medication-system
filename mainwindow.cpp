@@ -8,6 +8,7 @@
 #include <QCloseEvent>
 #include <QPainter>
 #include <algorithm> // for std::clamp
+#include <QLabel>
 #include <QMenu>
 #include <QPushButton>
 #include <QPixmap>
@@ -257,7 +258,13 @@ MainWindow::MainWindow(QWidget *parent)
         });
     }
 
-
+    /*** 初始化状态栏天平重量实时显示标签 ***/
+    m_statusWeightLabel = new QLabel(this);
+    m_statusWeightLabel->setFont(QFont("Courier New", 9));
+    m_statusWeightLabel->setAlignment(Qt::AlignLeft | Qt::AlignVCenter);
+    ui->statusbar->addWidget(m_statusWeightLabel, 1);
+    // 开机时用占位符填充，确保格式立刻可见
+    updateWeightStatusBar(0.0, 0.0, 0.0);
 
 }
 
@@ -308,18 +315,7 @@ void MainWindow::onEmergencyStopButtonClicked()
 
     saveAndExecuteRecipe(newRecipe);
 
-    // QString stopLeftXyzCommand = tcpCore->buildDeviceCommand("02", "K", 0, 0);
-    // tcpCore->sendMessageAsync(stopLeftXyzCommand.toUtf8(), true, "02K");
-    // QString stopLeftYzCommand = tcpCore->buildDeviceCommand("03", "K", 0, 0);
-    // tcpCore->sendMessageAsync(stopLeftYzCommand.toUtf8(), true, "03K");
-    // QString stopLeftZCommand = tcpCore->buildDeviceCommand("04", "K", 0, 0);
-    // tcpCore->sendMessageAsync(stopLeftZCommand.toUtf8(), true, "04K");
 
-    // 左侧电机   1号电机
-
-    // 右侧xyz   6，8，9，10号电机
-
-    // 右侧电机   5，7号电机
 }
 
 void MainWindow::cleanupResources()
@@ -420,6 +416,26 @@ void MainWindow::cleanupResources()
     QApplication::processEvents(QEventLoop::ExcludeUserInputEvents, 100);
     
     qDebug() << "资源清理完成";
+}
+
+// 更新状态栏天平重量显示（三列：当前 / 目标 / 目的，各占8位，靠左对齐）
+void MainWindow::updateWeightStatusBar(double current, double target, double goal)
+{
+    if (!m_statusWeightLabel) return;
+
+    // 将数值格式化为宽度8、保留4位小数、靠左显示的字段
+    // 若值为0则以 "--" 占位，保持列宽一致
+    auto fmtField = [](double v) -> QString {
+        if (v == 0.0)
+            return QString("--").leftJustified(8);
+        return QString::number(v, 'f', 4).leftJustified(8);
+    };
+
+    QString text = QString("当前：<b>%1</b>  目标：<b>%2</b>  目的：<b>%3</b>")
+                       .arg(fmtField(current))
+                       .arg(fmtField(target))
+                       .arg(fmtField(goal));
+    m_statusWeightLabel->setText(text);
 }
 
 // 每秒刷新日期与时间显示

@@ -44,6 +44,7 @@ class Box;
 class ReagentBottle;
 class TcpClientCore;
 class AppSqlDatabase;
+class QLabel;
 
 /**
  * MainWindow
@@ -173,6 +174,17 @@ private:
 
     // 数据库管理
     AppSqlDatabase *dbm = nullptr;           // 数据库管理对象
+
+    // 状态栏：天平重量实时显示标签
+    QLabel *m_statusWeightLabel = nullptr;
+
+    /**
+     * 更新状态栏天平重量显示
+     * @param current  天平当前读数（g）
+     * @param target   当前阶段瞄准的重量阈值（g），0 表示无目标
+     * @param goal     最终目标重量（g），0 表示无目标
+     */
+    void updateWeightStatusBar(double current, double target, double goal);
 
     // 摇床初始化连接（用于监听启动回复）
     QMetaObject::Connection m_shakeBedInitConnection;

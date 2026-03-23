@@ -84,6 +84,10 @@ void MainWindow::initializeSystemComponents()
     tcpBalanceCore = new TcpClientCore(this);
     tcpBalanceCore->initializeConnectionsForBalance();
 
+    // 连接天平实时重量信号 -> 状态栏实时显示（当前/目标/目的）
+    connect(tcpBalanceCore, &TcpClientCore::balanceWeightReceived,
+            this, &MainWindow::updateWeightStatusBar);
+
     // connetct tcpBalanceCore发出weightReached信号时，tcpCore发送停止命令
     connect(tcpBalanceCore, &TcpClientCore::weightReached, this, [=](double weight) {
  

@@ -312,6 +312,7 @@ void TcpClientCore::setExpectedWeight(double weight)
         weight = 0.0003;
     }
 
+    qDebug() << "设置期望重量值顶顶顶顶顶顶顶顶顶顶顶顶顶顶顶顶顶顶顶顶:" << weight << "mg";
     g_expectedWeight = weight;
 
     // 清空阈值和触发标记
@@ -845,7 +846,7 @@ void TcpClientCore::onReadyRead()
 
         if (conditionMet) {
             qDebug() << "匹配成功，匹配成功的命令。" << data;
-            qDebug() << "结束轮询。";
+            qDebug() << "";
             // 停止轮询
             stopPolling();
             m_currentExpectedNormalized.clear();
@@ -1012,7 +1013,7 @@ void TcpClientCore::onBalanceReadyRead()
 
     QByteArray data = m_tcpSocket->readAll();
     QString dataStr = QString::fromUtf8(data);
-    //qDebug() << "天平收到数据:" << dataStr << QString(data.toHex().toUpper());
+    // qDebug() << "天平收到数据:" << dataStr ;  // << QString(data.toHex().toUpper())
 
     // 正则表达式：匹配数字（包括负数、浮动点数字）
     // 支持格式：22.1074 g、-22.1074 g、N     -  22.1074 g 等
@@ -1026,11 +1027,26 @@ void TcpClientCore::onBalanceReadyRead()
         QString numberStr = match.captured(2); // 获取数字部分
         QString weightStr = sign + numberStr;   // 组合符号和数字
 
+        // qDebug() << "天平收到数据:" << sign << numberStr << weightStr ; 
+
+
         bool ok;
         double weight = weightStr.toDouble(&ok);
 
+        // 无论是否在称重等待状态，只要解析到有效重量就发出实时更新信号（供状态栏显示）
+        if (ok) {
+            double targetThreshold = 0.0;
+            for (int i = 0; i < 3; i++) {
+                if (!g_thresholdTriggered[i]) {
+                    targetThreshold = g_weightThresholds[i];
+                    break;
+                }
+            }
+            emit balanceWeightReceived(weight, targetThreshold, g_expectedWeight);
+        }
+
         if (!g_isWeightPauseActive) {
-            qDebug() << QString("●●NONONONONONONONONO●●  %1g 期望值%3g-----").arg(weight).arg(g_expectedWeight);
+            //qDebug() << QString("●●NONONONONONONONONO●●  %1g 期望值%3g-----").arg(weight).arg(g_expectedWeight);
             return;
         }
 
@@ -1508,7 +1524,7 @@ bool TcpClientCore::checkIfGripperInitialized(const QByteArray& data)
 // 处理消息队列
 void TcpClientCore::processMessageQueue()
 {
-    qDebug() << "●●●●●●processMessageQueue() 被调用，★★★★★当前队列长度:" << m_messageQueue.size() << "★★★★★";
+    //qDebug() << "●●●●●●processMessageQueue() 被调用，★★★★★当前队列长度:" << m_messageQueue.size() << "★★★★★";
 
     // 如果队列为空，停止处理
     if (m_messageQueue.isEmpty()) {
@@ -1529,7 +1545,7 @@ void TcpClientCore::processMessageQueue()
 
     // 取出队列中的第一条消息
     MessageQueueItem item = m_messageQueue.dequeue();
-    qDebug() << "▲▲▲正在处理消息:" << item.content << " | 剩余队列长度:" << m_messageQueue.size();
+    // qDebug() << "▲▲▲正在处理消息:" << item.content << " | 剩余队列长度:" << m_messageQueue.size();
 
 
 
@@ -1591,6 +1607,9 @@ void TcpClientCore::processMessageQueue()
             setExpectedWeight(weight); // 给谁设置重量：tcpCore
             emit setExpectedWeightRequested(weight);// 给谁设置重量：tcpBalanceCore
             qDebug() << "检测到AAsetExpectedWeight命令，设置期望重量:" << weight << "mg";
+
+
+
         } else {
             qWarning() << "AAsetExpectedWeight命令格式错误，无法解析重量值:" << weightStr;
         }
