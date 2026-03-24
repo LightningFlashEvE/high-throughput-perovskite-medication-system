@@ -26,7 +26,7 @@ void MainWindow::initializeSystemComponents()
 {
     // ========== 初始化数据库表==========
     {
-        dbm = new AppSqlDatabase("liquid.db", this);
+        dbm = new AppSqlDatabase(this);
         // 默认表结构与初始数据由 AppSqlDatabase 构造函数自动完成
     }
 

@@ -1,0 +1,21 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(echo:*)",
+      "Bash(export:*)",
+      "Bash(source:*)",
+      "Bash(env)",
+      "Bash(pip show:*)",
+      "Bash(pip install:*)",
+      "Bash(python check_mysql.py)",
+      "Bash(iconv -f gbk -t utf-8)",
+      "Bash(Remove-Item \"D:/application/high-throughput-perovskite-medication-system/check_mysql.py\")",
+      "Bash(ping 192.168.10.170 -n 2)",
+      "Read(//d//**)",
+      "Bash(where qmake:*)",
+      "Bash(find D:/application/high-throughput-perovskite-medication-system/build -name *.exe)",
+      "Bash(find /c/Qt/6.9.3 -name qsqlmysql* 2)",
+      "Bash(/dev/null find:*)"
+    ]
+  }
+}

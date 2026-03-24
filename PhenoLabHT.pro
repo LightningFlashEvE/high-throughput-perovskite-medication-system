@@ -1,4 +1,4 @@
-QT       += core gui
+QT += core gui
 QT += widgets
 QT += qml quick quickwidgets
 QT += serialport
