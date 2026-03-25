@@ -260,49 +260,57 @@ bool MainWindow::takeEmptyBottle(const QString& trayName, QQueue<MessageQueueIte
 {
     Q_UNUSED(trayName);
 
-    // TODO: 在此处编写取空瓶的具体实现
-    // 查询数据库表 Box_Transfer_Area_Right 获取 x y z 和 currentIndex四个信息
-    QString transferAreaSql = "SELECT originX, originY, gripperZ, currentIndex, rightSpacing, bottomSpacing, cols, `rows` FROM other WHERE name = 'emptyBottleArea'";
+    // 1. 从 pan_init 获取空瓶区盘首坐标和网格参数
+    QString transferAreaSql = "SELECT x, y, gripperZ, rightSpacing, bottomSpacing, cols, `rows` FROM pan_init WHERE name = 'emptyPosition'";
     QSqlQuery transferAreaQuery = dbm->query(transferAreaSql);
 
-    // 改用int类型
-    int transferOriginX, transferOriginY, transferGripperZ, transferSlotIndex, transferRightSpacing, transferBottomSpacing, transferCols, transferRows;
+    int transferOriginX = 0, transferOriginY = 0, transferGripperZ = 0;
+    int transferRightSpacing = 0, transferBottomSpacing = 0, transferCols = 1, transferRows = 1;
 
     if (transferAreaQuery.next()) {
-        // 在赋值时直接转换为8位十六进制字符串（大写）
-        transferOriginX = transferAreaQuery.value("originX").toInt();
-        transferOriginY = transferAreaQuery.value("originY").toInt();
-        transferGripperZ = transferAreaQuery.value("gripperZ").toInt();
-        transferSlotIndex = transferAreaQuery.value("currentIndex").toInt();
-        transferRightSpacing = transferAreaQuery.value("rightSpacing").toDouble();
-        transferBottomSpacing = transferAreaQuery.value("bottomSpacing").toDouble();
-        transferCols = transferAreaQuery.value("cols").toInt();
-        transferRows = transferAreaQuery.value("rows").toInt();
-        //qDebug() << "Transfer area coordinates:" << transferOriginX << transferOriginY << transferGripperZ << "slot index:" << transferSlotIndex << "rightSpacing:" << transferRightSpacing << "bottomSpacing:" << transferBottomSpacing << "cols:" << transferCols << "rows:" << transferRows;
-        Q_UNUSED(transferSlotIndex);
+        transferOriginX    = transferAreaQuery.value("x").toInt();
+        transferOriginY    = transferAreaQuery.value("y").toInt();
+        transferGripperZ   = transferAreaQuery.value("gripperZ").toInt();
+        transferRightSpacing  = transferAreaQuery.value("rightSpacing").toInt();
+        transferBottomSpacing = transferAreaQuery.value("bottomSpacing").toInt();
+        transferCols       = transferAreaQuery.value("cols").toInt();
+        transferRows       = transferAreaQuery.value("rows").toInt();
     } else {
-        qWarning() << "未找到 other 表的 emptyBottleArea 数据";
+        qWarning() << "未找到 pan_init 表的 emptyPosition 数据";
         return false;
     }
-    // 如果currentIndex是15的时候，把数据库改成0，改成获取首个。因为15是最后一个，获取首个。同时不希望超出范围。同时需要修改数据库。
-    if(transferSlotIndex == 15) {
-        transferSlotIndex = 0;
-        // 将 currentIndex 重置为 0
-        QString resetSql = QString("UPDATE other SET currentIndex = 0 WHERE name = 'emptyBottleArea'");
-        QSqlQuery resetQuery = dbm->query(resetSql);
-        if (resetQuery.lastError().isValid()) {
-            qWarning() << "重置 emptyBottleArea 的 currentIndex 失败:" << resetQuery.lastError().text();
-        }
+
+    // 2. 从 pan_EmptyBottlePosition 找 drug_name 不为空且 slot_index 最小的可用槽位
+    QString slotSql = "SELECT slot_index FROM pan_EmptyBottlePosition WHERE drug_name != '' ORDER BY slot_index ASC LIMIT 1";
+    QSqlQuery slotQuery = dbm->query(slotSql);
+
+    int transferSlotIndex = -1;
+    if (slotQuery.next()) {
+        transferSlotIndex = slotQuery.value("slot_index").toInt();
+    } else {
+        qWarning() << "pan_EmptyBottlePosition 中没有可用槽位（drug_name 均为空）";
+        return false;
     }
 
-    // 使用 calculateSlotPosition 函数计算目标槽位坐标
-    SlotPositionConfig config(transferOriginX, transferOriginY, transferCols, transferRows, transferRightSpacing, transferBottomSpacing);
+    // 校验槽位下标范围，超出范围就取首个位置坐标
+    int maxSlot = transferCols * transferRows - 1;
+    if (transferSlotIndex < 0 || transferSlotIndex > maxSlot) {
+        qWarning() << "slot_index" << transferSlotIndex << "超出范围 [0," << maxSlot << "]";
+        transferSlotIndex = 0;
+    }
 
+    // 3. 计算目标坐标
+    SlotPositionConfig config(transferOriginX, transferOriginY, transferCols, transferRows, transferRightSpacing, transferBottomSpacing);
     QPoint targetPos = calculateSlotPosition(config, transferSlotIndex);
     int emptyBottleAreaTargetX = targetPos.x();
     int emptyBottleAreaTargetY = targetPos.y();
 
-    incrementDatabaseField("other", "currentIndex", "name = 'emptyBottleArea'");
+    // 4. 取走空瓶后将该槽位的 drug_name 清空（不修改 value 字段）
+    QString updateSlotSql = QString("UPDATE pan_EmptyBottlePosition SET drug_name = '' WHERE slot_index = %1").arg(transferSlotIndex);
+    QSqlQuery updateSlotQuery = dbm->query(updateSlotSql);
+    if (updateSlotQuery.lastError().isValid()) {
+        qWarning() << "清空 pan_EmptyBottlePosition drug_name 失败:" << updateSlotQuery.lastError().text();
+    }
 
     // 添加命令到消息队列而不是直接发送
     QString moveToTransferXCommand = tcpCore->buildDeviceCommand("0A", "D", emptyBottleAreaTargetX, 8);
