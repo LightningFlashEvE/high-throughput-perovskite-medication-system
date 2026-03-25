@@ -15,7 +15,10 @@
       "Bash(where qmake:*)",
       "Bash(find D:/application/high-throughput-perovskite-medication-system/build -name *.exe)",
       "Bash(find /c/Qt/6.9.3 -name qsqlmysql* 2)",
-      "Bash(/dev/null find:*)"
+      "Bash(/dev/null find:*)",
+      "Bash(python fix_auto_increment.py)",
+      "Bash(python check_conn.py)",
+      "Bash(rm check_conn.py)"
     ]
   }
 }

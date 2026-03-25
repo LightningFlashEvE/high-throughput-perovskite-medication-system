@@ -78,6 +78,9 @@ public:
     // 继续队列处理
     void resumeQueue();
 
+    /** 队列是否处于用户暂停（pauseQueue）状态 */
+    bool isQueuePaused() const { return m_isQueuePaused; }
+
     // 断开连接
     void disconnectFromTcp();
     // 仅复位内部状态（不主动断开连接）

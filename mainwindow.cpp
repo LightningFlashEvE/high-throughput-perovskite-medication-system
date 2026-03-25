@@ -20,6 +20,8 @@
 #include "rtspplayer.h"
 #include "tcpclientcore.h"
 #include "qsqldatabase.h"
+#include "databasesettingsdialog.h"
+#include "networksettingsdialog.h"
 #include <QtSql/QSqlQuery>
 #include <QSqlError>
 
@@ -247,6 +249,14 @@ MainWindow::MainWindow(QWidget *parent)
             rtspPlayerPanel->show();
             rtspPlayerPanel->raise();
             rtspPlayerPanel->activateWindow();
+        });
+
+        // 网络设置菜单项（含数据库与 TCP）
+        QAction *settingsActionNetwork = new QAction("网络设置", this);
+        ui->menuSettings->addAction(settingsActionNetwork);
+        connect(settingsActionNetwork, &QAction::triggered, this, [this] {
+            NetworkSettingsDialog dlg(dbm, tcpCore, tcpBalanceCore, this);
+            dlg.exec();
         });
     }
 

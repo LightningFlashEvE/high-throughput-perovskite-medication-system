@@ -17,6 +17,7 @@
 #include <QNetworkAddressEntry>
 #include <QAbstractSocket>
 #include <QHostAddress>
+#include <QSettings>
 
 // ========== 网络配置 ==========
 // 网络连接类型选择：true=使用无线网络，false=使用有线网络
@@ -339,29 +340,41 @@ void MainWindow::initializeSystemComponents()
     // ========== 按钮连接 ==========
     // 按钮1：连接并发送测试命令
     connect(ui->pushButton, &QPushButton::clicked, this, [=] {
-        // 根据配置自动获取本地网口IP地址（有线或无线），如果没找到则使用默认IP
-        QString localIP;
-        if (USE_WIRELESS_NETWORK) {
-            localIP = getLocalWirelessIP();
-            if (localIP.isEmpty()) {
-                localIP = "192.168.5.78";  // 使用默认IP
-                qDebug() << "未找到无线网口IP，使用默认IP地址:" << localIP;
+        // 从 BoxData.ini 读取 TCP 连接参数（与网络设置对话框共用同一数据源）
+        QSettings tcpIni("BoxData.ini", QSettings::IniFormat);
+        tcpIni.beginGroup("TCP");
+        QString savedLocalIP          = tcpIni.value("localIP",              "").toString();
+        QString tcpCoreRemoteIP       = tcpIni.value("tcpCoreRemoteIP",      "192.168.5.201").toString();
+        quint16 tcpCoreRemotePort     = static_cast<quint16>(tcpIni.value("tcpCoreRemotePort",    4196).toUInt());
+        QString tcpBalanceRemoteIP    = tcpIni.value("tcpBalanceRemoteIP",   "192.168.5.201").toString();
+        quint16 tcpBalanceRemotePort  = static_cast<quint16>(tcpIni.value("tcpBalanceRemotePort", 4197).toUInt());
+        tcpIni.endGroup();
+
+        // 本机 IP：优先用 ini 中保存的值，否则自动查找有线 IP
+        QString localIP = savedLocalIP;
+        if (localIP.isEmpty()) {
+            if (USE_WIRELESS_NETWORK) {
+                localIP = getLocalWirelessIP();
+                if (localIP.isEmpty()) {
+                    localIP = "192.168.5.78";
+                    qDebug() << "未找到无线网口IP，使用默认IP地址:" << localIP;
+                } else {
+                    qDebug() << "使用自动获取的无线网口IP地址:" << localIP;
+                }
             } else {
-                qDebug() << "使用自动获取的无线网口IP地址:" << localIP;
-            }
-        } else {
-            localIP = getLocalWiredIP();
-            if (localIP.isEmpty()) {
-                localIP = "192.168.5.78";  // 使用默认IP
-                qDebug() << "未找到有线网口IP，使用默认IP地址:" << localIP;
-            } else {
-                qDebug() << "使用自动获取的有线网口IP地址:" << localIP;
+                localIP = getLocalWiredIP();
+                if (localIP.isEmpty()) {
+                    localIP = "192.168.5.78";
+                    qDebug() << "未找到有线网口IP，使用默认IP地址:" << localIP;
+                } else {
+                    qDebug() << "使用自动获取的有线网口IP地址:" << localIP;
+                }
             }
         }
-        
+
         // 连接到TCP服务器
-        bool okMain = tcpCore->connectToTcp(localIP, "192.168.5.201", 4196, true);
-        bool okBalance = tcpBalanceCore->connectToTcp(localIP, "192.168.5.201", 4197, true);
+        bool okMain    = tcpCore->connectToTcp(localIP, tcpCoreRemoteIP,    tcpCoreRemotePort,    true);
+        bool okBalance = tcpBalanceCore->connectToTcp(localIP, tcpBalanceRemoteIP, tcpBalanceRemotePort, true);
 
         // 任意一个连接失败，都不继续后续初始化
         if (!okMain || !okBalance) {
@@ -730,16 +743,6 @@ void MainWindow::initializeAllDevices(QQueue<MessageQueueItem>& messageQueue)
     messageQueue.enqueue(MessageQueueItem(initializeGripAreaCommand.toUtf8(), false));
     QString waitGripAreaInitializedCommand = tcpCore->buildDeviceCommand("0B", "03", "0200", 1, 4);
     messageQueue.enqueue(MessageQueueItem(waitGripAreaInitializedCommand.toUtf8(), false));
-}
-
-
-// 用于tcpBalanceCore，发送T\r\n（十六进制：54 0D 0A），这是天平去皮命令。单纯发送就行->write(dataToSend); 
-void MainWindow::on_pushButton_6_clicked()
-{
-    // 使用十六进制模式发送：54 0D 0A (T\r\n)
-    // tcpBalanceCore->writeBalanceTareCommand("540D0A", TcpClientCore::HexMode);
-    // tcpCore->writeBalanceTareCommand(">01K0EE65", TcpClientCore::AsciiMode);
-    tcpBalanceCore->disconnectReceiveForBalance();
 }
 
 

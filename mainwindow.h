@@ -93,7 +93,6 @@ private slots:
      */
     void checkShakeBedTimeout();
 
-    void on_pushButton_6_clicked();
 
     void on_pushButton_7_clicked();
 
@@ -192,6 +191,10 @@ private:
     // 设备是否已经完成一次初始化（initializeAllDevices 调用后置为 true）
     bool m_allDevicesInitialized = false;
 
+    // pushButton_Stop：用户「紧急暂停 / 继续」切换后的保持态（与称重触发的暂停区分，避免自动定时恢复误解除）
+    bool m_emergencyHoldActive = false;
+
+    void updateEmergencyStopButtonAppearance();
 
     /***************** UP *********************/
     // MessageQueueItem / RecipeQueueItem 在 tcpclientcore.h 中已定义为全局结构体

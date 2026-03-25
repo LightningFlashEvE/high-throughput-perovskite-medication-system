@@ -11,28 +11,20 @@
 
 namespace {
 const char* kConnName = "app_sqlite_conn";
-
-// MySQL 连接参数
-constexpr auto kHost     = "192.168.10.170";
-constexpr int  kPort     = 3306;
-constexpr auto kUser     = "root";
-constexpr auto kPassword = "Zq17122320_";
-constexpr auto kDatabase = "PhenoLabHT";
 }
 
 AppSqlDatabase::AppSqlDatabase(QObject *parent)
     : QObject{parent}
 {
     if (!openDatabase()) {
-        QString errorMsg = QStringLiteral("无法连接 MySQL: %1:%2/%3")
-                               .arg(kHost).arg(kPort).arg(kDatabase);
+        const QString errorMsg = QStringLiteral("无法连接 MySQL (ODBC): 192.168.10.170:3306/PhenoLabHT");
         qWarning() << errorMsg;
         if (auto *parentWidget = qobject_cast<QWidget*>(parent)) {
             QMessageBox::warning(parentWidget, QStringLiteral("数据库连接失败"), errorMsg);
         }
         return;
     }
-    qDebug() << "MySQL 连接成功，目标库:" << kDatabase;
+    qDebug() << "MySQL 连接成功，目标库: PhenoLabHT";
 }
 
 AppSqlDatabase::~AppSqlDatabase()
@@ -77,30 +69,21 @@ bool AppSqlDatabase::openDatabase()
         QSqlDatabase::removeDatabase(kConnName);
     }
 
-    QSqlDatabase db = QSqlDatabase::addDatabase("QMYSQL", kConnName);
-    db.setHostName(kHost);
-    db.setPort(kPort);
-    db.setUserName(kUser);
-    db.setPassword(kPassword);
-    db.setDatabaseName(kDatabase);
+    QSqlDatabase db = QSqlDatabase::addDatabase("QODBC", kConnName);
+    db.setDatabaseName(
+        QStringLiteral("DRIVER={MySQL ODBC 9.6 Unicode Driver};"
+                       "SERVER=192.168.10.170;PORT=3306;"
+                       "DATABASE=PhenoLabHT;"
+                       "USER=root;PASSWORD=Zq17122320_;"
+                       "OPTION=3;")
+    );
 
     if (!db.open()) {
-        const QSqlError err = db.lastError();
-        qWarning() << "QMYSQL 打开失败";
-        qWarning() << "  driverName:" << db.driverName();
-        qWarning() << "  host/port/db:" << kHost << kPort << kDatabase;
-        qWarning() << "  errorType:" << err.type();
-        qWarning() << "  databaseText:" << err.databaseText();
-        qWarning() << "  driverText:" << err.driverText();
-        qWarning() << "  nativeErrorCode:" << err.nativeErrorCode();
-        qWarning() << "  fullText:" << err.text();
-        if (!QSqlDatabase::drivers().contains("QMYSQL")) {
-            qWarning() << "  提示: 当前 Qt 运行时未发现 QMYSQL 驱动，请检查 sqldrivers/qsqlmysql.dll 是否已部署。";
-        }
+        qWarning() << "QODBC 打开失败:" << db.lastError().text();
         return false;
     }
 
-    qDebug() << "QMYSQL 已连接:" << kHost << kPort << kDatabase;
+    qDebug() << "QODBC 已连接: 192.168.10.170:3306/PhenoLabHT";
     return true;
 }
 
