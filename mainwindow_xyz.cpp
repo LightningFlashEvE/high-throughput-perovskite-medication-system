@@ -491,30 +491,40 @@ bool MainWindow::takeEmptyBottle(const QString& trayName, QQueue<MessageQueueIte
 // 取液体 - 重载版本
 bool MainWindow::getLiquid(const QString& liquidName, double volumeMl, QQueue<MessageQueueItem>& messageQueue)
 {
-    Q_UNUSED(liquidName);
     Q_UNUSED(volumeMl);
-    Q_UNUSED(messageQueue);
 
     // 移动到liquidName的xyz坐标
-    QString liquidNameSql = "SELECT originX, originY, gripperZ, rightSpacing, bottomSpacing, cols, `rows`, selfLocation FROM LiquidMaterialArea WHERE liquidName = '" + liquidName + "'";
-    QSqlQuery liquidNameQuery = dbm->query(liquidNameSql);
-    int liquidNameX=0, liquidNameY=0, liquidNameZ=0, liquidNameRightSpacing=0, liquidNameBottomSpacing=0, liquidNameCols=0, liquidNameRows=0, liquidNameSelfLocation=0;
-    if (liquidNameQuery.next()) {
-        liquidNameX = liquidNameQuery.value("originX").toInt();
-        liquidNameY = liquidNameQuery.value("originY").toInt();
-        liquidNameZ = liquidNameQuery.value("gripperZ").toInt();
-        liquidNameRightSpacing = liquidNameQuery.value("rightSpacing").toDouble();
-        liquidNameBottomSpacing = liquidNameQuery.value("bottomSpacing").toDouble();
-        liquidNameCols = liquidNameQuery.value("cols").toInt();
-        liquidNameRows = liquidNameQuery.value("rows").toInt();
-        liquidNameSelfLocation = liquidNameQuery.value("selfLocation").toInt();
+    // 2.1 从 pan_init 取液体盘网格参数
+    QString liquidAreaSql = "SELECT x, y, gripperZ, rightSpacing, bottomSpacing, cols, `rows` FROM pan_init WHERE name = 'liquidPositon'";
+    QSqlQuery liquidAreaQuery = dbm->query(liquidAreaSql);
+    int liquidAreaX = 0, liquidAreaY = 0, liquidNameZ = 0;
+    int liquidAreaRightSpacing = 0, liquidAreaBottomSpacing = 0, liquidAreaCols = 1, liquidAreaRows = 1;
+    if (liquidAreaQuery.next()) {
+        liquidAreaX            = liquidAreaQuery.value("x").toInt();
+        liquidAreaY            = liquidAreaQuery.value("y").toInt();
+        liquidNameZ            = liquidAreaQuery.value("gripperZ").toInt();
+        liquidAreaRightSpacing = liquidAreaQuery.value("rightSpacing").toInt();
+        liquidAreaBottomSpacing= liquidAreaQuery.value("bottomSpacing").toInt();
+        liquidAreaCols         = liquidAreaQuery.value("cols").toInt();
+        liquidAreaRows         = liquidAreaQuery.value("rows").toInt();
     } else {
-        qWarning() << "未找到 liquidName = " << liquidName << " 的数据";
+        qWarning() << "未找到 pan_init 表的 liquidPositon 数据";
         return false;
     }
 
-    SlotPositionConfig liquidNameConfig(liquidNameX, liquidNameY, liquidNameCols, liquidNameRows, liquidNameRightSpacing, liquidNameBottomSpacing);
-    QPoint targetPos = calculateSlotPosition(liquidNameConfig, liquidNameSelfLocation);
+    // 2.2 从 pan_LiquidPosition 查液体槽位下标
+    QString slotSql = "SELECT slot_index FROM pan_LiquidPosition WHERE drug_name = '" + liquidName + "' LIMIT 1";
+    QSqlQuery slotIndexQuery = dbm->query(slotSql);
+    int liquidSlotIndex = -1;
+    if (slotIndexQuery.next()) {
+        liquidSlotIndex = slotIndexQuery.value("slot_index").toInt();
+    } else {
+        qWarning() << "pan_LiquidPosition 中未找到 drug_name = " << liquidName;
+        return false;
+    }
+
+    SlotPositionConfig liquidNameConfig(liquidAreaX, liquidAreaY, liquidAreaCols, liquidAreaRows, liquidAreaRightSpacing, liquidAreaBottomSpacing);
+    QPoint targetPos = calculateSlotPosition(liquidNameConfig, liquidSlotIndex);
     int liquidNameTargetX = targetPos.x();
     int liquidNameTargetY = targetPos.y();
 
