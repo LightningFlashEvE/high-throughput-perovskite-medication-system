@@ -191,6 +191,12 @@ private:
     // 设备是否已经完成一次初始化（initializeAllDevices 调用后置为 true）
     bool m_allDevicesInitialized = false;
 
+    // 紧急暂停按钮状态：false=运行中（显示"紧急暂停"红色），true=已暂停（显示"继续运行"绿色）
+    bool m_isEmergencyPaused = false;
+
+    // 更新紧急暂停按钮的文字和颜色
+    void updateEmergencyStopButton();
+
 
     /***************** UP *********************/
     // MessageQueueItem / RecipeQueueItem 在 tcpclientcore.h 中已定义为全局结构体

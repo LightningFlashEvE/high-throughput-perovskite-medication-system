@@ -262,7 +262,7 @@ bool MainWindow::takeEmptyBottle(const QString& trayName, QQueue<MessageQueueIte
 
     // TODO: 在此处编写取空瓶的具体实现
     // 查询数据库表 Box_Transfer_Area_Right 获取 x y z 和 currentIndex四个信息
-    QString transferAreaSql = "SELECT originX, originY, gripperZ, currentIndex, rightSpacing, bottomSpacing ,cols, rows FROM other WHERE name = 'emptyBottleArea'";
+    QString transferAreaSql = "SELECT originX, originY, gripperZ, currentIndex, rightSpacing, bottomSpacing, cols, `rows` FROM other WHERE name = 'emptyBottleArea'";
     QSqlQuery transferAreaQuery = dbm->query(transferAreaSql);
 
     // 改用int类型
@@ -281,7 +281,7 @@ bool MainWindow::takeEmptyBottle(const QString& trayName, QQueue<MessageQueueIte
         //qDebug() << "Transfer area coordinates:" << transferOriginX << transferOriginY << transferGripperZ << "slot index:" << transferSlotIndex << "rightSpacing:" << transferRightSpacing << "bottomSpacing:" << transferBottomSpacing << "cols:" << transferCols << "rows:" << transferRows;
         Q_UNUSED(transferSlotIndex);
     } else {
-        qWarning() << "未找到 Box_Transfer_Area_Right 表的数据";
+        qWarning() << "未找到 other 表的 emptyBottleArea 数据";
         return false;
     }
     // 如果currentIndex是15的时候，把数据库改成0，改成获取首个。因为15是最后一个，获取首个。同时不希望超出范围。同时需要修改数据库。
@@ -488,7 +488,7 @@ bool MainWindow::getLiquid(const QString& liquidName, double volumeMl, QQueue<Me
     Q_UNUSED(messageQueue);
 
     // 移动到liquidName的xyz坐标
-    QString liquidNameSql = "SELECT originX, originY, gripperZ, rightSpacing, bottomSpacing, cols, rows, selfLocation FROM LiquidMaterialArea WHERE liquidName = '" + liquidName + "'";
+    QString liquidNameSql = "SELECT originX, originY, gripperZ, rightSpacing, bottomSpacing, cols, `rows`, selfLocation FROM LiquidMaterialArea WHERE liquidName = '" + liquidName + "'";
     QSqlQuery liquidNameQuery = dbm->query(liquidNameSql);
     int liquidNameX=0, liquidNameY=0, liquidNameZ=0, liquidNameRightSpacing=0, liquidNameBottomSpacing=0, liquidNameCols=0, liquidNameRows=0, liquidNameSelfLocation=0;
     if (liquidNameQuery.next()) {
@@ -594,7 +594,7 @@ bool MainWindow::getLiquid(const QString& liquidName, double volumeMl, QQueue<Me
         return false;
     }
     // 移动到tips头区域
-    QString tipsHeadSql = "SELECT originX, originY, currentIndex, cols, rows, rightSpacing, bottomSpacing FROM other WHERE name = 'tipsHeadArea'";
+    QString tipsHeadSql = "SELECT originX, originY, currentIndex, cols, `rows`, rightSpacing, bottomSpacing FROM other WHERE name = 'tipsHeadArea'";
     QSqlQuery tipsHeadQuery = dbm->query(tipsHeadSql);
     int tipsHeadX=0, tipsHeadY=0, tipsHeadSlotIndex=0, tipsHeadCols=0, tipsHeadRows=0, tipsHeadRightSpacing=0, tipsHeadBottomSpacing=0;
     if (tipsHeadQuery.next()) {
@@ -805,7 +805,7 @@ bool MainWindow::getSolid(const QString& solidName, double mass, QQueue<MessageQ
     messageQueue.enqueue(MessageQueueItem("AA2", true)); // 去皮
     
     // 从 SolidMaterialArea 表中根据固体名称查找配置
-    QString solidAreaSql = "SELECT originX, originY, solidZ, rightSpacing, bottomSpacing, cols, rows, currentIndex FROM SolidMaterialArea WHERE solidName = '" + solidName + "'";
+    QString solidAreaSql = "SELECT originX, originY, solidZ, rightSpacing, bottomSpacing, cols, `rows`, currentIndex FROM SolidMaterialArea WHERE solidName = '" + solidName + "'";
     QSqlQuery solidAreaQuery = dbm->query(solidAreaSql);
     
     int solidAreaX = 0, solidAreaY = 0, solidAreaZ = 0;
@@ -1223,7 +1223,7 @@ void MainWindow::tightenBottle(QQueue<MessageQueueItem>& messageQueue)
         return;
     }
     // 计算空床位
-    QString otherSql = "SELECT originX, originY, rightSpacing, bottomSpacing, cols, rows, gripperZ FROM other WHERE name = 'shakeBedArea'";
+    QString otherSql = "SELECT originX, originY, rightSpacing, bottomSpacing, cols, `rows`, gripperZ FROM other WHERE name = 'shakeBedArea'";
     QSqlQuery otherQuery = dbm->query(otherSql);
     int otherOriginX=0, otherOriginY=0, otherRightSpacing=0, otherBottomSpacing=0, otherCols=0, otherRows=0, otherGripperZ=0;
     if (otherQuery.next()) {

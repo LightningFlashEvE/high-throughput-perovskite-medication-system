@@ -298,34 +298,53 @@ void MainWindow::closeEvent(QCloseEvent *event)
     qDebug() << "主窗口关闭完成";
 }
 
-// UI“紧急暂停”按钮槽：预留紧急停止逻辑
+// update emergency stop button text and color
+void MainWindow::updateEmergencyStopButton()
+{
+    if (!ui->pushButton_Stop) return;
+    if (m_isEmergencyPaused) {
+        ui->pushButton_Stop->setText(QString::fromUtf8("继续运行"));
+        ui->pushButton_Stop->setStyleSheet(QStringLiteral("color: green;"));
+    } else {
+        ui->pushButton_Stop->setText(QString::fromUtf8("紧急暂停"));
+        ui->pushButton_Stop->setStyleSheet(QStringLiteral("color: red;"));
+    }
+}
+
 void MainWindow::onEmergencyStopButtonClicked()
 {
-    // ========== 检查并重置中断的配方（开机时调用）==========
-    checkAndResetInterruptedRecipes();
-
-    // 暂停当前的配方队列
     if (!tcpCore) {
-        qWarning() << "TCP核心对象未初始化，无法暂停配方队列";
+        qWarning() << "tcpCore not initialized";
         return;
     }
-    tcpCore->clearMessageQueue();
 
+    if (!m_isEmergencyPaused) {
+        // running -> pause
+        tcpCore->pauseQueue();
 
-    RecipeQueueItem newRecipe;
-    newRecipe.recipeName = "STOP";                     // 使用化学方程式作为配方名称
-    newRecipe.createTime = QDateTime::currentDateTime(); // 记录创建时间
-    newRecipe.processState = RecipeNotProcessed;         // 配方初始为“未处理”
+        QString stop02 = tcpCore->buildDeviceCommand("02", "K", 0, 1);
+        tcpCore->sendMessage(stop02.toUtf8(), true);
+        QString stop03 = tcpCore->buildDeviceCommand("03", "K", 0, 1);
+        tcpCore->sendMessage(stop03.toUtf8(), true);
+        QString stop04 = tcpCore->buildDeviceCommand("04", "K", 0, 1);
+        tcpCore->sendMessage(stop04.toUtf8(), true);
+        QString stop06 = tcpCore->buildDeviceCommand("06", "K", 0, 1);
+        tcpCore->sendMessage(stop06.toUtf8(), true);
+        QString stop09 = tcpCore->buildDeviceCommand("09", "K", 0, 1);
+        tcpCore->sendMessage(stop09.toUtf8(), true);
+        QString stop0A = tcpCore->buildDeviceCommand("0A", "K", 0, 1);
+        tcpCore->sendMessage(stop0A.toUtf8(), true);
 
-    // 左侧的xyz  2，3，4号电机。立刻停止
-    QString stop02Command = tcpCore->buildDeviceCommand("02", "K", 0, 0);
-    newRecipe.messageQueue.enqueue(MessageQueueItem(stop02Command.toUtf8(), true));
-    QString release02Command = tcpCore->buildDeviceCommand("02", "a", 0, 0);
-    newRecipe.messageQueue.enqueue(MessageQueueItem(release02Command.toUtf8(), true, "02a"));
+        m_isEmergencyPaused = true;
+        updateEmergencyStopButton();
 
-    saveAndExecuteRecipe(newRecipe);
+    } else {
+        // paused -> resume
+        tcpCore->resumeQueue();
 
-
+        m_isEmergencyPaused = false;
+        updateEmergencyStopButton();
+    }
 }
 
 void MainWindow::cleanupResources()
@@ -440,9 +459,12 @@ void MainWindow::updateWeightStatusBar(double current, double target, double goa
             return QString("--").leftJustified(8);
         return QString::number(v, 'f', 4).leftJustified(8);
     };
+    auto fmtCurrent = [](double v) -> QString {
+        return QString::number(v, 'f', 4).leftJustified(8);
+    };
 
     QString text = QString("当前：<b>%1</b>  目标：<b>%2</b>  目的：<b>%3</b>")
-                       .arg(fmtField(current))
+                       .arg(fmtCurrent(current))
                        .arg(fmtField(target))
                        .arg(fmtField(goal));
     m_statusWeightLabel->setText(text);
@@ -504,7 +526,7 @@ void MainWindow::onShakeBedEmptyCheckTimeout()
 
     // 如果表中有记录且所有记录的isEmpty都为1，则停止摇床
     if (hasRecords && allEmpty) {
-        qDebug() << "摇床区域全部为空，正在停止摇床...";
+        // qDebug() << "摇床区域全部为空，正在停止摇床...";
         controlShakeBed(false, true);
     }
 }
@@ -635,7 +657,7 @@ void MainWindow::moveShakeBedToFinishedProductArea(int selfLocation, QQueue<Mess
 
 
     // 去other表，获取originX, originY, gripperZ, rightSpacing, bottomSpacing, cols, rows, currentIndex
-    QString otherSql = "SELECT originX, originY, gripperZ, rightSpacing, bottomSpacing, cols, rows, currentIndex FROM other WHERE name = 'shakeBedArea'";
+    QString otherSql = "SELECT originX, originY, gripperZ, rightSpacing, bottomSpacing, cols, `rows`, currentIndex FROM other WHERE name = 'shakeBedArea'";
     QSqlQuery otherQuery = dbm->query(otherSql);
     int otherOriginX=0, otherOriginY=0, otherGripperZ=0;
     double otherRightSpacing=0, otherBottomSpacing=0;
@@ -697,7 +719,7 @@ void MainWindow::moveShakeBedToFinishedProductArea(int selfLocation, QQueue<Mess
     messageQueue.enqueue(MessageQueueItem(waitTransferZRaisedCommand.toUtf8(), true, "06d01"));
 
     // 找到 字段name为transferRightArea的originX, originY, gripperZ, rightSpacing, bottomSpacing, cols, rows, currentIndex
-    QString transferRightAreaSql = "SELECT originX, originY, gripperZ, rightSpacing, bottomSpacing, cols, rows, currentIndex FROM other WHERE name = 'transferRightArea'";
+    QString transferRightAreaSql = "SELECT originX, originY, gripperZ, rightSpacing, bottomSpacing, cols, `rows`, currentIndex FROM other WHERE name = 'transferRightArea'";
     QSqlQuery transferRightAreaQuery = dbm->query(transferRightAreaSql);
     int transferRightAreaX=0, transferRightAreaY=0, transferRightAreaZ=0;
     double transferRightAreaRightSpacing=0, transferRightAreaBottomSpacing=0;

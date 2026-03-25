@@ -898,7 +898,7 @@ void MainWindow::placeShakenReagentBottle()
     * 计算槽位坐标
     * 0A, 09, 06电机移动到shakeBedArea的xyz  currentIndex
     */
-    QString shakeBedAreaSql = "SELECT originX, originY, gripperZ, rightSpacing, bottomSpacing, cols, rows, currentIndex FROM other WHERE name = 'shakeBedArea'";
+    QString shakeBedAreaSql = "SELECT originX, originY, gripperZ, rightSpacing, bottomSpacing, cols, `rows`, currentIndex FROM other WHERE name = 'shakeBedArea'";
     QSqlQuery shakeBedAreaQuery = dbm->query(shakeBedAreaSql);
     int shakeBedAreaRightSpacing=0, shakeBedAreaBottomSpacing=0, shakeBedAreaCols=0, shakeBedAreaRows=0, shakeBedAreaSlotIndex=0;
     int shakeBedAreaX=0, shakeBedAreaY=0, shakeBedAreaZ=0;
