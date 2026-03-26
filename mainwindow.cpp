@@ -9,8 +9,6 @@
 #include <QPainter>
 #include <algorithm> // for std::clamp
 #include <QLabel>
-#include <QVBoxLayout>
-#include <QFrame>
 #include <QListWidget>
 #include <QMenu>
 #include <QPushButton>
@@ -87,46 +85,9 @@ MainWindow::MainWindow(QWidget *parent)
     chessBoard = new ChessBoardView(this);
     chessBoard->init(ui->graphicsView);
 
-    /*** 初始化 widget_m 配方队列面板 ***/
-    if (ui->widget_m) {
-        auto *outerLayout = new QVBoxLayout(ui->widget_m);
-        outerLayout->setContentsMargins(0, 0, 0, 0);
-        outerLayout->setSpacing(0);
-
-        // 上方占位区（比例 2）
-        auto *topPlaceholder = new QWidget;
-        outerLayout->addWidget(topPlaceholder, 2);
-
-        // 下方配方面板（比例 1）
-        auto *bottomPanel = new QFrame;
-        bottomPanel->setFrameShape(QFrame::StyledPanel);
-        bottomPanel->setMinimumWidth(200);
-        auto *panelLayout = new QVBoxLayout(bottomPanel);
-        panelLayout->setContentsMargins(4, 4, 4, 4);
-        panelLayout->setSpacing(2);
-
-        auto *titleLabel = new QLabel(tr("配方队列"));
-        QFont titleFont = titleLabel->font();
-        titleFont.setBold(true);
-        titleLabel->setFont(titleFont);
-        panelLayout->addWidget(titleLabel);
-
-        panelLayout->addWidget(new QLabel(tr("▶ 当前执行")));
-
-        m_recipeCurrentLabel = new QLabel(tr("无"));
-        m_recipeCurrentLabel->setWordWrap(true);
-        m_recipeCurrentLabel->setStyleSheet("background: palette(mid); padding: 2px; border-radius: 2px;");
-        panelLayout->addWidget(m_recipeCurrentLabel);
-
-        panelLayout->addWidget(new QLabel(tr("即将执行")));
-
-        m_recipeQueueList = new QListWidget;
-        m_recipeQueueList->setEditTriggers(QAbstractItemView::NoEditTriggers);
-        m_recipeQueueList->setSelectionMode(QAbstractItemView::NoSelection);
-        panelLayout->addWidget(m_recipeQueueList, 1);
-
-        outerLayout->addWidget(bottomPanel, 1);
-    }
+    /*** 绑定 widget_m 配方队列面板子控件 ***/
+    m_recipeCurrentLabel = ui->m_recipeCurrentLabel;
+    m_recipeQueueList    = ui->listWidget_recipeQueue;
 
     if (ui->menuStatus) {
         // 创建一个菜单项
