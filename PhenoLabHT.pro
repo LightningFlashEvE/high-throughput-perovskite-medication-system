@@ -33,8 +33,6 @@ qnx: target.path = /tmp/$${TARGET}/bin
 else: unix:!android: target.path = /opt/$${TARGET}/bin
 !isEmpty(target.path): INSTALLS += target
 
-include($$PWD/FlowViewManager/flowviewmanager.pri)  #include()包含的文件会显示在工程结构目录中
-INCLUDEPATH += $$PWD/FlowViewManager   # 工程编译时，会去INCLUDEPATH列表下的目录搜索文件
 include($$PWD/ChessBoardView/chessboardview.pri)  #include()包含的文件会显示在工程结构目录中
 INCLUDEPATH += $$PWD/chessboardview   # 工程编译时，会去INCLUDEPATH列表下的目录搜索文
 

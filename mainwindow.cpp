@@ -84,16 +84,6 @@ MainWindow::MainWindow(QWidget *parent)
     chessBoard = new ChessBoardView(this);
     chessBoard->init(ui->graphicsView);
 
-    /*** 初始化流程视图（封装到 FlowViewManager，挂载 frame_2） ***/
-    if (ui->frame_2) {
-        ui->frame_2->setMinimumSize(450, 440);
-        // 让 frame_2 背景随主题，由样式/调色板统一控制
-        ui->frame_2->setAttribute(Qt::WA_StyledBackground, true);
-        ui->frame_2->setStyleSheet("background-color: palette(window);");
-    }
-    flowManager = new FlowViewManager(this);
-    flowManager->init(ui->frame_2);
-
 
     if (ui->menuStatus) {
         // 创建一个菜单项
@@ -276,6 +266,13 @@ MainWindow::MainWindow(QWidget *parent)
     // 开机时用占位符填充，确保格式立刻可见
     updateWeightStatusBar(0.0, 0.0, 0.0);
 
+    /*** 初始化状态栏日期时间标签（最右侧固定区域）***/
+    m_statusDateTimeLabel = new QLabel(this);
+    m_statusDateTimeLabel->setFont(QFont("Courier New", 9));
+    m_statusDateTimeLabel->setAlignment(Qt::AlignRight | Qt::AlignVCenter);
+    m_statusDateTimeLabel->setContentsMargins(8, 0, 4, 0);
+    ui->statusbar->addPermanentWidget(m_statusDateTimeLabel);
+
 }
 
 MainWindow::~MainWindow()
@@ -431,14 +428,9 @@ void MainWindow::cleanupResources()
         QApplication::processEvents(QEventLoop::ExcludeUserInputEvents, 50);
     }
     
-    // 清理棋盘和流程图（它们是 this 的子对象，会自动清理）
-    // 但为了确保，我们可以显式停止它们
+    // 清理棋盘（是 this 的子对象，会自动清理）
     if (chessBoard) {
         chessBoard = nullptr; // 是 this 的子对象，会在析构时自动删除
-    }
-    
-    if (flowManager) {
-        flowManager = nullptr; // 是 this 的子对象，会在析构时自动删除
     }
     
     // 最后处理一次事件，确保所有删除操作完成
@@ -470,18 +462,14 @@ void MainWindow::updateWeightStatusBar(double current, double target, double goa
     m_statusWeightLabel->setText(text);
 }
 
-// 每秒刷新日期与时间显示
+// 每秒刷新日期与时间显示（底部状态栏最右侧）
 void MainWindow::updateTime()
 {
     QDateTime currentDateTime = QDateTime::currentDateTime();
-
-    // 更新日期显示 (格式: 2025.10.1)DD
-    QString dateStr = currentDateTime.toString("yyyy.M.d");
-    ui->labelDate->setText(dateStr);
-
-    // 更新时间显示 (格式: 12:33:21)
-    QString timeStr = currentDateTime.toString("hh:mm:ss");
-    ui->labelTime->setText(timeStr);
+    if (m_statusDateTimeLabel) {
+        m_statusDateTimeLabel->setText(
+            currentDateTime.toString("yyyy.M.d") + "  " + currentDateTime.toString("hh:mm:ss"));
+    }
 }
 
 // 摇床为空检查定时器回调：每10秒执行一次，检查摇床是否为空并停止摇床

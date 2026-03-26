@@ -6,7 +6,6 @@
 #include <QPointF>
 #include <QQueue>
 #include "chessboardview.h"
-#include "flowviewmanager.h"
 #include "settingsbutton.h"
 #include "tcpclient.h"
 #include "recipeanalyzer.h"
@@ -143,8 +142,6 @@ private:
 
     // 棋盘封装类
     ChessBoardView *chessBoard = nullptr;
-    // 流程图封装类（挂载在 frame_2）
-    FlowViewManager *flowManager = nullptr;
     // TcpFramedClient 已移除
 
     // 设置面板（非模态，可频繁打开关闭）
@@ -176,6 +173,8 @@ private:
 
     // 状态栏：天平重量实时显示标签
     QLabel *m_statusWeightLabel = nullptr;
+    // 状态栏：日期时间显示标签（最右侧固定区域）
+    QLabel *m_statusDateTimeLabel = nullptr;
 
     /**
      * 更新状态栏天平重量显示

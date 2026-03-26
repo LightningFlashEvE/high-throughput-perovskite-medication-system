@@ -1415,7 +1415,7 @@ void MainWindow::controlShakeBed(bool isOn, bool sendImmediately)
         logMessage = "关闭摇床";
     }
 
-    qDebug() << logMessage << command;
+    // qDebug() << logMessage << command;
 
     if (sendImmediately) {
         // 立即发送（同步）
