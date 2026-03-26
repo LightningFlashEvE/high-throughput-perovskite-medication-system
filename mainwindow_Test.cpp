@@ -784,7 +784,7 @@ void MainWindow::initializeAllDevices(QQueue<MessageQueueItem>& messageQueue)
     QString initializeGripAreaCommand = tcpCore->buildDeviceCommand("0B", "06", "0100", 1, 4);
     messageQueue.enqueue(MessageQueueItem(initializeGripAreaCommand.toUtf8(), false));
     QString waitGripAreaInitializedCommand = tcpCore->buildDeviceCommand("0B", "03", "0200", 1, 4);
-    messageQueue.enqueue(MessageQueueItem(waitGripAreaInitializedCommand.toUtf8(), false, "0B0302000001"));
+    messageQueue.enqueue(MessageQueueItem(waitGripAreaInitializedCommand.toUtf8(), false, "0B03020001"));
 }
 
 

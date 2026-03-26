@@ -321,11 +321,14 @@ public:
     QByteArray m_currentCommand;              // 当前正在等待响应的命令
     bool m_currentCommandAsciiMode;           // 当前命令是否为ASCII模式
     QTimer* m_responseTimeoutTimer;           // 响应超时定时器
-    static const int MAX_RETRIES = 3;         // 最大重试次数
-    static const int RESPONSE_TIMEOUT = 5000; // 响应超时时间（毫秒）
+    static const int MAX_RETRIES = 3;                // 普通命令最大重试次数
+    static const int MOTOR_MAX_RETRIES = 400;        // 电机到位最大重试次数（400次×50ms = 20秒）
+    static const int RESPONSE_TIMEOUT = 90;        // 响应超时时间（毫秒）
+    static const int MOTOR_RESPONSE_TIMEOUT = 50;   // 电机到位轮询间隔（毫秒，设备不主动上报需主动查询）
 
     // 命令发送间隔控制
     QElapsedTimer m_lastSendTime;             // 上次发送命令的时间戳
+    bool m_justFinishedWaiting;               // 刚完成响应等待，下一条命令跳过间隔
     static const int MIN_SEND_INTERVAL = 50; // 最小发送间隔（毫秒）
 
     // 步骤跳过相关

@@ -33,6 +33,7 @@ TcpClientCore::TcpClientCore(QObject *parent)
     , m_reconnectAttempts(0)
     , m_reconnectTimer(nullptr)
     , m_isSkippingStep(false)
+    , m_justFinishedWaiting(false)
 {
     // 启动发送时间戳计时器
     m_lastSendTime.start();
@@ -802,6 +803,7 @@ void TcpClientCore::onReadyRead()
             m_retryCount = 0;
             m_expectedResponse.clear();
             m_isWaitingForResponse = false;
+            m_justFinishedWaiting = true;  // 标记刚完成等待，下一条命令跳过间隔
             // 继续处理队列
             QTimer::singleShot(0, this, &TcpClientCore::processMessageQueue);
         }
@@ -1602,9 +1604,10 @@ void TcpClientCore::processMessageQueue()
     qDebug() << "当前发送的命令是:" << QString::fromUtf8(item.content) << "，期待回复:" << (needsWait ? item.expectedSignature : "无需等待");
 
 
-    // 计算距离上次发送的时间间隔
+    // 计算距离上次发送的时间间隔（刚完成响应等待时跳过间隔，直接发送）
     qint64 elapsed = m_lastSendTime.elapsed();
-    int delay = (elapsed < MIN_SEND_INTERVAL) ? (MIN_SEND_INTERVAL - elapsed) : 0;
+    int delay = (m_justFinishedWaiting || elapsed >= MIN_SEND_INTERVAL) ? 0 : (MIN_SEND_INTERVAL - elapsed);
+    m_justFinishedWaiting = false;
 
     qDebug() << "距离上次发送已过" << elapsed << "ms，延迟" << delay << "ms后发送";
 
@@ -1625,9 +1628,11 @@ void TcpClientCore::processMessageQueue()
             sendMessageInternal(item.content, item.asciiOrHex, needsWait);
             m_lastSendTime.restart();
 
-            // 启动超时定时器
-            m_responseTimeoutTimer->start(RESPONSE_TIMEOUT);
-            qDebug() << "等待响应，期望:" << m_expectedResponse << "，超时:" << RESPONSE_TIMEOUT << "ms";
+            // 启动超时定时器：等电机到位（期望值含小写'd'）用长超时，其他用默认超时
+            bool isMotorWait = m_expectedResponse.contains('d');
+            int timeout = isMotorWait ? MOTOR_RESPONSE_TIMEOUT : RESPONSE_TIMEOUT;
+            m_responseTimeoutTimer->start(timeout);
+            qDebug() << "等待响应，期望:" << m_expectedResponse << "，超时:" << timeout << "ms";
         } else {
             // 发送消息
             sendMessageInternal(item.content, item.asciiOrHex, needsWait);
@@ -1699,20 +1704,25 @@ void TcpClientCore::onResponseTimeout()
 {
     if (!m_isWaitingForResponse) return;
 
+    bool isMotorWait = m_expectedResponse.contains('d');
+    int maxRetries = isMotorWait ? MOTOR_MAX_RETRIES : MAX_RETRIES;
+
     m_retryCount++;
-    if (m_retryCount <= MAX_RETRIES) {
-        qDebug() << "⚠ 响应超时，第" << m_retryCount << "次重试，命令:" << QString::fromUtf8(m_currentCommand);
+    if (m_retryCount <= maxRetries) {
+        if (isMotorWait) {
+            qDebug() << "电机轮询第" << m_retryCount << "/" << maxRetries << "次，命令:" << QString::fromUtf8(m_currentCommand);
+        } else {
+            qDebug() << "⚠ 响应超时，第" << m_retryCount << "次重试，命令:" << QString::fromUtf8(m_currentCommand);
+        }
         // 重新发送命令
         sendMessageInternal(m_currentCommand, m_currentCommandAsciiMode, true);
         m_lastSendTime.restart();
-        // 重启超时定时器
-        m_responseTimeoutTimer->start(RESPONSE_TIMEOUT);
+        m_responseTimeoutTimer->start(isMotorWait ? MOTOR_RESPONSE_TIMEOUT : RESPONSE_TIMEOUT);
     } else {
-        qWarning() << "✗ 响应超时，已重试" << MAX_RETRIES << "次，放弃等待，继续下一条命令";
+        qWarning() << "✗ 响应超时，已重试" << maxRetries << "次，放弃等待，继续下一条命令";
         m_retryCount = 0;
         m_expectedResponse.clear();
         m_isWaitingForResponse = false;
-        // 继续处理队列
         QTimer::singleShot(0, this, &TcpClientCore::processMessageQueue);
     }
 }
