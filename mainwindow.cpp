@@ -9,6 +9,9 @@
 #include <QPainter>
 #include <algorithm> // for std::clamp
 #include <QLabel>
+#include <QVBoxLayout>
+#include <QFrame>
+#include <QListWidget>
 #include <QMenu>
 #include <QPushButton>
 #include <QPixmap>
@@ -84,6 +87,46 @@ MainWindow::MainWindow(QWidget *parent)
     chessBoard = new ChessBoardView(this);
     chessBoard->init(ui->graphicsView);
 
+    /*** 初始化 widget_m 配方队列面板 ***/
+    if (ui->widget_m) {
+        auto *outerLayout = new QVBoxLayout(ui->widget_m);
+        outerLayout->setContentsMargins(0, 0, 0, 0);
+        outerLayout->setSpacing(0);
+
+        // 上方占位区（比例 2）
+        auto *topPlaceholder = new QWidget;
+        outerLayout->addWidget(topPlaceholder, 2);
+
+        // 下方配方面板（比例 1）
+        auto *bottomPanel = new QFrame;
+        bottomPanel->setFrameShape(QFrame::StyledPanel);
+        bottomPanel->setMinimumWidth(200);
+        auto *panelLayout = new QVBoxLayout(bottomPanel);
+        panelLayout->setContentsMargins(4, 4, 4, 4);
+        panelLayout->setSpacing(2);
+
+        auto *titleLabel = new QLabel(tr("配方队列"));
+        QFont titleFont = titleLabel->font();
+        titleFont.setBold(true);
+        titleLabel->setFont(titleFont);
+        panelLayout->addWidget(titleLabel);
+
+        panelLayout->addWidget(new QLabel(tr("▶ 当前执行")));
+
+        m_recipeCurrentLabel = new QLabel(tr("无"));
+        m_recipeCurrentLabel->setWordWrap(true);
+        m_recipeCurrentLabel->setStyleSheet("background: palette(mid); padding: 2px; border-radius: 2px;");
+        panelLayout->addWidget(m_recipeCurrentLabel);
+
+        panelLayout->addWidget(new QLabel(tr("即将执行")));
+
+        m_recipeQueueList = new QListWidget;
+        m_recipeQueueList->setEditTriggers(QAbstractItemView::NoEditTriggers);
+        m_recipeQueueList->setSelectionMode(QAbstractItemView::NoSelection);
+        panelLayout->addWidget(m_recipeQueueList, 1);
+
+        outerLayout->addWidget(bottomPanel, 1);
+    }
 
     if (ui->menuStatus) {
         // 创建一个菜单项
@@ -469,6 +512,38 @@ void MainWindow::updateTime()
     if (m_statusDateTimeLabel) {
         m_statusDateTimeLabel->setText(
             currentDateTime.toString("yyyy.M.d") + "  " + currentDateTime.toString("hh:mm:ss"));
+    }
+    updateRecipeQueuePanel();
+}
+
+// 刷新 widget_m 配方队列面板（当前执行 + 即将执行）
+void MainWindow::updateRecipeQueuePanel()
+{
+    if (!dbm || !m_recipeCurrentLabel || !m_recipeQueueList) return;
+
+    // 当前执行（processState = 1）
+    QSqlQuery curQ = dbm->query(
+        "SELECT id, recipeName, createTime FROM recipeQueue "
+        "WHERE processState = 1 LIMIT 1");
+    if (curQ.next()) {
+        QString id   = curQ.value("id").toString();
+        QString name = curQ.value("recipeName").toString();
+        QString dt   = curQ.value("createTime").toString();
+        m_recipeCurrentLabel->setText(QString("%1 - %2 - %3").arg(id, name, dt));
+    } else {
+        m_recipeCurrentLabel->setText(tr("无"));
+    }
+
+    // 即将执行（processState = 0，按 executionOrder 排序）
+    QSqlQuery pendQ = dbm->query(
+        "SELECT id, recipeName, createTime FROM recipeQueue "
+        "WHERE processState = 0 ORDER BY executionOrder ASC");
+    m_recipeQueueList->clear();
+    while (pendQ.next()) {
+        QString id   = pendQ.value("id").toString();
+        QString name = pendQ.value("recipeName").toString();
+        QString dt   = pendQ.value("createTime").toString();
+        m_recipeQueueList->addItem(QString("%1 - %2 - %3").arg(id, name, dt));
     }
 }
 

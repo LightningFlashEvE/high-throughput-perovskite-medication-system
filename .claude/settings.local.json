@@ -18,7 +18,8 @@
       "Bash(/dev/null find:*)",
       "Bash(python fix_auto_increment.py)",
       "Bash(python check_conn.py)",
-      "Bash(rm check_conn.py)"
+      "Bash(rm check_conn.py)",
+      "Bash(grep -n \"takeEmptyBottle\\\\|getLiquid\\\\|getSolid\" /d/application/high-throughput-perovskite-medication-system/*.cpp)"
     ]
   }
 }

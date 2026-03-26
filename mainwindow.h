@@ -44,6 +44,7 @@ class ReagentBottle;
 class TcpClientCore;
 class AppSqlDatabase;
 class QLabel;
+class QListWidget;
 
 /**
  * MainWindow
@@ -104,6 +105,8 @@ private slots:
     void onEmergencyStopButtonClicked();
 
     void on_pushButton_3_clicked();
+
+    void updateRecipeQueuePanel();
 
 protected:
     /**
@@ -175,6 +178,10 @@ private:
     QLabel *m_statusWeightLabel = nullptr;
     // 状态栏：日期时间显示标签（最右侧固定区域）
     QLabel *m_statusDateTimeLabel = nullptr;
+
+    // 配方队列面板子控件
+    QLabel *m_recipeCurrentLabel = nullptr;   // 当前执行
+    QListWidget *m_recipeQueueList = nullptr; // 即将执行列表
 
     /**
      * 更新状态栏天平重量显示
