@@ -514,7 +514,7 @@ void MainWindow::testRecipeSend(const QJsonObject& recipePacket)
     qDebug() << "化学方程式:" << equation;
 
     // ============ 步骤2：设置配方信息 ============
-    newRecipe.recipeName = "equation";                     // 使用化学方程式作为配方名称
+    newRecipe.recipeName = equation;                     // 使用化学方程式作为配方名称
     newRecipe.createTime = QDateTime::currentDateTime(); // 记录创建时间
     newRecipe.processState = RecipeNotProcessed;         // 配方初始为“未处理”
 
