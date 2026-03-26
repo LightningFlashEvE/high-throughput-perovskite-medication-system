@@ -1,0 +1,103 @@
+#include "mainwindow.h"
+#include "tcpclientcore.h"
+#include <QCheckBox>
+#include <QMenu>
+#include <QPushButton>
+
+// 获取步骤对应的勾选框
+QCheckBox* MainWindow::getCheckBoxForStep(const QString& stepName)
+{
+    if (stepName == "takeEmptyBottle") return m_processCheckBox_takeEmptyBottle;
+    if (stepName == "getSolid") return m_processCheckBox_getSolid;
+    if (stepName == "resetXYZ") return m_processCheckBox_resetXYZ;
+    if (stepName == "getLiquid") return m_processCheckBox_getLiquid;
+    if (stepName == "tightenBottle") return m_processCheckBox_tightenBottle;
+    return nullptr;
+}
+
+// 运行选中的步骤
+void MainWindow::runSelectedSteps()
+{
+    if (!tcpCore || !dbm) {
+        qWarning() << "TCP核心或数据库未初始化";
+        return;
+    }
+
+    // 1. 创建新配方
+    RecipeQueueItem newRecipe;
+    newRecipe.recipeName = "手动选择步骤";
+    newRecipe.createTime = QDateTime::currentDateTime();
+    newRecipe.processState = RecipeNotProcessed;
+
+    // 2. 清空跳过步骤集合
+    m_skippedSteps.clear();
+
+    // 3. 按顺序检查每个步骤是否被勾选
+    QStringList allSteps = {"takeEmptyBottle", "getSolid", "resetXYZ", "getLiquid", "tightenBottle"};
+
+    for (const QString& step : allSteps) {
+        QCheckBox* checkBox = getCheckBoxForStep(step);
+        if (!checkBox || !checkBox->isChecked()) {
+            // 未勾选：插入跳过标记
+            QString skipCmd = QString("AAskipStep:%1").arg(step);
+            newRecipe.messageQueue.enqueue(MessageQueueItem(skipCmd.toUtf8(), true));
+            qDebug() << "步骤未勾选，将跳过:" << step;
+            continue;
+        }
+
+        // 已勾选：调用对应的业务函数填充消息队列
+        qDebug() << "步骤已勾选，将执行:" << step;
+        if (step == "takeEmptyBottle") {
+            takeEmptyBottle("", newRecipe.messageQueue);
+        } else if (step == "getSolid") {
+            // 使用默认参数：固体名称和质量
+            getSolid("PbI2", 100.0, newRecipe.messageQueue);
+        } else if (step == "resetXYZ") {
+            resetXYZMotorsToZero(newRecipe.messageQueue);
+        } else if (step == "getLiquid") {
+            // 使用默认参数：液体名称和体积
+            getLiquid("DMF", 10.0, newRecipe.messageQueue);
+        } else if (step == "tightenBottle") {
+            tightenBottle(newRecipe.messageQueue);
+        }
+    }
+
+    // 4. 保存并执行配方
+    saveAndExecuteRecipe(newRecipe, false);
+
+    // 5. 禁用勾选框和运行按钮（执行过程中不可修改）
+    updateStepCheckBoxStates();
+
+    qDebug() << "已提交选中步骤到执行队列";
+}
+
+// 取消步骤（在执行过程中调用）
+void MainWindow::cancelStep(const QString& stepName)
+{
+    if (!tcpCore) {
+        qWarning() << "TCP核心未初始化";
+        return;
+    }
+
+    // 1. 将步骤加入跳过集合
+    m_skippedSteps.insert(stepName);
+
+    // 2. 构建跳过命令并立即发送
+    QString skipCmd = QString("AAskipStep:%1").arg(stepName);
+    tcpCore->sendMessageAsync(skipCmd.toUtf8(), true);
+
+    // 3. 更新UI显示（该步骤变为灰色+删除线）
+    QCheckBox* checkBox = getCheckBoxForStep(stepName);
+    if (checkBox) {
+        checkBox->setStyleSheet("color: gray; text-decoration: line-through;");
+        checkBox->setEnabled(false);
+    }
+
+    qDebug() << "已取消步骤:" << stepName;
+}
+
+// 更新步骤勾选框的可用状态
+void MainWindow::updateStepCheckBoxStates()
+{
+    // 不再禁用任何控件，保持所有复选框始终可用
+}
