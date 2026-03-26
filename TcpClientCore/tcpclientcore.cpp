@@ -1800,6 +1800,16 @@ void TcpClientCore::processMessageQueue()
         QTimer::singleShot(0, this, &TcpClientCore::processMessageQueue);
         return;
     }
+    if (item.asciiOrHex && contentStr.startsWith("AAstateChange:")) {
+        // 检测到AAstateChange命令（流程状态变更），解析状态名称，不发送，而是发出信号
+        QString stateName = contentStr.mid(QString("AAstateChange:").length());
+        qDebug() << "检测到AAstateChange命令，状态名称 =" << stateName;
+        emit processStateChanged(stateName);
+        // 继续处理下一条消息
+        m_isProcessingQueue = false;
+        QTimer::singleShot(0, this, &TcpClientCore::processMessageQueue);
+        return;
+    }
 
 
 

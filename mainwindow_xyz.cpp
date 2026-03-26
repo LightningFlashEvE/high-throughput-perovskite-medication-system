@@ -260,6 +260,9 @@ bool MainWindow::takeEmptyBottle(const QString& trayName, QQueue<MessageQueueIte
 {
     Q_UNUSED(trayName);
 
+    // ★ 插入状态标记：打开空瓶
+    messageQueue.enqueue(MessageQueueItem("AAstateChange:takeEmptyBottle", true));
+
     // 1. 从 pan_init 获取空瓶区盘首坐标和网格参数
     QString transferAreaSql = "SELECT x, y, gripperZ, rightSpacing, bottomSpacing, cols, `rows` FROM pan_init WHERE name = 'emptyPosition'";
     QSqlQuery transferAreaQuery = dbm->query(transferAreaSql);
@@ -492,6 +495,9 @@ bool MainWindow::takeEmptyBottle(const QString& trayName, QQueue<MessageQueueIte
 bool MainWindow::getLiquid(const QString& liquidName, double volumeMl, QQueue<MessageQueueItem>& messageQueue)
 {
     Q_UNUSED(volumeMl);
+
+    // ★ 插入状态标记：取液体
+    messageQueue.enqueue(MessageQueueItem("AAstateChange:getLiquid", true));
 
     // 移动到liquidName的xyz坐标
     // 2.1 从 pan_init 取液体盘网格参数
@@ -818,6 +824,8 @@ bool MainWindow::getSolid(const QString& solidName, double mass, QQueue<MessageQ
     Q_UNUSED(currentIndex);  // 不使用函数参数的 currentIndex，改用表中的
     qDebug() << "getSolid 队列版本1: " << solidName << " " << mass << "mg";
 
+    // ★ 插入状态标记：取出固体
+    messageQueue.enqueue(MessageQueueItem("AAstateChange:getSolid", true));
 
     messageQueue.enqueue(MessageQueueItem("AA1", true)); // 打开天平打印  
     messageQueue.enqueue(MessageQueueItem("AA2", true)); // 去皮
@@ -1095,6 +1103,9 @@ bool MainWindow::getSolid(const QString& solidName, double mass, QQueue<MessageQ
 // 拧紧瓶子 - 重载版本
 void MainWindow::tightenBottle(QQueue<MessageQueueItem>& messageQueue)
 {
+    // ★ 插入状态标记：拧好瓶子取摇床
+    messageQueue.enqueue(MessageQueueItem("AAstateChange:tightenBottle", true));
+
     // 移动到天平
     QString balanceAreaSql = "SELECT originX, originY, gripperZ FROM other WHERE name = 'balanceArea'";
     QSqlQuery balanceAreaQuery = dbm->query(balanceAreaSql);

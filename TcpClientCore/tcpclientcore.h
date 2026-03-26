@@ -275,6 +275,9 @@ signals:
     // 摇床离开请求信号（当检测到AAleaveTheShaker命令时发出，携带selfLocation）
     void leaveTheShakerRequested(int selfLocation);
 
+    // 流程状态变更信号（当检测到AAstateChange命令时发出，携带状态名称）
+    void processStateChanged(const QString& stateName);
+
     // 所有设备初始化完成的请求信号（当检测到AAallDevicesInitialized命令时发出）
     void allDevicesInitializedRequested();
 

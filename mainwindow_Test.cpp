@@ -174,6 +174,12 @@ void MainWindow::initializeSystemComponents()
         }
     });
     
+    // 连接 tcpCore 的 processStateChanged 信号，更新流程状态显示
+    connect(tcpCore, &TcpClientCore::processStateChanged, this, [=](const QString& stateName) {
+        qDebug() << "流程状态变更:" << stateName;
+        updateProcessStateDisplay(stateName);
+    });
+
     // 连接 tcpCore 的 openShakeBedRequested 信号，执行启动摇床
     connect(tcpCore, &TcpClientCore::openShakeBedRequested, this, [=]() {
         qDebug() << "收到AAopenShakeBed命令，执行启动摇床";
@@ -853,6 +859,9 @@ void MainWindow::shakeBed(int parameter)
  */
 void MainWindow::resetXYZMotorsToZero(QQueue<MessageQueueItem>& messageQueue)
 {
+    // ★ 插入状态标记：XYZ复位
+    messageQueue.enqueue(MessageQueueItem("AAstateChange:resetXYZ", true));
+
     // 复位时停止天平打印
     if (tcpBalanceCore) {
         tcpBalanceCore->disconnectReceiveForBalance();

@@ -89,6 +89,16 @@ MainWindow::MainWindow(QWidget *parent)
     m_recipeCurrentLabel = ui->m_recipeCurrentLabel;
     m_recipeQueueList    = ui->listWidget_recipeQueue;
 
+    // 绑定流程状态标签
+    m_processState_takeEmptyBottle = ui->m_processState_takeEmptyBottle;
+    m_processState_getSolid = ui->m_processState_getSolid;
+    m_processState_resetXYZ = ui->m_processState_resetXYZ;
+    m_processState_getLiquid = ui->m_processState_getLiquid;
+    m_processState_tightenBottle = ui->m_processState_tightenBottle;
+
+    // 初始化流程状态显示为灰色
+    resetProcessStateDisplay();
+
     if (ui->menuStatus) {
         // 创建一个菜单项
         QAction *statusAction = new QAction("查看状态", this);
@@ -953,6 +963,75 @@ void MainWindow::initializeDataIni()
         qDebug() << "data.ini文件创建成功，默认配置已写入";
     } else {
         qDebug() << "data.ini文件已存在，跳过初始化";
+    }
+}
+
+// 流程步骤定义（顺序即执行顺序）
+static const QStringList PROCESS_STEPS = {
+    "takeEmptyBottle",
+    "getSolid",
+    "resetXYZ",
+    "getLiquid",
+    "tightenBottle"
+};
+
+void MainWindow::resetProcessStateDisplay()
+{
+    m_completedStates.clear();
+    const QString grayStyle = "color: gray;";
+    if (m_processState_takeEmptyBottle) m_processState_takeEmptyBottle->setStyleSheet(grayStyle);
+    if (m_processState_getSolid)        m_processState_getSolid->setStyleSheet(grayStyle);
+    if (m_processState_resetXYZ)        m_processState_resetXYZ->setStyleSheet(grayStyle);
+    if (m_processState_getLiquid)       m_processState_getLiquid->setStyleSheet(grayStyle);
+    if (m_processState_tightenBottle)   m_processState_tightenBottle->setStyleSheet(grayStyle);
+}
+
+void MainWindow::updateProcessStateDisplay(const QString& stateName)
+{
+    // 找到当前步骤在顺序中的位置
+    int currentIndex = PROCESS_STEPS.indexOf(stateName);
+    if (currentIndex < 0) return;
+
+    // 当前步骤之前的所有步骤标记为已完成（绿色加粗）
+    for (int i = 0; i < currentIndex; ++i) {
+        m_completedStates.insert(PROCESS_STEPS[i]);
+    }
+
+    // 状态名称 -> 对应的 QLabel 指针
+    QMap<QString, QLabel*> labelMap = {
+        {"takeEmptyBottle", m_processState_takeEmptyBottle},
+        {"getSolid",        m_processState_getSolid},
+        {"resetXYZ",        m_processState_resetXYZ},
+        {"getLiquid",       m_processState_getLiquid},
+        {"tightenBottle",   m_processState_tightenBottle}
+    };
+
+    const QString doneStyle    = "color: green; font-weight: bold;";
+    const QString currentStyle = "color: #00aa00; font-weight: bold; text-decoration: underline;";
+    const QString pendingStyle = "color: gray;";
+
+    for (const QString& step : PROCESS_STEPS) {
+        QLabel* label = labelMap.value(step, nullptr);
+        if (!label) continue;
+
+        if (step == stateName) {
+            label->setStyleSheet(currentStyle);  // 当前执行：绿色加粗+下划线
+        } else if (m_completedStates.contains(step)) {
+            label->setStyleSheet(doneStyle);     // 已完成：绿色加粗
+        } else {
+            label->setStyleSheet(pendingStyle);  // 未执行：灰色
+        }
+    }
+
+    // 如果是最后一步，执行完后全部变绿
+    if (stateName == PROCESS_STEPS.last()) {
+        for (const QString& step : PROCESS_STEPS) {
+            m_completedStates.insert(step);
+        }
+        for (const QString& step : PROCESS_STEPS) {
+            QLabel* label = labelMap.value(step, nullptr);
+            if (label) label->setStyleSheet(doneStyle);
+        }
     }
 }
 

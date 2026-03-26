@@ -183,6 +183,27 @@ private:
     QLabel *m_recipeCurrentLabel = nullptr;   // 当前执行
     QListWidget *m_recipeQueueList = nullptr; // 即将执行列表
 
+    // 流程状态标签（5个步骤）
+    QLabel *m_processState_takeEmptyBottle = nullptr;
+    QLabel *m_processState_getSolid = nullptr;
+    QLabel *m_processState_resetXYZ = nullptr;
+    QLabel *m_processState_getLiquid = nullptr;
+    QLabel *m_processState_tightenBottle = nullptr;
+
+    // 流程状态跟踪
+    QSet<QString> m_completedStates;  // 已完成的状态集合
+
+    /**
+     * 更新流程状态显示
+     * @param stateName 当前执行的状态名称
+     */
+    void updateProcessStateDisplay(const QString& stateName);
+
+    /**
+     * 重置流程状态显示（全部恢复为灰色）
+     */
+    void resetProcessStateDisplay();
+
     /**
      * 更新状态栏天平重量显示
      * @param current  天平当前读数（g）
