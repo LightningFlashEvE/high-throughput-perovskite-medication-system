@@ -20,7 +20,8 @@ SOURCES += \
     main.cpp \
     mainwindow.cpp \
     mainwindow_Test.cpp \
-    mainwindow_xyz.cpp
+    mainwindow_xyz.cpp \
+    mainwindow_steps.cpp
 
 HEADERS += \
     mainwindow.h

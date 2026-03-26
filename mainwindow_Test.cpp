@@ -180,6 +180,35 @@ void MainWindow::initializeSystemComponents()
         updateProcessStateDisplay(stateName);
     });
 
+    // 为每个步骤勾选框添加右键菜单（用于执行过程中取消步骤）
+    auto setupContextMenu = [this](QCheckBox* checkBox, const QString& stepName) {
+        if (!checkBox) return;
+        checkBox->setContextMenuPolicy(Qt::CustomContextMenu);
+        connect(checkBox, &QWidget::customContextMenuRequested, this, [this, checkBox, stepName](const QPoint& pos) {
+            QMenu menu;
+            QAction* cancelAction = menu.addAction("取消此步骤");
+            // 只有在执行过程中才能取消
+            cancelAction->setEnabled(tcpCore && tcpCore->m_isProcessingQueue && !m_skippedSteps.contains(stepName));
+
+            if (menu.exec(checkBox->mapToGlobal(pos)) == cancelAction) {
+                cancelStep(stepName);
+            }
+        });
+    };
+
+    setupContextMenu(m_processCheckBox_takeEmptyBottle, "takeEmptyBottle");
+    setupContextMenu(m_processCheckBox_getSolid, "getSolid");
+    setupContextMenu(m_processCheckBox_resetXYZ, "resetXYZ");
+    setupContextMenu(m_processCheckBox_getLiquid, "getLiquid");
+    setupContextMenu(m_processCheckBox_tightenBottle, "tightenBottle");
+
+    // 连接 tcpCore 的 stepSkipped 信号，更新UI显示
+    connect(tcpCore, &TcpClientCore::stepSkipped, this, [=](const QString& stepName) {
+        qDebug() << "步骤已跳过:" << stepName;
+        m_skippedSteps.insert(stepName);
+        updateProcessStateDisplay(stepName);
+    });
+
     // 连接 tcpCore 的 openShakeBedRequested 信号，执行启动摇床
     connect(tcpCore, &TcpClientCore::openShakeBedRequested, this, [=]() {
         qDebug() << "收到AAopenShakeBed命令，执行启动摇床";
@@ -376,6 +405,13 @@ void MainWindow::initializeSystemComponents()
                     qDebug() << "使用自动获取的有线网口IP地址:" << localIP;
                 }
             }
+        }
+
+        // 将上次意外中断的配方（processState=1 正在执行）标记为已完成（processState=2）
+        if (dbm) {
+            dbm->query(QString("UPDATE recipeQueue SET processState = %1 WHERE processState = %2")
+                       .arg(RecipeFinished).arg(RecipeProcessing));
+            qDebug() << "连接前清理：将遗留的 processState=1 记录标记为 processState=2";
         }
 
         // 连接到TCP服务器
@@ -691,64 +727,64 @@ void MainWindow::initializeAllDevices(QQueue<MessageQueueItem>& messageQueue)
     
     qDebug() << "\n\nx固体电机初始化"; // 4号电机
     QString xMotorInitializeCommand = tcpCore->buildDeviceCommand("04", "G", 0, 0); // 归零
-    messageQueue.enqueue(MessageQueueItem(xMotorInitializeCommand.toUtf8(), true));
+    messageQueue.enqueue(MessageQueueItem(xMotorInitializeCommand.toUtf8(), true, "04G"));
     QString waitXMotorInitializeCommand = tcpCore->buildDeviceCommand("04", "d", 0, 0);
     messageQueue.enqueue(MessageQueueItem(waitXMotorInitializeCommand.toUtf8(), true, "04d01"));
 
 
     qDebug() << "\n\n泵初始化"; // 7号电机
     QString initializePumpCommand = tcpCore->buildDeviceCommand("07", "G", 0, 0);
-    messageQueue.enqueue(MessageQueueItem(initializePumpCommand.toUtf8(), true));
+    messageQueue.enqueue(MessageQueueItem(initializePumpCommand.toUtf8(), true, "07G"));
     QString waitPumpInitializedCommand = tcpCore->buildDeviceCommand("07", "d", 0, 0);
-    messageQueue.enqueue(MessageQueueItem(waitPumpInitializedCommand.toUtf8(), true));
+    messageQueue.enqueue(MessageQueueItem(waitPumpInitializedCommand.toUtf8(), true, "07d01"));
 
     qDebug() << "\n\nz泵初始化"; // 8号电机
     QString initializeZPumpCommand = tcpCore->buildDeviceCommand("08", "G", 0, 0);
-    messageQueue.enqueue(MessageQueueItem(initializeZPumpCommand.toUtf8(), true));
+    messageQueue.enqueue(MessageQueueItem(initializeZPumpCommand.toUtf8(), true, "08G"));
     QString waitZPumpInitializedCommand = tcpCore->buildDeviceCommand("08", "d", 0, 0);
-    messageQueue.enqueue(MessageQueueItem(waitZPumpInitializedCommand.toUtf8(), true));
+    messageQueue.enqueue(MessageQueueItem(waitZPumpInitializedCommand.toUtf8(), true, "08d01"));
     // 08移动到4的位置
     QString moveToZ4Command = tcpCore->buildDeviceCommand("08", "D", 100, 8); // 00000004
-    messageQueue.enqueue(MessageQueueItem(moveToZ4Command.toUtf8(), true));
+    messageQueue.enqueue(MessageQueueItem(moveToZ4Command.toUtf8(), true, "08D"));
     QString waitZ4Command = tcpCore->buildDeviceCommand("08", "d", 0, 0);
-    messageQueue.enqueue(MessageQueueItem(waitZ4Command.toUtf8(), true));
+    messageQueue.enqueue(MessageQueueItem(waitZ4Command.toUtf8(), true, "08d01"));
     
     qDebug() << "\n\n移动电爪初始化"; // 5号电机
     QString initializeGripperCommand = tcpCore->buildDeviceCommand("05", "06", "0100", 1, 4);
     messageQueue.enqueue(MessageQueueItem(initializeGripperCommand.toUtf8(), false));
     QString waitGripperInitializedCommand = tcpCore->buildDeviceCommand("05", "03", "0200", 1, 4);
-    messageQueue.enqueue(MessageQueueItem(waitGripperInitializedCommand.toUtf8(), false));
+    messageQueue.enqueue(MessageQueueItem(waitGripperInitializedCommand.toUtf8(), false, "0503020001"));   //  05 03 0200 0001
     QString configureGripperModeCommand = tcpCore->buildDeviceCommand("05", "06", "0101", 1, 4);
     messageQueue.enqueue(MessageQueueItem(configureGripperModeCommand.toUtf8(), false));
     QString waitGripperModeConfiguredCommand = tcpCore->buildDeviceCommand("05", "03", "0201", 1, 4);
-    messageQueue.enqueue(MessageQueueItem(waitGripperModeConfiguredCommand.toUtf8(), false));
+    messageQueue.enqueue(MessageQueueItem(waitGripperModeConfiguredCommand.toUtf8(), false, "0503020001"));  // 0503020  10001
 
     qDebug() << "\n\nz移动电爪初始化"; // 6号电机
     QString initializeZAxisCommand = tcpCore->buildDeviceCommand("06", "G", 0, 0);
-    messageQueue.enqueue(MessageQueueItem(initializeZAxisCommand.toUtf8(), true));
+    messageQueue.enqueue(MessageQueueItem(initializeZAxisCommand.toUtf8(), true, "06G"));
     QString waitZAxisInitializedCommand = tcpCore->buildDeviceCommand("06", "d", 0, 0);
-    messageQueue.enqueue(MessageQueueItem(waitZAxisInitializedCommand.toUtf8(), true));
+    messageQueue.enqueue(MessageQueueItem(waitZAxisInitializedCommand.toUtf8(), true, "06d01"));
 
     // 启动摇床，3秒后自动关闭（作为初始化）
     messageQueue.enqueue(MessageQueueItem("AAshakeBedForSeconds:3", true));
 
     qDebug() << "\n\n初始化X"; // 10号电机
     QString initializeXAxisCommand = tcpCore->buildDeviceCommand("0A", "G", 0, 0);
-    messageQueue.enqueue(MessageQueueItem(initializeXAxisCommand.toUtf8(), true));
+    messageQueue.enqueue(MessageQueueItem(initializeXAxisCommand.toUtf8(), true, "0AG"));
     QString waitXAxisInitializedCommand = tcpCore->buildDeviceCommand("0A", "d", 0, 0);
-    messageQueue.enqueue(MessageQueueItem(waitXAxisInitializedCommand.toUtf8(), true));
+    messageQueue.enqueue(MessageQueueItem(waitXAxisInitializedCommand.toUtf8(), true, "0Ad01"));
 
     qDebug() << "\n\n初始化Y"; // 9号电机
     QString initializeYAxisCommand = tcpCore->buildDeviceCommand("09", "G", 0, 0);
-    messageQueue.enqueue(MessageQueueItem(initializeYAxisCommand.toUtf8(), true));
+    messageQueue.enqueue(MessageQueueItem(initializeYAxisCommand.toUtf8(), true, "09G"));
     QString waitYAxisInitializedCommand = tcpCore->buildDeviceCommand("09", "d", 0, 0);
-    messageQueue.enqueue(MessageQueueItem(waitYAxisInitializedCommand.toUtf8(), true));
+    messageQueue.enqueue(MessageQueueItem(waitYAxisInitializedCommand.toUtf8(), true, "09d01"));
 
     qDebug() << "\n\n夹持区初始化"; // 11号电机
     QString initializeGripAreaCommand = tcpCore->buildDeviceCommand("0B", "06", "0100", 1, 4);
     messageQueue.enqueue(MessageQueueItem(initializeGripAreaCommand.toUtf8(), false));
     QString waitGripAreaInitializedCommand = tcpCore->buildDeviceCommand("0B", "03", "0200", 1, 4);
-    messageQueue.enqueue(MessageQueueItem(waitGripAreaInitializedCommand.toUtf8(), false));
+    messageQueue.enqueue(MessageQueueItem(waitGripAreaInitializedCommand.toUtf8(), false, "0B0302000001"));
 }
 
 
@@ -870,13 +906,13 @@ void MainWindow::resetXYZMotorsToZero(QQueue<MessageQueueItem>& messageQueue)
 
     // 06号电机恢复到零点
     QString zeroMotorCommand = tcpCore->buildDeviceCommand("06", "D", 0, 8);
-    messageQueue.enqueue(MessageQueueItem(zeroMotorCommand.toUtf8(), true));
+    messageQueue.enqueue(MessageQueueItem(zeroMotorCommand.toUtf8(), true, "06D"));
     QString waitZeroMotorCommand = tcpCore->buildDeviceCommand("06", "d", 0, 0);
     messageQueue.enqueue(MessageQueueItem(waitZeroMotorCommand.toUtf8(), true, "06d01"));
 
     // 08号电机恢复到零点
     zeroMotorCommand = tcpCore->buildDeviceCommand("08", "D", 3, 8);
-    messageQueue.enqueue(MessageQueueItem(zeroMotorCommand.toUtf8(), true));
+    messageQueue.enqueue(MessageQueueItem(zeroMotorCommand.toUtf8(), true, "08D"));
     waitZeroMotorCommand = tcpCore->buildDeviceCommand("08", "d", 0, 0);
     messageQueue.enqueue(MessageQueueItem(waitZeroMotorCommand.toUtf8(), true, "08d01"));
 

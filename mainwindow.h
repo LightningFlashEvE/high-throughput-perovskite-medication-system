@@ -93,11 +93,6 @@ private slots:
      */
     void checkShakeBedTimeout();
 
-
-    void on_pushButton_7_clicked();
-
-    void on_pushButton_8_clicked();
-
     /**
      * 紧急停止按钮（UI上的“紧急暂停”）点击槽
      * 目前为空实现，后续可填入紧急停止逻辑
@@ -183,15 +178,20 @@ private:
     QLabel *m_recipeCurrentLabel = nullptr;   // 当前执行
     QListWidget *m_recipeQueueList = nullptr; // 即将执行列表
 
-    // 流程状态标签（5个步骤）
-    QLabel *m_processState_takeEmptyBottle = nullptr;
-    QLabel *m_processState_getSolid = nullptr;
-    QLabel *m_processState_resetXYZ = nullptr;
-    QLabel *m_processState_getLiquid = nullptr;
-    QLabel *m_processState_tightenBottle = nullptr;
+    // 流程步骤勾选框（5个步骤）
+    QCheckBox *m_processCheckBox_takeEmptyBottle = nullptr;
+    QCheckBox *m_processCheckBox_getSolid = nullptr;
+    QCheckBox *m_processCheckBox_resetXYZ = nullptr;
+    QCheckBox *m_processCheckBox_getLiquid = nullptr;
+    QCheckBox *m_processCheckBox_tightenBottle = nullptr;
 
-    // 流程状态跟踪
-    QSet<QString> m_completedStates;  // 已完成的状态集合
+    // 运行按钮
+    QPushButton *m_runSelectedStepsButton = nullptr;
+
+    // 步骤执行状态跟踪
+    QSet<QString> m_selectedSteps;      // 用户勾选的步骤
+    QSet<QString> m_skippedSteps;       // 用户取消的步骤（执行中）
+    QSet<QString> m_completedSteps;     // 已完成的步骤
 
     /**
      * 更新流程状态显示
@@ -203,6 +203,29 @@ private:
      * 重置流程状态显示（全部恢复为灰色）
      */
     void resetProcessStateDisplay();
+
+    /**
+     * 运行选中的步骤
+     */
+    void runSelectedSteps();
+
+    /**
+     * 取消步骤（在执行过程中调用）
+     * @param stepName 要取消的步骤名称
+     */
+    void cancelStep(const QString& stepName);
+
+    /**
+     * 更新步骤勾选框的可用状态
+     */
+    void updateStepCheckBoxStates();
+
+    /**
+     * 获取步骤对应的勾选框
+     * @param stepName 步骤名称
+     * @return 对应的QCheckBox指针
+     */
+    QCheckBox* getCheckBoxForStep(const QString& stepName);
 
     /**
      * 更新状态栏天平重量显示

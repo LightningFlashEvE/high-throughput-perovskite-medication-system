@@ -64,7 +64,7 @@
                   </property>
                   <layout class="QVBoxLayout" name="verticalLayout_8">
                    <item>
-                    <widget class="QLabel" name="m_processState_takeEmptyBottle">
+                    <widget class="QCheckBox" name="m_processCheckBox_takeEmptyBottle">
                      <property name="font">
                       <font>
                        <pointsize>9</pointsize>
@@ -74,10 +74,13 @@
                      <property name="text">
                       <string>1. 打开空瓶</string>
                      </property>
+                     <property name="checked">
+                      <bool>true</bool>
+                     </property>
                     </widget>
                    </item>
                    <item>
-                    <widget class="QLabel" name="m_processState_getSolid">
+                    <widget class="QCheckBox" name="m_processCheckBox_getSolid">
                      <property name="font">
                       <font>
                        <pointsize>9</pointsize>
@@ -87,10 +90,13 @@
                      <property name="text">
                       <string>2. 取出固体</string>
                      </property>
+                     <property name="checked">
+                      <bool>true</bool>
+                     </property>
                     </widget>
                    </item>
                    <item>
-                    <widget class="QLabel" name="m_processState_resetXYZ">
+                    <widget class="QCheckBox" name="m_processCheckBox_resetXYZ">
                      <property name="font">
                       <font>
                        <pointsize>9</pointsize>
@@ -100,10 +106,13 @@
                      <property name="text">
                       <string>3. XYZ复位</string>
                      </property>
+                     <property name="checked">
+                      <bool>true</bool>
+                     </property>
                     </widget>
                    </item>
                    <item>
-                    <widget class="QLabel" name="m_processState_getLiquid">
+                    <widget class="QCheckBox" name="m_processCheckBox_getLiquid">
                      <property name="font">
                       <font>
                        <pointsize>9</pointsize>
@@ -113,10 +122,13 @@
                      <property name="text">
                       <string>4. 取液体</string>
                      </property>
+                     <property name="checked">
+                      <bool>true</bool>
+                     </property>
                     </widget>
                    </item>
                    <item>
-                    <widget class="QLabel" name="m_processState_tightenBottle">
+                    <widget class="QCheckBox" name="m_processCheckBox_tightenBottle">
                      <property name="font">
                       <font>
                        <pointsize>9</pointsize>
@@ -125,6 +137,16 @@
                      </property>
                      <property name="text">
                       <string>5. 拧好瓶子取摇床</string>
+                     </property>
+                     <property name="checked">
+                      <bool>true</bool>
+                     </property>
+                    </widget>
+                   </item>
+                   <item>
+                    <widget class="QPushButton" name="m_runSelectedStepsButton">
+                     <property name="text">
+                      <string>运行选中步骤</string>
                      </property>
                     </widget>
                    </item>

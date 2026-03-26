@@ -278,6 +278,9 @@ signals:
     // 流程状态变更信号（当检测到AAstateChange命令时发出，携带状态名称）
     void processStateChanged(const QString& stateName);
 
+    // 步骤跳过信号（当检测到AAskipStep命令时发出，携带步骤名称）
+    void stepSkipped(const QString& stepName);
+
     // 所有设备初始化完成的请求信号（当检测到AAallDevicesInitialized命令时发出）
     void allDevicesInitializedRequested();
 
@@ -296,28 +299,38 @@ private slots:
     void onBalanceDisconnected();
     void onBalanceReadyRead();
     void onBalanceSocketError(QAbstractSocket::SocketError error);
-    
-    // 轮询检查电机是否到位
-    void pollMotorPosition();
+
+    // 响应超时处理
+    void onResponseTimeout();
 
 public:
     QTcpSocket* m_tcpSocket;
-    
-    // 轮询机制相关
-    QTimer* m_pollTimer;              // 轮询定时器
-    bool m_isPolling;                 // 是否正在轮询
-    QString m_pollingDeviceNum;       // 正在轮询的设备编号
-    QString m_pollingCommand;         // 轮询命令（完整的带CRC的命令）
-    QEventLoop* m_pollEventLoop;      // 用于阻塞等待的事件循环
-    
+
     // 消息队列相关
     QQueue<MessageQueueItem> m_messageQueue;  // 消息队列
     bool m_isProcessingQueue;                  // 是否正在处理队列
     QTimer* m_queueTimer;                     // 队列处理定时器
     bool m_isWaitingForResponse;              // 是否正在等待响应
     bool m_isQueuePaused;                     // 队列是否被用户暂停（新增）
-    QString m_currentExpectedNormalized;      // 当前等待的标准化期望前缀
-    bool m_currentAsciiMode;                  // 当前等待是否ASCII模式
+
+    // 响应等待机制（新）
+    QString m_expectedResponse;               // 期望的响应内容
+    bool m_expectedAsciiMode;                 // 期望响应是否为ASCII模式
+    QElapsedTimer m_responseTimer;            // 响应超时计时器
+    int m_retryCount;                         // 当前命令的重试次数
+    QByteArray m_currentCommand;              // 当前正在等待响应的命令
+    bool m_currentCommandAsciiMode;           // 当前命令是否为ASCII模式
+    QTimer* m_responseTimeoutTimer;           // 响应超时定时器
+    static const int MAX_RETRIES = 3;         // 最大重试次数
+    static const int RESPONSE_TIMEOUT = 5000; // 响应超时时间（毫秒）
+
+    // 命令发送间隔控制
+    QElapsedTimer m_lastSendTime;             // 上次发送命令的时间戳
+    static const int MIN_SEND_INTERVAL = 50; // 最小发送间隔（毫秒）
+
+    // 步骤跳过相关
+    bool m_isSkippingStep;                    // 是否正在跳过步骤
+    QString m_currentSkippingStep;            // 当前正在跳过的步骤名称
     
     // 天平称重相关（静态变量使用 g_ 前缀表示全局共享）
     static double g_expectedWeight;            // 期望重量值（用于对比，默认为0，所有对象共用）
@@ -341,33 +354,7 @@ public:
     int m_reconnectAttempts;                      // 当前重连尝试次数
     static const int MAX_RECONNECT_ATTEMPTS = 5;  // 最大重连尝试次数
     QTimer* m_reconnectTimer;                     // 重连定时器
-    
-    /**
-     * @brief 检查收到的数据是否是到位响应（XYZ电机）
-     * @param data 收到的数据
-     * @return true 表示已到位
-     */
-    bool checkIfReachedPosition(const QByteArray& data);
-    
-    /**
-     * @brief 检查收到的数据是否是电爪初始化完成响应（ModBus RTU）
-     * @param data 收到的数据
-     * @return true 表示初始化完成
-     */
-    bool checkIfGripperInitialized(const QByteArray& data);
-    
-    /**
-     * @brief 启动轮询机制
-     * @param deviceNum 设备编号
-     * @param command 查询命令
-     */
-    void startPolling(const QString& deviceNum, const QString& command);
-    
-    /**
-     * @brief 停止轮询机制
-     */
-    void stopPolling();
-    
+
     /**
      * @brief 尝试重连
      */

@@ -18,21 +18,25 @@ QMutex TcpClientCore::g_weightCheckMutex;
 TcpClientCore::TcpClientCore(QObject *parent)
     : QObject{parent}
     , m_tcpSocket(nullptr)
-    , m_pollTimer(nullptr)
-    , m_isPolling(false)
-    , m_pollEventLoop(nullptr)
     , m_isProcessingQueue(false)
     , m_queueTimer(nullptr)
     , m_isWaitingForResponse(false)
     , m_isQueuePaused(false)
+    , m_expectedAsciiMode(true)
+    , m_retryCount(0)
+    , m_currentCommandAsciiMode(true)
+    , m_responseTimeoutTimer(nullptr)
     , m_lastRemotePort(0)
     , m_lastProxyDisabled(false)
     , m_autoReconnectEnabled(true)
     , m_manualDisconnect(false)
     , m_reconnectAttempts(0)
     , m_reconnectTimer(nullptr)
-
+    , m_isSkippingStep(false)
 {
+    // 启动发送时间戳计时器
+    m_lastSendTime.start();
+
     // 创建 TCP Socket
     m_tcpSocket = new QTcpSocket(this);
     
@@ -59,15 +63,15 @@ void TcpClientCore::initializeConnectionsAndTimers()
             this, &TcpClientCore::onSocketError);
     #endif
 
-    // 创建轮询定时器
-    m_pollTimer = new QTimer(this);
-    m_pollTimer->setInterval(500);  // 0.5秒
-    connect(m_pollTimer, &QTimer::timeout, this, &TcpClientCore::pollMotorPosition);
-
     // 创建队列处理定时器（单次触发）
     m_queueTimer = new QTimer(this);
     m_queueTimer->setSingleShot(true);
     connect(m_queueTimer, &QTimer::timeout, this, &TcpClientCore::processMessageQueue);
+
+    // 创建响应超时定时器（单次触发）
+    m_responseTimeoutTimer = new QTimer(this);
+    m_responseTimeoutTimer->setSingleShot(true);
+    connect(m_responseTimeoutTimer, &QTimer::timeout, this, &TcpClientCore::onResponseTimeout);
 }
 
 
@@ -136,12 +140,9 @@ void TcpClientCore::disconnectReceiveForBalance()
 
 TcpClientCore::~TcpClientCore()
 {
-    // 停止轮询
-    stopPolling();
-
-    // 如果事件循环正在运行，先退出它
-    if (m_pollEventLoop && m_pollEventLoop->isRunning()) {
-        m_pollEventLoop->quit();
+    // 停止响应超时定时器
+    if (m_responseTimeoutTimer) {
+        m_responseTimeoutTimer->stop();
     }
 
     // 停止队列处理
@@ -462,38 +463,6 @@ bool TcpClientCore::sendMessage(const QByteArray& content, bool asciiOrHex)
     }
 
     m_tcpSocket->flush();
-    // qDebug() << "发送成功，字节数:" << bytesWritten;
-
-    /*
-     * ============================
-     * 5. 轮询机制
-     * ============================
-     * 情况1：XYZ电机查询到位
-     * 情况2：电爪初始化状态查询
-     * 共同流程：
-     *   - 启动0.3秒轮询定时器（pollMotorPosition）
-     *   - 创建事件循环阻塞等待
-     *   - 收到目标响应后（在 onReadyRead 中），退出循环继续执行
-     */
-    if (isPositionQuery || isGripperInitQuery) {
-        if (isPositionQuery) {
-            qDebug() << "(ง •_•)ง启动轮询，等待设备" << deviceNum << "到位...";
-        } else if (isGripperInitQuery) {
-            qDebug() << "(ง •_•)ง启动轮询，等待设备" << deviceNum << "电爪初始化完成...";
-        }
-
-        // 启动轮询定时器
-        startPolling(deviceNum, contentStr);
-
-        // 创建事件循环，阻塞等待到位信号
-        if (!m_pollEventLoop) {
-            m_pollEventLoop = new QEventLoop(this);
-        }
-
-        qDebug() << "进入阻塞等待...";
-        m_pollEventLoop->exec();  // 阻塞在这里，直到收到目标响应（在 onReadyRead 中退出）
-        qDebug() << "退出阻塞，Start the next step\n\n\n";
-    }
 
     return true;
 }
@@ -653,11 +622,15 @@ void TcpClientCore::pauseQueue()
         qDebug() << "  步骤4: 调用 stop() 停止队列定时器";
     }
 
-    // 清除当前期望值，避免与后续直接发送的命令冲突
-    if (!m_currentExpectedNormalized.isEmpty()) {
-        qDebug() << "  步骤5: 清除当前期望值:" << m_currentExpectedNormalized;
-        m_currentExpectedNormalized.clear();
+    // 停止响应超时定时器，清除期望值
+    if (m_responseTimeoutTimer) {
+        m_responseTimeoutTimer->stop();
     }
+    if (!m_expectedResponse.isEmpty()) {
+        qDebug() << "  步骤5: 清除当前期望值:" << m_expectedResponse;
+        m_expectedResponse.clear();
+    }
+    m_isWaitingForResponse = false;
 
     qDebug() << "  ✓ 当前队列剩余消息:" << m_messageQueue.size() << "条";
     qDebug() << "  ✓ 队列已暂停，如果正在轮询等待，将在下次轮询检查时退出";
@@ -701,14 +674,12 @@ void TcpClientCore::disconnectFromTcp()
         m_reconnectTimer->stop();
     }
 
-    // 1. 停止轮询
-    stopPolling();
-
-    // 2. 如果事件循环正在运行，先退出它
-    if (m_pollEventLoop && m_pollEventLoop->isRunning()) {
-        qDebug() << "退出事件循环...";
-        m_pollEventLoop->quit();
+    // 1. 停止响应超时定时器
+    if (m_responseTimeoutTimer) {
+        m_responseTimeoutTimer->stop();
     }
+
+    // 2. 如果事件循环正在运行，先退出它（兼容旧代码）
 
     // 3. 停止队列处理定时器
     if (m_queueTimer) {
@@ -756,8 +727,10 @@ bool TcpClientCore::isConnected() const
 // 仅复位内部状态（不主动断开连接）
 void TcpClientCore::resetState()
 {
-    // 停止轮询并清空相关状态
-    stopPolling();
+    // 停止响应超时定时器
+    if (m_responseTimeoutTimer) {
+        m_responseTimeoutTimer->stop();
+    }
 
     // 停止队列处理定时器
     if (m_queueTimer) {
@@ -772,7 +745,10 @@ void TcpClientCore::resetState()
     // 复位标志
     m_isProcessingQueue = false;
     m_isWaitingForResponse = false;
-    m_currentExpectedNormalized.clear();
+    m_expectedResponse.clear();
+    m_retryCount = 0;
+    m_isSkippingStep = false;
+    m_currentSkippingStep.clear();
 }
 
 // 私有槽函数实现
@@ -807,64 +783,27 @@ void TcpClientCore::onReadyRead()
 
     QByteArray data = m_tcpSocket->readAll();
 
-    qDebug() << "<<<<<<<<收到数据:" << QString::fromUtf8(data) << " " << QString(data.toHex().toUpper())  << " 期望：" << m_currentExpectedNormalized;
+    qDebug() << "<<<<<<<<收到数据:" << QString::fromUtf8(data) << " " << QString(data.toHex().toUpper()) << " 期望：" << m_expectedResponse;
 
-    // 如果正在轮询，检查是否收到目标响应
-    if (m_isPolling) {
+    // 如果正在等待响应，检查是否匹配期望值
+    if (m_isWaitingForResponse && !m_expectedResponse.isEmpty()) {
         bool conditionMet = false;
 
-        // 优先：按期望片段包含匹配（若提供）
-        if (!m_currentExpectedNormalized.isEmpty()) {
-            const QString plain = QString::fromUtf8(data);
-            const QString hexUpper = QString(data.toHex().toUpper());
-
-            //qDebug() << "------------------" << m_currentAsciiMode << m_currentExpectedNormalized;
-            if (m_currentAsciiMode) {
-                // ASCII：包含匹配（大小写敏感，d/D 区分）
-                if (plain.contains(m_currentExpectedNormalized)) {
-                    conditionMet = true;
-                }
-            } else {
-                // HEX：包含匹配（使用大写）
-                if (hexUpper.contains(m_currentExpectedNormalized)) {
-                    conditionMet = true;
-                }
-            }
-        }
-
-        // 兼容旧逻辑：若没提供期望，按既有的到位判断
-        if (!conditionMet && m_currentExpectedNormalized.isEmpty()) {
-            // 检查1：XYZ电机到位响应
-            if (checkIfReachedPosition(data)) {
-                conditionMet = true;
-            }
-            // 检查2：电爪初始化完成响应
-            else if (checkIfGripperInitialized(data)) {
-                conditionMet = true;
-            }
+        if (m_expectedAsciiMode) {
+            conditionMet = QString::fromUtf8(data).contains(m_expectedResponse);
+        } else {
+            conditionMet = QString(data.toHex().toUpper()).contains(m_expectedResponse.toUpper());
         }
 
         if (conditionMet) {
-            qDebug() << "匹配成功，匹配成功的命令。" << data;
-            qDebug() << "";
-            // 停止轮询
-            stopPolling();
-            m_currentExpectedNormalized.clear();
-
-            // 发射到位信号
-            emit motorReachedPosition(m_pollingDeviceNum); // 预留
-
-            // 如果有事件循环在等待，退出它
-            if (m_pollEventLoop && m_pollEventLoop->isRunning()) {
-                m_pollEventLoop->quit();
-            }
-
-            // 通知队列处理：响应已收到
-            if (m_isWaitingForResponse) {
-                m_isWaitingForResponse = false;
-                // 继续处理队列
-                QTimer::singleShot(0, this, &TcpClientCore::processMessageQueue);
-            }
+            qDebug() << "✓ 响应匹配成功:" << m_expectedResponse;
+            // 停止超时定时器
+            m_responseTimeoutTimer->stop();
+            m_retryCount = 0;
+            m_expectedResponse.clear();
+            m_isWaitingForResponse = false;
+            // 继续处理队列
+            QTimer::singleShot(0, this, &TcpClientCore::processMessageQueue);
         }
     }
 
@@ -1324,203 +1263,7 @@ QString TcpClientCore::buildDeviceCommand(const QString& deviceNum,
 
 
 
-// ========== 轮询机制相关函数 ==========
-
-// 启动轮询机制
-void TcpClientCore::startPolling(const QString& deviceNum, const QString& command)
-{
-    if (m_isPolling) {
-        qWarning() << "已经在轮询中，无法启动新的轮询";
-        return;
-    }
-
-    // 如果定时器未初始化，自动初始化（向后兼容）
-    if (!m_pollTimer) {
-        initializeConnectionsAndTimers();
-    }
-
-    m_isPolling = true;
-    m_pollingDeviceNum = deviceNum;
-    m_pollingCommand = command;
-
-    // 启动定时器（不打印日志，避免刷屏）
-    m_pollTimer->start();
-}
-
-// 停止轮询机制
-void TcpClientCore::stopPolling()
-{
-    if (!m_isPolling) {
-        return;
-    }
-
-    m_isPolling = false;
-    m_pollTimer->stop();
-    m_pollingDeviceNum.clear();
-    m_pollingCommand.clear();
-
-    // 如果有事件循环正在运行，退出它
-    if (m_pollEventLoop && m_pollEventLoop->isRunning()) {
-        m_pollEventLoop->quit();
-    }
-
-    // 不打印日志，避免刷屏
-}
-
-// 轮询定时器槽函数
-void TcpClientCore::pollMotorPosition()
-{
-    if (!m_isPolling || m_pollingCommand.isEmpty()) {
-        return;
-    }
-
-    // ⚠️ 检查是否用户暂停了队列
-    if (m_isQueuePaused) {
-        qDebug() << "⏸ 检测到队列暂停，停止轮询并退出事件循环";
-        stopPolling();
-        if (m_pollEventLoop && m_pollEventLoop->isRunning()) {
-            m_pollEventLoop->quit();  // 退出阻塞的事件循环
-        }
-        return;
-    }
-
-    // 不打印轮询发送信息，避免每0.3秒刷屏
-
-    /*
-     * 根据命令格式判断发送模式：
-     * - 以 ">" 开头：XYZ电机（ASCII模式，直接发送）
-     * - 不以 ">" 开头：电爪ModBus（Hex模式，需要转换）
-     */
-    QByteArray dataToSend;
-
-    if (m_pollingCommand.startsWith(">")) {
-        // ASCII模式：XYZ电机，直接发送
-        dataToSend = m_pollingCommand.toUtf8();
-    } else {
-        // Hex模式：电爪ModBus，先从十六进制字符串转换为字节数组
-        dataToSend = QByteArray::fromHex(m_pollingCommand.toUtf8());
-    }
-
-    if (m_tcpSocket && m_tcpSocket->state() == QAbstractSocket::ConnectedState) {
-        m_tcpSocket->write(dataToSend);
-        // qDebug() << "轮询发送:" << QString(dataToSend.toHex().toUpper());
-        m_tcpSocket->flush();
-    } else {
-        qWarning() << "TCP未连接，停止轮询";
-        stopPolling();
-
-        if (m_pollEventLoop && m_pollEventLoop->isRunning()) {
-            m_pollEventLoop->quit();
-        }
-    }
-}
-
 // XYZ电机否是到位响应
-bool TcpClientCore::checkIfReachedPosition(const QByteArray& data)
-{
-    // 将接收到的数据转换为字符串
-    QString dataStr = QString::fromUtf8(data);
-
-    // 期望格式：>06d01 + 4位CRC  或  >0Ad01 + 4位CRC
-    // 其中 01 表示已到达预定位置
-
-    // 检查数据长度是否合理（至少需要 >XXdYY + ZZZZ = 11个字符）
-    if (dataStr.length() < 11) {
-        return false;
-    }
-
-    // 检查是否以 > 开头
-    if (!dataStr.startsWith(">")) {
-        return false;
-    }
-
-    // 提取设备编号（位置1-2）
-    QString deviceNum = dataStr.mid(1, 2);
-
-    // 检查设备编号是否匹配
-    if (deviceNum.toUpper() != m_pollingDeviceNum.toUpper()) {
-        return false;
-    }
-
-    // 检查功能码是否是 'd'
-    QChar functionCode = dataStr.at(3);
-    if (functionCode != 'd') {
-        return false;
-    }
-
-    // 提取状态码（位置4-5）
-    QString statusCode = dataStr.mid(4, 2);
-
-    // 状态码 01 表示到达预定位置
-    if (statusCode == "01") {
-        return true;
-    }
-
-    // 其他状态码的含义（不打印，避免刷屏）：
-    // 00: 运行中
-    // 02: 异常撞击
-    // 03: 检测到液位
-    // 04: 未检测到液位到达最大距离
-    // 05: 力矩模式下运行到极限位置
-    // 08: 紧急停止
-
-    return false;
-}
-
-// 电爪否是到位响应
-bool TcpClientCore::checkIfGripperInitialized(const QByteArray& data)
-{
-    /*
-     * ModBus RTU 响应格式：
-     * 字节0: 设备ID（如 0x05）
-     * 字节1: 功能码（0x03 = 读取保持寄存器）
-     * 字节2: 字节计数（0x02 = 2字节数据）
-     * 字节3-4: 数据（0x00 0x01 = 初始化完成）
-     * 字节5-6: CRC16校验
-     *
-     * 示例：05 03 02 00 01 79 84
-     */
-
-    // 检查数据长度（至少7字节：ID + FC + BC + 2字节数据 + 2字节CRC）
-    if (data.length() < 7) {
-        return false;
-    }
-
-    // 提取设备ID（字节0）
-    quint8 deviceId = static_cast<quint8>(data[0]);
-    QString deviceIdStr = QString("%1").arg(deviceId, 2, 16, QChar('0')).toUpper();
-
-    // 检查设备ID是否匹配
-    if (deviceIdStr != m_pollingDeviceNum.toUpper()) {
-        return false;
-    }
-
-    // 检查功能码（字节1）是否是 0x03
-    quint8 functionCode = static_cast<quint8>(data[1]);
-    if (functionCode != 0x03) {
-        return false;
-    }
-
-    // 检查字节计数（字节2）是否是 0x02
-    quint8 byteCount = static_cast<quint8>(data[2]);
-    if (byteCount != 0x02) {
-        return false;
-    }
-
-    // 提取状态数据（字节3-4）
-    quint16 statusData = (static_cast<quint8>(data[3]) << 8) | static_cast<quint8>(data[4]);
-    if (statusData == 0x0001 || statusData == 0x0002) {
-        return true;
-    }
-
-
-
-    // 如果是其他状态，可以打印调试信息
-    // qDebug() << "电爪状态:" << QString("0x%1").arg(statusData, 4, 16, QChar('0')).toUpper();
-
-    return false;
-}
-
 // 处理消息队列
 void TcpClientCore::processMessageQueue()
 {
@@ -1547,11 +1290,33 @@ void TcpClientCore::processMessageQueue()
     MessageQueueItem item = m_messageQueue.dequeue();
     // qDebug() << "▲▲▲正在处理消息:" << item.content << " | 剩余队列长度:" << m_messageQueue.size();
 
-
-
-
-
-
+    // ★★★ 步骤跳过逻辑：如果正在跳过步骤，检查是否应该继续跳过 ★★★
+    QString contentStr = QString::fromUtf8(item.content);
+    if (m_isSkippingStep) {
+        // 如果遇到新的AAstateChange命令，说明进入下一个步骤
+        if (contentStr.startsWith("AAstateChange:")) {
+            QString newStep = contentStr.mid(QString("AAstateChange:").length());
+            if (newStep != m_currentSkippingStep) {
+                // 进入不同的步骤，停止跳过
+                qDebug() << "停止跳过步骤" << m_currentSkippingStep << "，进入新步骤" << newStep;
+                m_isSkippingStep = false;
+                m_currentSkippingStep.clear();
+                // 继续正常处理这条AAstateChange命令（不return，继续往下执行）
+            } else {
+                // 跳过当前步骤的AAstateChange命令
+                qDebug() << "跳过步骤" << m_currentSkippingStep << "的AAstateChange命令";
+                m_isProcessingQueue = false;
+                QTimer::singleShot(0, this, &TcpClientCore::processMessageQueue);
+                return;
+            }
+        } else {
+            // 跳过当前步骤的所有命令
+            qDebug() << "跳过步骤" << m_currentSkippingStep << "的命令:" << contentStr;
+            m_isProcessingQueue = false;
+            QTimer::singleShot(0, this, &TcpClientCore::processMessageQueue);
+            return;
+        }
+    }
 
     /*
     * AA0  天平打印关
@@ -1563,7 +1328,6 @@ void TcpClientCore::processMessageQueue()
     * 第二步骤
     */
     // 检查是否是AA0、AA1、AA2 或自定义 AA 命令（天平/逻辑命令）
-    QString contentStr = QString::fromUtf8(item.content);
     if (item.asciiOrHex && contentStr == "AA0") {
         // 检测到AA0命令（关闭天平打印），不发送，而是发出信号
         qDebug() << "检测到AA0命令，发出天平打印关闭信号";
@@ -1800,6 +1564,23 @@ void TcpClientCore::processMessageQueue()
         QTimer::singleShot(0, this, &TcpClientCore::processMessageQueue);
         return;
     }
+    if (item.asciiOrHex && contentStr.startsWith("AAskipStep:")) {
+        // 检测到AAskipStep命令（跳过步骤标记）
+        QString stepName = contentStr.mid(QString("AAskipStep:").length());
+        qDebug() << "检测到AAskipStep命令，跳过步骤:" << stepName;
+
+        // 发出跳过信号（用于UI更新）
+        emit stepSkipped(stepName);
+
+        // 进入跳过模式：持续跳过消息，直到遇到下一个不同步骤的AAstateChange命令
+        m_isSkippingStep = true;
+        m_currentSkippingStep = stepName;
+
+        // 继续处理下一条消息
+        m_isProcessingQueue = false;
+        QTimer::singleShot(0, this, &TcpClientCore::processMessageQueue);
+        return;
+    }
     if (item.asciiOrHex && contentStr.startsWith("AAstateChange:")) {
         // 检测到AAstateChange命令（流程状态变更），解析状态名称，不发送，而是发出信号
         QString stateName = contentStr.mid(QString("AAstateChange:").length());
@@ -1818,56 +1599,43 @@ void TcpClientCore::processMessageQueue()
                      ? true
                      : needsWaitForResponse(item.content, item.asciiOrHex);
 
-    if (needsWait) {
-        // 需要等待响应（如查询到位命令），设置等待标志
-        m_isWaitingForResponse = true;
-
-        // 使用简化匹配：保存用户提供的期望片段（ASCII原样、HEX转大写）
-        m_currentExpectedNormalized.clear();
-        m_currentAsciiMode = item.asciiOrHex;
-
-        QString contentStr = QString::fromUtf8(item.content);
-        QString deviceNum;
-        if (item.asciiOrHex && contentStr.startsWith(">") && contentStr.length() >= 4) {
-            deviceNum = contentStr.mid(1, 2);
-        } else if (!item.asciiOrHex && contentStr.length() >= 2) {
-            deviceNum = contentStr.left(2);
-        }
-
-        const QString& sig = item.expectedSignature;
-        if (!sig.isEmpty() && sig != "-----") {
-            if (item.asciiOrHex) {
-                // ASCII：保留用户提供片段，大小写敏感匹配
-                m_currentExpectedNormalized = sig;
-            } else {
-                // HEX：将片段转为大写，进行HEX包含匹配
-                m_currentExpectedNormalized = sig.toUpper();
-            }
-        }
-
-        // 打印：当前发送命令 与 期待回复
-        QString contentStrLog = QString::fromUtf8(item.content);
-        qDebug() << "当前发送的命令是:" << contentStrLog << "，期待回复:" << (sig.isEmpty() || sig == "-----" ? "" : sig);
-    }
-    else
-    {
-        qDebug() << "当前发送的命令是:" << item.content << item.asciiOrHex << needsWait;
-    }
+    qDebug() << "当前发送的命令是:" << QString::fromUtf8(item.content) << "，期待回复:" << (needsWait ? item.expectedSignature : "无需等待");
 
 
-    // 在发送消息之前，非阻塞延时40ms
-    QTimer::singleShot(40, this, [=, item = item, needsWait = needsWait]() {
+    // 计算距离上次发送的时间间隔
+    qint64 elapsed = m_lastSendTime.elapsed();
+    int delay = (elapsed < MIN_SEND_INTERVAL) ? (MIN_SEND_INTERVAL - elapsed) : 0;
 
-        //qDebug() << "读取队列信息:" << QString::fromUtf8(item.content) << "，期待回复:" << item.expectedSignature;
-        // 发送消息（使用非阻塞方式）
-        sendMessageInternal(item.content, item.asciiOrHex, needsWait);
+    qDebug() << "距离上次发送已过" << elapsed << "ms，延迟" << delay << "ms后发送";
 
-        // 如果不需要等待响应，立即处理下一条消息
-        if (!needsWait) {
-            // 递归处理下一条消息（通过定时器异步调用，避免阻塞）
+    // 使用计算出的延迟时间，确保两条命令之间至少间隔MIN_SEND_INTERVAL毫秒
+    QTimer::singleShot(delay, this, [=, item = item, needsWait = needsWait]() {
+
+        if (needsWait) {
+            // 先设置期望响应，再发送，防止设备响应极快导致 onReadyRead 在等待状态设置前触发
+            const QString& sig = item.expectedSignature;
+            m_expectedResponse = (!sig.isEmpty() && sig != "-----") ? sig : QString();
+            m_expectedAsciiMode = item.asciiOrHex;
+            m_currentCommand = item.content;
+            m_currentCommandAsciiMode = item.asciiOrHex;
+            m_retryCount = 0;
+            m_isWaitingForResponse = true;
+
+            // 发送消息
+            sendMessageInternal(item.content, item.asciiOrHex, needsWait);
+            m_lastSendTime.restart();
+
+            // 启动超时定时器
+            m_responseTimeoutTimer->start(RESPONSE_TIMEOUT);
+            qDebug() << "等待响应，期望:" << m_expectedResponse << "，超时:" << RESPONSE_TIMEOUT << "ms";
+        } else {
+            // 发送消息
+            sendMessageInternal(item.content, item.asciiOrHex, needsWait);
+            m_lastSendTime.restart();
+
+            // 不需要等待响应，立即处理下一条消息
             QTimer::singleShot(0, this, &TcpClientCore::processMessageQueue);
         }
-        // 如果需要等待响应，会在 onReadyRead 中接收到响应后继续处理
     });
 }
 
@@ -1924,19 +1692,28 @@ void TcpClientCore::sendMessageInternal(const QByteArray& content, bool asciiOrH
     }
 
     m_tcpSocket->flush();
+}
 
-    // 如果需要等待响应，启动轮询
-    if (shouldWait) {
-        QString contentStr = QString::fromUtf8(content);
-        QString deviceNum;
+// 响应超时处理：重试或放弃
+void TcpClientCore::onResponseTimeout()
+{
+    if (!m_isWaitingForResponse) return;
 
-        if (asciiOrHex && contentStr.startsWith(">") && contentStr.length() >= 4) {
-            deviceNum = contentStr.mid(1, 2);
-        } else if (!asciiOrHex && contentStr.length() >= 12) {
-            deviceNum = contentStr.left(2);
-        }
-
-        startPolling(deviceNum, contentStr);
+    m_retryCount++;
+    if (m_retryCount <= MAX_RETRIES) {
+        qDebug() << "⚠ 响应超时，第" << m_retryCount << "次重试，命令:" << QString::fromUtf8(m_currentCommand);
+        // 重新发送命令
+        sendMessageInternal(m_currentCommand, m_currentCommandAsciiMode, true);
+        m_lastSendTime.restart();
+        // 重启超时定时器
+        m_responseTimeoutTimer->start(RESPONSE_TIMEOUT);
+    } else {
+        qWarning() << "✗ 响应超时，已重试" << MAX_RETRIES << "次，放弃等待，继续下一条命令";
+        m_retryCount = 0;
+        m_expectedResponse.clear();
+        m_isWaitingForResponse = false;
+        // 继续处理队列
+        QTimer::singleShot(0, this, &TcpClientCore::processMessageQueue);
     }
 }
 

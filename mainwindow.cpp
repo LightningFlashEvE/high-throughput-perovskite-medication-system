@@ -89,12 +89,18 @@ MainWindow::MainWindow(QWidget *parent)
     m_recipeCurrentLabel = ui->m_recipeCurrentLabel;
     m_recipeQueueList    = ui->listWidget_recipeQueue;
 
-    // 绑定流程状态标签
-    m_processState_takeEmptyBottle = ui->m_processState_takeEmptyBottle;
-    m_processState_getSolid = ui->m_processState_getSolid;
-    m_processState_resetXYZ = ui->m_processState_resetXYZ;
-    m_processState_getLiquid = ui->m_processState_getLiquid;
-    m_processState_tightenBottle = ui->m_processState_tightenBottle;
+    // 绑定流程步骤勾选框
+    m_processCheckBox_takeEmptyBottle = ui->m_processCheckBox_takeEmptyBottle;
+    m_processCheckBox_getSolid = ui->m_processCheckBox_getSolid;
+    m_processCheckBox_resetXYZ = ui->m_processCheckBox_resetXYZ;
+    m_processCheckBox_getLiquid = ui->m_processCheckBox_getLiquid;
+    m_processCheckBox_tightenBottle = ui->m_processCheckBox_tightenBottle;
+
+    // 绑定运行按钮
+    m_runSelectedStepsButton = ui->m_runSelectedStepsButton;
+
+    // 连接运行按钮的点击事件
+    connect(m_runSelectedStepsButton, &QPushButton::clicked, this, &MainWindow::runSelectedSteps);
 
     // 初始化流程状态显示为灰色
     resetProcessStateDisplay();
@@ -977,13 +983,14 @@ static const QStringList PROCESS_STEPS = {
 
 void MainWindow::resetProcessStateDisplay()
 {
-    m_completedStates.clear();
+    m_completedSteps.clear();
+    m_skippedSteps.clear();
     const QString grayStyle = "color: gray;";
-    if (m_processState_takeEmptyBottle) m_processState_takeEmptyBottle->setStyleSheet(grayStyle);
-    if (m_processState_getSolid)        m_processState_getSolid->setStyleSheet(grayStyle);
-    if (m_processState_resetXYZ)        m_processState_resetXYZ->setStyleSheet(grayStyle);
-    if (m_processState_getLiquid)       m_processState_getLiquid->setStyleSheet(grayStyle);
-    if (m_processState_tightenBottle)   m_processState_tightenBottle->setStyleSheet(grayStyle);
+    if (m_processCheckBox_takeEmptyBottle) m_processCheckBox_takeEmptyBottle->setStyleSheet(grayStyle);
+    if (m_processCheckBox_getSolid)        m_processCheckBox_getSolid->setStyleSheet(grayStyle);
+    if (m_processCheckBox_resetXYZ)        m_processCheckBox_resetXYZ->setStyleSheet(grayStyle);
+    if (m_processCheckBox_getLiquid)       m_processCheckBox_getLiquid->setStyleSheet(grayStyle);
+    if (m_processCheckBox_tightenBottle)   m_processCheckBox_tightenBottle->setStyleSheet(grayStyle);
 }
 
 void MainWindow::updateProcessStateDisplay(const QString& stateName)
@@ -994,43 +1001,50 @@ void MainWindow::updateProcessStateDisplay(const QString& stateName)
 
     // 当前步骤之前的所有步骤标记为已完成（绿色加粗）
     for (int i = 0; i < currentIndex; ++i) {
-        m_completedStates.insert(PROCESS_STEPS[i]);
+        m_completedSteps.insert(PROCESS_STEPS[i]);
     }
 
-    // 状态名称 -> 对应的 QLabel 指针
-    QMap<QString, QLabel*> labelMap = {
-        {"takeEmptyBottle", m_processState_takeEmptyBottle},
-        {"getSolid",        m_processState_getSolid},
-        {"resetXYZ",        m_processState_resetXYZ},
-        {"getLiquid",       m_processState_getLiquid},
-        {"tightenBottle",   m_processState_tightenBottle}
+    // 状态名称 -> 对应的 QCheckBox 指针
+    QMap<QString, QCheckBox*> checkBoxMap = {
+        {"takeEmptyBottle", m_processCheckBox_takeEmptyBottle},
+        {"getSolid",        m_processCheckBox_getSolid},
+        {"resetXYZ",        m_processCheckBox_resetXYZ},
+        {"getLiquid",       m_processCheckBox_getLiquid},
+        {"tightenBottle",   m_processCheckBox_tightenBottle}
     };
 
     const QString doneStyle    = "color: green; font-weight: bold;";
     const QString currentStyle = "color: #00aa00; font-weight: bold; text-decoration: underline;";
     const QString pendingStyle = "color: gray;";
+    const QString skippedStyle = "color: gray; text-decoration: line-through;";
 
     for (const QString& step : PROCESS_STEPS) {
-        QLabel* label = labelMap.value(step, nullptr);
-        if (!label) continue;
+        QCheckBox* checkBox = checkBoxMap.value(step, nullptr);
+        if (!checkBox) continue;
 
-        if (step == stateName) {
-            label->setStyleSheet(currentStyle);  // 当前执行：绿色加粗+下划线
-        } else if (m_completedStates.contains(step)) {
-            label->setStyleSheet(doneStyle);     // 已完成：绿色加粗
+        if (m_skippedSteps.contains(step)) {
+            checkBox->setStyleSheet(skippedStyle);  // 已跳过：灰色+删除线
+        } else if (step == stateName) {
+            checkBox->setStyleSheet(currentStyle);  // 当前执行：绿色加粗+下划线
+        } else if (m_completedSteps.contains(step)) {
+            checkBox->setStyleSheet(doneStyle);     // 已完成：绿色加粗
         } else {
-            label->setStyleSheet(pendingStyle);  // 未执行：灰色
+            checkBox->setStyleSheet(pendingStyle);  // 未执行：灰色
         }
     }
 
     // 如果是最后一步，执行完后全部变绿
     if (stateName == PROCESS_STEPS.last()) {
         for (const QString& step : PROCESS_STEPS) {
-            m_completedStates.insert(step);
+            if (!m_skippedSteps.contains(step)) {
+                m_completedSteps.insert(step);
+            }
         }
         for (const QString& step : PROCESS_STEPS) {
-            QLabel* label = labelMap.value(step, nullptr);
-            if (label) label->setStyleSheet(doneStyle);
+            QCheckBox* checkBox = checkBoxMap.value(step, nullptr);
+            if (checkBox && !m_skippedSteps.contains(step)) {
+                checkBox->setStyleSheet(doneStyle);
+            }
         }
     }
 }
