@@ -1329,7 +1329,11 @@ bool MainWindow::loadAndExecuteNextRecipeFromDatabase()
     
     qDebug() << "从数据库加载配方: ID=" << recipeId << "名称=" << recipeName << "创建时间=" << createTimeStr;
 
-    // 3. 更新配方状态为"正在执行"
+    // 3. 重置流程状态显示（清除上一次的绿色效果）
+    resetProcessStateDisplay();
+    qDebug() << "已重置流程状态显示，准备执行新配方";
+
+    // 4. 更新配方状态为"正在执行"
     QString updateStateSql = QString("UPDATE recipeQueue SET processState = %1 WHERE id = %2")
         .arg(RecipeProcessing).arg(recipeId);
     QSqlQuery updateQuery = dbm->query(updateStateSql);
@@ -1337,7 +1341,7 @@ bool MainWindow::loadAndExecuteNextRecipeFromDatabase()
         qWarning() << "更新配方状态失败:" << updateQuery.lastError().text();
     }
 
-    // 4. 查询该配方的所有消息（按 messageOrder 排序）
+    // 5. 查询该配方的所有消息（按 messageOrder 排序）
     QString selectMessagesSql = QString(
         "SELECT messageOrder, content, asciiOrHex, shouldWaitForResponse, expectedSignature "
         "FROM recipeMessageQueue WHERE recipeId = %1 ORDER BY messageOrder"
@@ -1349,10 +1353,10 @@ bool MainWindow::loadAndExecuteNextRecipeFromDatabase()
         return false;
     }
 
-    // 5. 清空旧队列，确保数据干净
+    // 6. 清空旧队列，确保数据干净
     tcpCore->clearMessageQueue();
-    
-    // 6. 将消息添加到 tcpCore 执行
+
+    // 7. 将消息添加到 tcpCore 执行
     int messageCount = 0;
     qDebug() << "════════════════════════════════════════";
     qDebug() << "开始批量添加消息到队列（同步执行）";
