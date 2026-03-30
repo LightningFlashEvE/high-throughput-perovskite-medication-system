@@ -1603,11 +1603,13 @@ void MainWindow::rotateMotor5ByCircles(double circles, QQueue<MessageQueueItem>&
     // 构建5号电机旋转命令（寄存器0108用于旋转）
     QString rotateCommand = tcpCore->buildDeviceCommand("05", "06", "0108", angleValue, 4);
 
-    // 发送命令（Hex模式）
-    //tcpCore->sendMessageAsync(rotateCommand.toUtf8(), false);
-    messageQueue.enqueue(MessageQueueItem(rotateCommand.toUtf8(), false, "05060108"));
+    // 构建完整的期望响应值（ModBus写命令会回显完整的请求）
+    QString expectedResponse = QString("05060108%1").arg(angleValue, 4, 16, QChar('0')).toUpper();
 
-    qDebug() << "5号电机旋转:" << circles << "圈（角度值:" << angleValue << "度）";
+    // 发送命令（Hex模式）
+    messageQueue.enqueue(MessageQueueItem(rotateCommand.toUtf8(), false, expectedResponse));
+
+    qDebug() << "5号电机旋转:" << circles << "圈（角度值:" << angleValue << "度）期望响应:" << expectedResponse;
 }
 
 // 获取本地无线网口的IP地址

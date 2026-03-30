@@ -869,7 +869,7 @@ bool MainWindow::getSolid(const QString& solidName, double mass, QQueue<MessageQ
     return true;
 }
 
-// 拧紧瓶子 - 重载版本
+// 拧紧瓶子去摇床 - 重载版本
 void MainWindow::tightenBottle(QQueue<MessageQueueItem>& messageQueue)
 {
     try 
@@ -909,13 +909,14 @@ void MainWindow::tightenBottle(QQueue<MessageQueueItem>& messageQueue)
         QString waitBalanceAreaXCommand = tcpCore->buildDeviceCommand("06", "d", 0, 0);
         messageQueue.enqueue(MessageQueueItem(waitBalanceAreaXCommand.toUtf8(), true, "06d01"));
 
-        // 夹住瓶子，上移
+        // 夹住瓶子
         QString enableGripperCommand = tcpCore->buildDeviceCommand("05", "06", "0105", 100, 4);
         messageQueue.enqueue(MessageQueueItem(enableGripperCommand.toUtf8(), false, "050601050064"));
         QString waitGripperEnableCommand = tcpCore->buildDeviceCommand("05", "03", "0202", 1, 4);
         messageQueue.enqueue(MessageQueueItem(waitGripperEnableCommand.toUtf8(), false, "0503020002"));
 
-        QString raiseTransferZCommand = tcpCore->buildDeviceCommand("06", "D", 0, 8);
+        // 上移
+        QString raiseTransferZCommand = tcpCore->buildDeviceCommand("06", "D", 1, 8);
         messageQueue.enqueue(MessageQueueItem(raiseTransferZCommand.toUtf8(), true, "06D"));
         QString waitTransferZRaisedCommand = tcpCore->buildDeviceCommand("06", "d", 0, 0);
         messageQueue.enqueue(MessageQueueItem(waitTransferZRaisedCommand.toUtf8(), true, "06d01"));
@@ -951,12 +952,13 @@ void MainWindow::tightenBottle(QQueue<MessageQueueItem>& messageQueue)
         QString waitFixedGripperEnableCommand = tcpCore->buildDeviceCommand("0B", "03", "0202", 1, 4);
         messageQueue.enqueue(MessageQueueItem(waitFixedGripperEnableCommand.toUtf8(), false, "0B03020002"));
 
+        // 释放5号夹爪（提前张爪）
         QString releaseGripperCommand = tcpCore->buildDeviceCommand("05", "06", "0105", 0, 4);
-        messageQueue.enqueue(MessageQueueItem(releaseGripperCommand.toUtf8(), false));
+        messageQueue.enqueue(MessageQueueItem(releaseGripperCommand.toUtf8(), false, "050601050000"));
         QString waitGripperReleaseCommand = tcpCore->buildDeviceCommand("05", "03", "0202", 1, 4);
         messageQueue.enqueue(MessageQueueItem(waitGripperReleaseCommand.toUtf8(), false, "0503020001"));
 
-        messageQueue.enqueue(MessageQueueItem(raiseTransferZCommand.toUtf8(), true));
+        messageQueue.enqueue(MessageQueueItem(raiseTransferZCommand.toUtf8(), true, "06D"));
         messageQueue.enqueue(MessageQueueItem(waitTransferZRaisedCommand.toUtf8(), true, "06d01"));
 
         // 移动到帽子区域，下移
@@ -990,7 +992,7 @@ void MainWindow::tightenBottle(QQueue<MessageQueueItem>& messageQueue)
         messageQueue.enqueue(MessageQueueItem(enableGripperCommand.toUtf8(), false));
         messageQueue.enqueue(MessageQueueItem(waitGripperEnableCommand.toUtf8(), false, "0503020002"));
         // 上移
-        messageQueue.enqueue(MessageQueueItem(raiseTransferZCommand.toUtf8(), true));
+        messageQueue.enqueue(MessageQueueItem(raiseTransferZCommand.toUtf8(), true, "06D"));
         messageQueue.enqueue(MessageQueueItem(waitTransferZRaisedCommand.toUtf8(), true, "06d01"));
 
         // 移动到放盖子区域
@@ -1205,9 +1207,9 @@ void MainWindow::openBottleCap(QQueue<MessageQueueItem>& messageQueue)
     setMotor6ZSpeed(1000, messageQueue);
 
     QString rotateInitCommand = tcpCore->buildDeviceCommand("05", "06", "0101", 1, 4);
-    messageQueue.enqueue(MessageQueueItem(rotateInitCommand.toUtf8(), false));
+    messageQueue.enqueue(MessageQueueItem(rotateInitCommand.toUtf8(), false, "050601010001"));
     QString waitRotateInitCommand = tcpCore->buildDeviceCommand("05", "03", "0201", 1, 4);
-    messageQueue.enqueue(MessageQueueItem(waitRotateInitCommand.toUtf8(), false));
+    messageQueue.enqueue(MessageQueueItem(waitRotateInitCommand.toUtf8(), false, "0503020001"));
 }
 
 // 关盖函数（关闭瓶盖）

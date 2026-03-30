@@ -19,7 +19,10 @@
       "Bash(python fix_auto_increment.py)",
       "Bash(python check_conn.py)",
       "Bash(rm check_conn.py)",
-      "Bash(grep -n \"takeEmptyBottle\\\\|getLiquid\\\\|getSolid\" /d/application/high-throughput-perovskite-medication-system/*.cpp)"
+      "Bash(grep -n \"takeEmptyBottle\\\\|getLiquid\\\\|getSolid\" /d/application/high-throughput-perovskite-medication-system/*.cpp)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git push:*)"
     ]
   }
 }
