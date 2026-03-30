@@ -521,7 +521,8 @@ void TcpClientCore::sendMessage(QVector<RecipeQueueItem>& recipeMessageQueues)
     }
 
     // 4. 如果当前没有在处理队列且未暂停，启动处理（与 sendMessageAsync 相同）
-    if (!m_isProcessingQueue && !m_isWaitingForResponse) {
+    // 注意：如果队列已暂停（m_isQueuePaused = true），不应自动启动定时器
+    if (!m_isProcessingQueue && !m_isWaitingForResponse && !m_isQueuePaused) {
         m_queueTimer->start(0);  // 在下一个事件循环周期立即触发
     }
 }
@@ -1199,7 +1200,7 @@ QString TcpClientCore::buildDeviceCommand(const QString& deviceNum, const QStrin
     }
     else
     {
-        qWarning() << "设备编号错误:" << deviceNum;
+        qWarning() << "错误设备号:" << deviceNum << "功能码:" << functionCode << "数据:" << processedCommandData    ;
         return "";
     }
 }

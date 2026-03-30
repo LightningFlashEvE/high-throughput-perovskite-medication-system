@@ -1,5 +1,6 @@
 #include "mainwindow.h"
 #include "ui_mainwindow.h"
+#include <QMessageBox>
 #include <QTimer>
 #include <QDateTime>
 #include <QGraphicsView>
@@ -328,6 +329,47 @@ void MainWindow::updateEmergencyStopButton()
     }
 }
 
+// 放弃当前配方并预载下一条
+void MainWindow::abandonCurrentRecipeAndLoadNext()
+{
+    qDebug() << "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━";
+    qDebug() << "放弃当前配方并预载下一条";
+    qDebug() << "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━";
+
+    if (!tcpCore || !dbm) {
+        qWarning() << "TCP核心或数据库未初始化";
+        return;
+    }
+
+    // 1. 清空 TCP 队列
+    tcpCore->clearMessageQueue();
+    qDebug() << "  步骤1: 已清空 TCP 队列";
+
+    // 2. 更新数据库：将当前正在执行的配方标记为"已放弃"（状态码 8）
+    QString updateSql = QString("UPDATE recipeQueue SET processState = 8 WHERE processState = %1")
+        .arg(RecipeProcessing);
+    QSqlQuery updateQuery = dbm->query(updateSql);
+    if (updateQuery.lastError().isValid()) {
+        qWarning() << "  步骤2: 更新配方状态为已放弃失败:" << updateQuery.lastError().text();
+    } else {
+        int rowsAffected = updateQuery.numRowsAffected();
+        qDebug() << "  步骤2: 已将" << rowsAffected << "个配方标记为已放弃（状态码 8）";
+    }
+
+    // 3. 预载下一条配方（但不启动执行，因为仍处于暂停状态）
+    qDebug() << "  步骤3: 预载下一条配方到队列（不自动启动）";
+
+    // 调用 loadAndExecuteNextRecipeFromDatabase，但由于 m_isQueuePaused = true，
+    // sendMessage() 不会自动启动定时器
+    if (!loadAndExecuteNextRecipeFromDatabase()) {
+        qDebug() << "  ⚠ 没有更多待执行的配方";
+    } else {
+        qDebug() << "  ✓ 下一条配方已预载到队列，等待用户点击「继续运行」";
+    }
+
+    qDebug() << "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n";
+}
+
 void MainWindow::onEmergencyStopButtonClicked()
 {
     if (!tcpCore) {
@@ -336,7 +378,7 @@ void MainWindow::onEmergencyStopButtonClicked()
     }
 
     if (!m_isEmergencyPaused) {
-        // running -> pause
+        // running -> pause: 先暂停队列并刹停所有设备
         tcpCore->pauseQueue();
 
         QString stop02 = tcpCore->buildDeviceCommand("02", "K", 0, 1);
@@ -354,6 +396,22 @@ void MainWindow::onEmergencyStopButtonClicked()
 
         m_isEmergencyPaused = true;
         updateEmergencyStopButton();
+
+        // 弹出选择对话框
+        QMessageBox msgBox(this);
+        msgBox.setWindowTitle(QString::fromUtf8("紧急暂停"));
+        msgBox.setText(QString::fromUtf8("已暂停当前配方执行，请选择操作："));
+        QPushButton *btnPauseOnly = msgBox.addButton(
+            QString::fromUtf8("仅暂停"), QMessageBox::AcceptRole);
+        QPushButton *btnAbandon   = msgBox.addButton(
+            QString::fromUtf8("放弃当前配方"), QMessageBox::DestructiveRole);
+        msgBox.setDefaultButton(btnPauseOnly);
+        msgBox.exec();
+
+        if (msgBox.clickedButton() == btnAbandon) {
+            abandonCurrentRecipeAndLoadNext();
+        }
+        // 若选"仅暂停"，保持暂停状态等待用户点「继续运行」
 
     } else {
         // paused -> resume

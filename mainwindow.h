@@ -247,6 +247,9 @@ private:
     // 更新紧急暂停按钮的文字和颜色
     void updateEmergencyStopButton();
 
+    // 放弃当前配方并预载下一条
+    void abandonCurrentRecipeAndLoadNext();
+
 
     /***************** UP *********************/
     // MessageQueueItem / RecipeQueueItem 在 tcpclientcore.h 中已定义为全局结构体
