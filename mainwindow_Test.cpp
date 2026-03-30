@@ -333,6 +333,22 @@ void MainWindow::initializeSystemComponents()
 
     });
 
+    // 连接 tcpCore 的 responseTimeoutFailed 信号：响应超时重试失败后触发紧急暂停
+    connect(tcpCore, &TcpClientCore::responseTimeoutFailed, this, [=](const QString& command, const QString& expectedResponse) {
+        qCritical() << "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━";
+        qCritical() << "收到响应超时失败信号，触发紧急暂停";
+        qCritical() << "失败命令:" << command;
+        qCritical() << "期望响应:" << expectedResponse;
+        qCritical() << "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━";
+
+        // 触发紧急暂停按钮
+        if (ui && ui->pushButton_Stop) {
+            QMetaObject::invokeMethod(ui->pushButton_Stop, "click", Qt::QueuedConnection);
+        } else {
+            qWarning() << "无法触发紧急暂停按钮：UI对象未初始化";
+        }
+    });
+
     // 连接 tcpCore 的 messageQueueEmpty 信号：当前配方消息执行完毕，自动从数据库加载下一个配方
     connect(tcpCore, &TcpClientCore::messageQueueEmpty, this, [=]() {
         qDebug() << "TcpClientCore 队列已空，当前配方执行完毕";
@@ -704,24 +720,24 @@ void MainWindow::initializeAllDevices(QQueue<MessageQueueItem>& messageQueue)
 
     qDebug() << "消磁开始";
     QString closeElectromagnetCommand = tcpCore->buildDeviceCommand("0D", "05", "00000000", 0, 0);
-    messageQueue.enqueue(MessageQueueItem(closeElectromagnetCommand.toUtf8(), false));
+    messageQueue.enqueue(MessageQueueItem(closeElectromagnetCommand.toUtf8(), false, "0D0500000000"));
 
 
     qDebug() << "\n\n固体电机初始化"; // 1号电机(跟A电机逻辑相似)
     QString solidMotorInitializeCommand = tcpCore->buildDeviceCommand("01", "f", 0, 0); // 归零
-    messageQueue.enqueue(MessageQueueItem(solidMotorInitializeCommand.toUtf8(), true));
+    messageQueue.enqueue(MessageQueueItem(solidMotorInitializeCommand.toUtf8(), true, "01f"));
     QString waitSolidMotorInitializeCommand = tcpCore->buildDeviceCommand("01", "g", 0, 0);
     messageQueue.enqueue(MessageQueueItem(waitSolidMotorInitializeCommand.toUtf8(), true, "01g01"));
 
     qDebug() << "\n\nz固体电机初始化"; // 2号电机
     QString zMotorInitializeCommand = tcpCore->buildDeviceCommand("02", "G", 0, 0); // 归零
-    messageQueue.enqueue(MessageQueueItem(zMotorInitializeCommand.toUtf8(), true));
+    messageQueue.enqueue(MessageQueueItem(zMotorInitializeCommand.toUtf8(), true, "02G"));
     QString waitZMotorInitializeCommand = tcpCore->buildDeviceCommand("02", "d", 0, 0);
     messageQueue.enqueue(MessageQueueItem(waitZMotorInitializeCommand.toUtf8(), true, "02d01"));
 
     qDebug() << "\n\ny固体电机初始化"; // 3号电机
     QString yMotorInitializeCommand = tcpCore->buildDeviceCommand("03", "G", 0, 0); // 归零
-    messageQueue.enqueue(MessageQueueItem(yMotorInitializeCommand.toUtf8(), true));
+    messageQueue.enqueue(MessageQueueItem(yMotorInitializeCommand.toUtf8(), true, "03G"));
     QString waitYMotorInitializeCommand = tcpCore->buildDeviceCommand("03", "d", 0, 0);
     messageQueue.enqueue(MessageQueueItem(waitYMotorInitializeCommand.toUtf8(), true, "03d01"));
     
@@ -751,11 +767,11 @@ void MainWindow::initializeAllDevices(QQueue<MessageQueueItem>& messageQueue)
     
     qDebug() << "\n\n移动电爪初始化"; // 5号电机
     QString initializeGripperCommand = tcpCore->buildDeviceCommand("05", "06", "0100", 1, 4);
-    messageQueue.enqueue(MessageQueueItem(initializeGripperCommand.toUtf8(), false));
+    messageQueue.enqueue(MessageQueueItem(initializeGripperCommand.toUtf8(), false, "050601000001"));
     QString waitGripperInitializedCommand = tcpCore->buildDeviceCommand("05", "03", "0200", 1, 4);
     messageQueue.enqueue(MessageQueueItem(waitGripperInitializedCommand.toUtf8(), false, "0503020001"));   //  05 03 0200 0001
     QString configureGripperModeCommand = tcpCore->buildDeviceCommand("05", "06", "0101", 1, 4);
-    messageQueue.enqueue(MessageQueueItem(configureGripperModeCommand.toUtf8(), false));
+    messageQueue.enqueue(MessageQueueItem(configureGripperModeCommand.toUtf8(), false, "050601010001"));
     QString waitGripperModeConfiguredCommand = tcpCore->buildDeviceCommand("05", "03", "0201", 1, 4);
     messageQueue.enqueue(MessageQueueItem(waitGripperModeConfiguredCommand.toUtf8(), false, "0503020001"));  // 0503020  10001
 
@@ -782,7 +798,7 @@ void MainWindow::initializeAllDevices(QQueue<MessageQueueItem>& messageQueue)
 
     qDebug() << "\n\n夹持区初始化"; // 11号电机
     QString initializeGripAreaCommand = tcpCore->buildDeviceCommand("0B", "06", "0100", 1, 4);
-    messageQueue.enqueue(MessageQueueItem(initializeGripAreaCommand.toUtf8(), false));
+    messageQueue.enqueue(MessageQueueItem(initializeGripAreaCommand.toUtf8(), false, "0B0601000001"));
     QString waitGripAreaInitializedCommand = tcpCore->buildDeviceCommand("0B", "03", "0200", 1, 4);
     messageQueue.enqueue(MessageQueueItem(waitGripAreaInitializedCommand.toUtf8(), false, "0B03020001"));
 }

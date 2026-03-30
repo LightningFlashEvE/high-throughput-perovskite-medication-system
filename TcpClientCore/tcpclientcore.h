@@ -288,6 +288,9 @@ signals:
     // MainWindow 可以在此信号中调用 sendMessage(m_recipeMessageQueues) 导入下一个配方
     void messageQueueEmpty();
 
+    // 响应超时且重试失败信号（当命令重试次数用尽后发出，携带失败的命令和期望的响应）
+    void responseTimeoutFailed(const QString& command, const QString& expectedResponse);
+
 private slots:
     void onConnected();
     void onDisconnected();
@@ -321,8 +324,8 @@ public:
     QByteArray m_currentCommand;              // 当前正在等待响应的命令
     bool m_currentCommandAsciiMode;           // 当前命令是否为ASCII模式
     QTimer* m_responseTimeoutTimer;           // 响应超时定时器
-    static const int MAX_RETRIES = 3;                // 普通命令最大重试次数
-    static const int MOTOR_MAX_RETRIES = 400;        // 电机到位最大重试次数（400次×50ms = 20秒）
+    static const int MAX_RETRIES = 100;                // 普通命令最大重试次数
+    static const int MOTOR_MAX_RETRIES = 300;        // 电机到位最大重试次数（400次×50ms = 20秒）
     static const int RESPONSE_TIMEOUT = 90;        // 响应超时时间（毫秒）
     static const int MOTOR_RESPONSE_TIMEOUT = 50;   // 电机到位轮询间隔（毫秒，设备不主动上报需主动查询）
 

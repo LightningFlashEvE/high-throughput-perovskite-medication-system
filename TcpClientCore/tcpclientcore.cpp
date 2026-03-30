@@ -1700,7 +1700,7 @@ void TcpClientCore::sendMessageInternal(const QByteArray& content, bool asciiOrH
     m_tcpSocket->flush();
 }
 
-// 响应超时处理：重试或放弃
+// 响应超时处理：重试或触发紧急暂停
 void TcpClientCore::onResponseTimeout()
 {
     if (!m_isWaitingForResponse) return;
@@ -1720,11 +1720,24 @@ void TcpClientCore::onResponseTimeout()
         m_lastSendTime.restart();
         m_responseTimeoutTimer->start(isMotorWait ? MOTOR_RESPONSE_TIMEOUT : RESPONSE_TIMEOUT);
     } else {
-        qWarning() << "✗ 响应超时，已重试" << maxRetries << "次，放弃等待，继续下一条命令";
+        // 重试次数用尽，发出信号触发紧急暂停
+        qCritical() << "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━";
+        qCritical() << "✗ 响应超时，已重试" << maxRetries << "次，触发紧急暂停";
+        qCritical() << "失败命令:" << QString::fromUtf8(m_currentCommand);
+        qCritical() << "期望响应:" << m_expectedResponse;
+        qCritical() << "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━";
+
+        // 保存失败信息
+        QString failedCommand = QString::fromUtf8(m_currentCommand);
+        QString expectedResp = m_expectedResponse;
+
+        // 重置状态
         m_retryCount = 0;
         m_expectedResponse.clear();
         m_isWaitingForResponse = false;
-        QTimer::singleShot(0, this, &TcpClientCore::processMessageQueue);
+
+        // 发出响应超时失败信号，触发紧急暂停
+        emit responseTimeoutFailed(failedCommand, expectedResp);
     }
 }
 
