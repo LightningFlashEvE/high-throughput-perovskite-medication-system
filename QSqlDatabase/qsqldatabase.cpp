@@ -87,6 +87,13 @@ bool AppSqlDatabase::openDatabase()
     return true;
 }
 
+bool AppSqlDatabase::isConnected() const
+{
+    if (!QSqlDatabase::contains(kConnName))
+        return false;
+    return QSqlDatabase::database(kConnName, false).isOpen();
+}
+
 QSqlQuery AppSqlDatabase::query(const QString &sql)
 {
     QSqlDatabase db = QSqlDatabase::database(kConnName);

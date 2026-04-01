@@ -163,7 +163,7 @@ bool MainWindow::takeEmptyBottle(const QString& trayName, QQueue<MessageQueueIte
     // 开盖 - 添加开盖命令到队列（这里简化处理，实际可能需要更多命令）
     // TODO: 如果 openBottleCap() 函数也需要支持队列版本，需要创建相应的重载
     openBottleCap(messageQueue);
-    
+
 
     // Z轴上移一点
     QString liftZAfterRotationCommand = tcpCore->buildDeviceCommand("06", "D", 163687, 8);
@@ -407,14 +407,14 @@ bool MainWindow::getLiquid(const QString& liquidName, double volumeMl, QQueue<Me
 
 
     // 去表里找到selfLocation为tipsHeadUsageSelfLocation的那一行，把status值加1（表示已使用）
-    QString tipsHeadUsageSql_update = QString("UPDATE tipsHeadUsage SET status = status + 1 WHERE selfLocation = %1").arg(tipsHeadUsageSelfLocation);  
+    QString tipsHeadUsageSql_update = QString("UPDATE tipsHeadUsage SET status = status + 1 WHERE selfLocation = %1").arg(tipsHeadUsageSelfLocation);
     QSqlQuery tipsHeadUsageQuery_update = dbm->query(tipsHeadUsageSql_update);
     if (tipsHeadUsageQuery_update.lastError().isValid()) {
         qWarning() << "更新tipsHeadUsage表失败:" << tipsHeadUsageQuery_update.lastError().text();
     } else {
         qDebug() << QString("已更新tipsHeadUsage位置 %1 的status自增1").arg(tipsHeadUsageSelfLocation);
     }
-    
+
 
     QString moveToTipsHeadXCommand = tcpCore->buildDeviceCommand("0A", "D", tipsHeadTargetX, 8);
     messageQueue.enqueue(MessageQueueItem(moveToTipsHeadXCommand.toUtf8(), true, "0AD"));
@@ -431,7 +431,7 @@ bool MainWindow::getLiquid(const QString& liquidName, double volumeMl, QQueue<Me
     QString waitMoveToGetTipZCommand = tcpCore->buildDeviceCommand("08", "d", 0, 0);
     messageQueue.enqueue(MessageQueueItem(waitMoveToGetTipZCommand.toUtf8(), true, "08d01"));
 
-    
+
     // 通过 AAtipsHeadAreaCurrentIndexPlusOne 指令，将 tipsHeadUsageSelfLocation 传递给 TcpClientCore
     // 由 TcpClientCore 在解析后，通过 tipsHeadAreaCurrentIndexPlusOneRequested(tipsHeadUsageSelfLocation) 信号回调到界面层
     QString tipsHeadCmd = QString("AAtipsHeadAreaCurrentIndexPlusOne:%1").arg(tipsHeadUsageSelfLocation);
@@ -596,17 +596,17 @@ bool MainWindow::getSolid(const QString& solidName, double mass, QQueue<MessageQ
     // ★ 插入状态标记：取出固体
     messageQueue.enqueue(MessageQueueItem("AAstateChange:getSolid", true));
 
-    messageQueue.enqueue(MessageQueueItem("AA1", true)); // 打开天平打印  
+    messageQueue.enqueue(MessageQueueItem("AA1", true)); // 打开天平打印
     messageQueue.enqueue(MessageQueueItem("AA2", true)); // 去皮
-    
+
     // 从 SolidMaterialArea 表中根据固体名称查找配置
     QString solidAreaSql = "SELECT originX, originY, solidZ, rightSpacing, bottomSpacing, cols, `rows`, currentIndex FROM SolidMaterialArea WHERE solidName = '" + solidName + "'";
     QSqlQuery solidAreaQuery = dbm->query(solidAreaSql);
-    
+
     int solidAreaX = 0, solidAreaY = 0, solidAreaZ = 0;
     int rightSpacing = 0, bottomSpacing = 0, cols = 1, rows = 1;
     int solidCurrentIndex = 0;  // 使用表中的 currentIndex
-    
+
     if (solidAreaQuery.next()) {
         solidAreaX = solidAreaQuery.value("originX").toInt();
         solidAreaY = solidAreaQuery.value("originY").toInt();
@@ -616,22 +616,22 @@ bool MainWindow::getSolid(const QString& solidName, double mass, QQueue<MessageQ
         cols = solidAreaQuery.value("cols").toInt();
         rows = solidAreaQuery.value("rows").toInt();
         solidCurrentIndex = solidAreaQuery.value("currentIndex").toInt();  // 从表中获取 currentIndex
-        
+
         qDebug() << QString("找到固体 %1: originX=%2, originY=%3, solidZ=%4, currentIndex=%5")
                     .arg(solidName).arg(solidAreaX).arg(solidAreaY).arg(solidAreaZ).arg(solidCurrentIndex);
     } else {
         qWarning() << "未找到固体:" << solidName;
         return false;
     }
-    
+
     // 使用 calculateSlotPosition 函数计算目标槽位坐标
     // 固体盘：X方向往右(xReverse=true)
     SlotPositionConfig config(solidAreaX, solidAreaY, cols, rows, rightSpacing, bottomSpacing, true);
-    
+
     QPoint targetPos = calculateSlotPosition(config, solidCurrentIndex);  // 使用表中的 currentIndex
     int solidAreaTargetX = targetPos.x();
     int solidAreaTargetY = targetPos.y();
-    
+
     // 使用计算后的坐标
     solidAreaX = solidAreaTargetX;
     solidAreaY = solidAreaTargetY;
@@ -746,13 +746,13 @@ bool MainWindow::getSolid(const QString& solidName, double mass, QQueue<MessageQ
         maxSpeed = 800; // 500
     }
     qDebug() << "速度最大值用：" << maxSpeed;
-    
+
     // ========== 方式1：固定三级速度（当前使用）==========
     // 第1级：根据重量动态计算的最大速度
     // 第2级：固定100
     // 第3级：固定50
     const int totalSegments = 3;
-    
+
     auto calculateSmoothSpeed = [maxSpeed](int segment) -> int {
         if (segment == 0) {
             return maxSpeed;  // 第1次：最大速度（根据重量动态计算）
@@ -762,7 +762,7 @@ bool MainWindow::getSolid(const QString& solidName, double mass, QQueue<MessageQ
             return 50;        // 第3次：固定最小速度50
         }
     };
-    
+
     // ========== 方式2：余弦平滑过渡（已屏蔽）==========
     // 使用余弦函数 π/2 到 π 实现速度平滑过渡
     // const int minSpeed = 50;
@@ -773,11 +773,11 @@ bool MainWindow::getSolid(const QString& solidName, double mass, QQueue<MessageQ
     //     // segment=2 → π (cos=-1, 最小速度)
     //     double angle = M_PI / 2.0 + segment * (M_PI / 2.0) / (totalSegments - 1);
     //     double cosValue = cos(angle);
-    //     
+    //
     //     // cos从0到-1，映射到速度从maxSpeed到minSpeed
     //     // speed = maxSpeed + cosValue × (maxSpeed - minSpeed)
     //     int speed = static_cast<int>(maxSpeed + cosValue * (maxSpeed - minSpeed));
-    //     
+    //
     //     return speed;
     // };
 
@@ -815,7 +815,7 @@ bool MainWindow::getSolid(const QString& solidName, double mass, QQueue<MessageQ
 
         QString waitChangeSpeedCommand = tcpCore->buildDeviceCommand("01", "d", 0, 0);
         messageQueue.enqueue(MessageQueueItem(waitChangeSpeedCommand.toUtf8(), true, "01d01"));
-        
+
         qDebug() << "=====一个循环结束=====" << segment ;
 
     }
@@ -869,13 +869,13 @@ bool MainWindow::getSolid(const QString& solidName, double mass, QQueue<MessageQ
     return true;
 }
 
-// 拧紧瓶子去摇床 - 重载版本
-void MainWindow::tightenBottle(QQueue<MessageQueueItem>& messageQueue)
+// 拧盖并送入摇床 - 重载版本
+void MainWindow::capBottleAndTransferToShaker(QQueue<MessageQueueItem>& messageQueue)
 {
-    try 
+    try
     {
-        // ★ 插入状态标记：拧好瓶子取摇床
-        messageQueue.enqueue(MessageQueueItem("AAstateChange:tightenBottle", true));
+        // ★ 插入状态标记：拧好瓶子去摇床
+        messageQueue.enqueue(MessageQueueItem("AAstateChange:capBottleAndTransferToShaker", true));
 
         // 移动到天平
         QString balanceAreaSql = "SELECT originX, originY, gripperZ FROM other WHERE name = 'balanceArea'";
@@ -921,6 +921,13 @@ void MainWindow::tightenBottle(QQueue<MessageQueueItem>& messageQueue)
         QString waitTransferZRaisedCommand = tcpCore->buildDeviceCommand("06", "d", 0, 0);
         messageQueue.enqueue(MessageQueueItem(waitTransferZRaisedCommand.toUtf8(), true, "06d01"));
 
+        // 固定夹爪提前张开
+        QString releaseFixedGripperCommand = tcpCore->buildDeviceCommand("0B", "06", "0105", 0, 4);
+        messageQueue.enqueue(MessageQueueItem(releaseFixedGripperCommand.toUtf8(), false, "0B0601050000"));
+        QString waitReleaseFixedGripperCommand = tcpCore->buildDeviceCommand("0B", "03", "0202", 1, 4);
+        messageQueue.enqueue(MessageQueueItem(waitReleaseFixedGripperCommand.toUtf8(), false, "0B03020001"));
+
+
         // 移动到固定夹爪
         QString gripAreaSql = "SELECT originX, originY, gripperZ FROM other WHERE name = 'gripArea'";
         QSqlQuery gripAreaQuery = dbm->query(gripAreaSql);
@@ -932,7 +939,6 @@ void MainWindow::tightenBottle(QQueue<MessageQueueItem>& messageQueue)
         } else {
             throw std::runtime_error("查询固定夹爪区域坐标失败：未找到 gripArea 记录");
         }
-
         QString moveToGripAreaXCommand = tcpCore->buildDeviceCommand("0A", "D", gripAreaX, 8);
         messageQueue.enqueue(MessageQueueItem(moveToGripAreaXCommand.toUtf8(), true, "0AD"));
         QString waitGripAreaXCommand = tcpCore->buildDeviceCommand("0A", "d", 0, 0);
@@ -995,108 +1001,33 @@ void MainWindow::tightenBottle(QQueue<MessageQueueItem>& messageQueue)
         messageQueue.enqueue(MessageQueueItem(raiseTransferZCommand.toUtf8(), true, "06D"));
         messageQueue.enqueue(MessageQueueItem(waitTransferZRaisedCommand.toUtf8(), true, "06d01"));
 
-        // 移动到放盖子区域
+        // 移动到放盖子区域上方
         messageQueue.enqueue(MessageQueueItem(moveToGripAreaXCommand.toUtf8(), true));
         messageQueue.enqueue(MessageQueueItem(waitGripAreaXCommand.toUtf8(), true, "0Ad01"));
         messageQueue.enqueue(MessageQueueItem(moveToGripAreaYCommand.toUtf8(), true));
         messageQueue.enqueue(MessageQueueItem(waitGripAreaYCommand.toUtf8(), true, "09d01"));
+
+        // // 打开0B夹爪
+        // QString openGripCommand = tcpCore->buildDeviceCommand("0B", "06", "0105", 100, 4);
+        // messageQueue.enqueue(MessageQueueItem(openGripCommand.toUtf8(), false, "0B0601050000"));
+        // QString waitGripOpenFeedbackCommand = tcpCore->buildDeviceCommand("0B", "03", "0202", 1, 4);
+        // messageQueue.enqueue(MessageQueueItem(waitGripOpenFeedbackCommand.toUtf8(), false, "0B03020001"));
+
+        // 下降
         QString moveToGripAreaZCommand_reduction= tcpCore->buildDeviceCommand("06", "D", gripAreaZ-24994, 8);
         messageQueue.enqueue(MessageQueueItem(moveToGripAreaZCommand_reduction.toUtf8(), true, "06D"));
         messageQueue.enqueue(MessageQueueItem(waitGripAreaZCommand.toUtf8(), true, "06d01"));
 
         closeBottleCap(messageQueue);
 
-        // 松开固定夹爪
-        QString releaseFixedGripperCommand = tcpCore->buildDeviceCommand("0B", "06", "0105", 0, 4);
-        messageQueue.enqueue(MessageQueueItem(releaseFixedGripperCommand.toUtf8(), false));
-        QString waitReleaseFixedGripperCommand = tcpCore->buildDeviceCommand("0B", "03", "0202", 1, 4);
-        messageQueue.enqueue(MessageQueueItem(waitReleaseFixedGripperCommand.toUtf8(), false, "0B03020001"));
+        transferToShaker(messageQueue);
 
-        messageQueue.enqueue(MessageQueueItem(raiseTransferZCommand.toUtf8(), true));
-        messageQueue.enqueue(MessageQueueItem(waitTransferZRaisedCommand.toUtf8(), true, "06d01"));
-
-        // 关闭摇床
-        messageQueue.enqueue(MessageQueueItem("AAcloseShakeBed", true));
-
-
-
-        // 找空床位
-        QString shakeBedAreaSql = "SELECT selfLocation FROM shakeBedArea WHERE isEmpty = 1";
-        QSqlQuery shakeBedAreaQuery = dbm->query(shakeBedAreaSql);
-        int shakeBedAreaSelfLocation=0;
-        if (shakeBedAreaQuery.next()) {
-            shakeBedAreaSelfLocation = shakeBedAreaQuery.value("selfLocation").toInt();
-        } else {
-            throw std::runtime_error("未找到空闲摇床位置：isEmpty = 1 的记录不存在");
-        }
-        // 计算空床位
-        QString otherSql = "SELECT originX, originY, rightSpacing, bottomSpacing, cols, `rows`, gripperZ FROM other WHERE name = 'shakeBedArea'";
-        QSqlQuery otherQuery = dbm->query(otherSql);
-        int otherOriginX=0, otherOriginY=0, otherRightSpacing=0, otherBottomSpacing=0, otherCols=0, otherRows=0, otherGripperZ=0;
-        if (otherQuery.next()) {
-            otherOriginX = otherQuery.value("originX").toInt();
-            otherOriginY = otherQuery.value("originY").toInt();
-            otherRightSpacing = otherQuery.value("rightSpacing").toDouble();
-            otherBottomSpacing = otherQuery.value("bottomSpacing").toDouble();
-            otherCols = otherQuery.value("cols").toInt();
-            otherRows = otherQuery.value("rows").toInt();
-            otherGripperZ = otherQuery.value("gripperZ").toInt();
-        } else {
-            throw std::runtime_error("查询摇床区域配置失败：未找到 shakeBedArea 记录");
-        }
-    
-        SlotPositionConfig shakeBedAreaConfig(otherOriginX, otherOriginY, otherCols, otherRows, otherRightSpacing, otherBottomSpacing);
-        QPoint targetPos = calculateSlotPosition(shakeBedAreaConfig, shakeBedAreaSelfLocation);
-        int shakeBedAreaTargetX = targetPos.x();
-        int shakeBedAreaTargetY = targetPos.y();
-
-        // 空床位自加1
-        if (!dbm) {
-            throw std::runtime_error("数据库对象未初始化，无法更新shakeBedArea的isEmpty状态");
-        }
-        QString updateShakeBedAreaSql = QString("UPDATE shakeBedArea SET isEmpty = isEmpty + 1 WHERE selfLocation = %1")
-                .arg(shakeBedAreaSelfLocation);
-        QSqlQuery updateShakeBedAreaQuery = dbm->query(updateShakeBedAreaSql);
-        if (updateShakeBedAreaQuery.lastError().isValid()) {
-            throw std::runtime_error(QString("更新shakeBedArea表isEmpty失败：%1").arg(updateShakeBedAreaQuery.lastError().text()).toStdString());
-        } else {
-            qDebug() << "摇床位置立刻" << shakeBedAreaSelfLocation << "的isEmpty自加1，标记为占用";
-        }
-
-
-        // 移动到摇床位置
-        QString moveToShakeBedAreaXCommand = tcpCore->buildDeviceCommand("0A", "D", shakeBedAreaTargetX, 8);
-        messageQueue.enqueue(MessageQueueItem(moveToShakeBedAreaXCommand.toUtf8(), true, "0AD"));
-        QString waitShakeBedAreaXCommand = tcpCore->buildDeviceCommand("0A", "d", 0, 0);
-        messageQueue.enqueue(MessageQueueItem(waitShakeBedAreaXCommand.toUtf8(), true, "0Ad01"));
-        QString moveToShakeBedAreaYCommand = tcpCore->buildDeviceCommand("09", "D", shakeBedAreaTargetY, 8);
-        messageQueue.enqueue(MessageQueueItem(moveToShakeBedAreaYCommand.toUtf8(), true, "09D"));
-        QString waitShakeBedAreaYCommand = tcpCore->buildDeviceCommand("09", "d", 0, 0);
-        messageQueue.enqueue(MessageQueueItem(waitShakeBedAreaYCommand.toUtf8(), true, "09d01"));
-        QString moveToShakeBedAreaZCommand = tcpCore->buildDeviceCommand("06", "D", otherGripperZ, 8);
-        messageQueue.enqueue(MessageQueueItem(moveToShakeBedAreaZCommand.toUtf8(), true, "06D"));
-        QString waitShakeBedAreaZCommand = tcpCore->buildDeviceCommand("06", "d", 0, 0);
-        messageQueue.enqueue(MessageQueueItem(waitShakeBedAreaZCommand.toUtf8(), true, "06d01"));
-
-        // 松移动夹爪，上移零点
-        messageQueue.enqueue(MessageQueueItem(releaseGripperCommand.toUtf8(), false));
-        messageQueue.enqueue(MessageQueueItem(waitGripperReleaseCommand.toUtf8(), false, "0503020001"));
-        messageQueue.enqueue(MessageQueueItem(raiseTransferZCommand.toUtf8(), true));
-        messageQueue.enqueue(MessageQueueItem(waitTransferZRaisedCommand.toUtf8(), true, "06d01"));
-
-        // 启动摇床
-        messageQueue.enqueue(MessageQueueItem("AAopenShakeBed", true));
-
-        // 记录摇床时间信息（传递selfLocation和摇床持续时间，默认15秒），确认已经使用值自加1（此时为3）
-        QString recordCmd = QString("AArecordShakeBedTime:%1:%2").arg(shakeBedAreaSelfLocation).arg(15);
-        messageQueue.enqueue(MessageQueueItem(recordCmd.toUtf8(), true));
-
-    } 
+    }
     catch (const std::exception& e)
     {
         // 捕获所有异常，触发紧急暂停
         qCritical() << "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━";
-        qCritical() << "tightenBottle 函数发生错误，触发紧急暂停";
+        qCritical() << "capBottleAndTransferToShaker 函数发生错误，触发紧急暂停";
         qCritical() << "错误信息:" << e.what();
         qCritical() << "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━";
 
@@ -1113,7 +1044,113 @@ void MainWindow::tightenBottle(QQueue<MessageQueueItem>& messageQueue)
     }
 }
 
+// 将已拧盖瓶子送入摇床
+void MainWindow::transferToShaker(QQueue<MessageQueueItem>& messageQueue)
+{
+    try
+    {
+        // 松开固定夹爪
+        QString releaseFixedGripperCommand = tcpCore->buildDeviceCommand("0B", "06", "0105", 0, 4);
+        messageQueue.enqueue(MessageQueueItem(releaseFixedGripperCommand.toUtf8(), false));
+        QString waitReleaseFixedGripperCommand = tcpCore->buildDeviceCommand("0B", "03", "0202", 1, 4);
+        messageQueue.enqueue(MessageQueueItem(waitReleaseFixedGripperCommand.toUtf8(), false, "0B03020001"));
 
+        QString raiseTransferZCommand = tcpCore->buildDeviceCommand("06", "D", 1, 8);
+        QString waitTransferZRaisedCommand = tcpCore->buildDeviceCommand("06", "d", 0, 0);
+        messageQueue.enqueue(MessageQueueItem(raiseTransferZCommand.toUtf8(), true));
+        messageQueue.enqueue(MessageQueueItem(waitTransferZRaisedCommand.toUtf8(), true, "06d01"));
+
+        // 关闭摇床
+        messageQueue.enqueue(MessageQueueItem("AAcloseShakeBed", true));
+
+        // 找空床位
+        QString shakeBedAreaSql = "SELECT selfLocation FROM shakeBedArea WHERE isEmpty = 1";
+        QSqlQuery shakeBedAreaQuery = dbm->query(shakeBedAreaSql);
+        int shakeBedAreaSelfLocation = 0;
+        if (shakeBedAreaQuery.next()) {
+            shakeBedAreaSelfLocation = shakeBedAreaQuery.value("selfLocation").toInt();
+        } else {
+            throw std::runtime_error("未找到空闲摇床位置：isEmpty = 1 的记录不存在");
+        }
+
+        // 计算空床位坐标
+        QString otherSql = "SELECT originX, originY, rightSpacing, bottomSpacing, cols, `rows`, gripperZ FROM other WHERE name = 'shakeBedArea'";
+        QSqlQuery otherQuery = dbm->query(otherSql);
+        int otherOriginX=0, otherOriginY=0, otherRightSpacing=0, otherBottomSpacing=0, otherCols=0, otherRows=0, otherGripperZ=0;
+        if (otherQuery.next()) {
+            otherOriginX = otherQuery.value("originX").toInt();
+            otherOriginY = otherQuery.value("originY").toInt();
+            otherRightSpacing = otherQuery.value("rightSpacing").toDouble();
+            otherBottomSpacing = otherQuery.value("bottomSpacing").toDouble();
+            otherCols = otherQuery.value("cols").toInt();
+            otherRows = otherQuery.value("rows").toInt();
+            otherGripperZ = otherQuery.value("gripperZ").toInt();
+        } else {
+            throw std::runtime_error("查询摇床区域配置失败：未找到 shakeBedArea 记录");
+        }
+
+        SlotPositionConfig shakeBedAreaConfig(otherOriginX, otherOriginY, otherCols, otherRows, otherRightSpacing, otherBottomSpacing);
+        QPoint targetPos = calculateSlotPosition(shakeBedAreaConfig, shakeBedAreaSelfLocation);
+        int shakeBedAreaTargetX = targetPos.x();
+        int shakeBedAreaTargetY = targetPos.y();
+
+        // 空床位标记为占用（isEmpty + 1）
+        if (!dbm) {
+            throw std::runtime_error("数据库对象未初始化，无法更新shakeBedArea的isEmpty状态");
+        }
+        QString updateShakeBedAreaSql = QString("UPDATE shakeBedArea SET isEmpty = isEmpty + 1 WHERE selfLocation = %1")
+                .arg(shakeBedAreaSelfLocation);
+        QSqlQuery updateShakeBedAreaQuery = dbm->query(updateShakeBedAreaSql);
+        if (updateShakeBedAreaQuery.lastError().isValid()) {
+            throw std::runtime_error(QString("更新shakeBedArea表isEmpty失败：%1").arg(updateShakeBedAreaQuery.lastError().text()).toStdString());
+        } else {
+            qDebug() << "摇床位置" << shakeBedAreaSelfLocation << "的isEmpty自加1，标记为占用";
+        }
+
+        // 移动到摇床位置
+        QString moveToShakeBedAreaXCommand = tcpCore->buildDeviceCommand("0A", "D", shakeBedAreaTargetX, 8);
+        messageQueue.enqueue(MessageQueueItem(moveToShakeBedAreaXCommand.toUtf8(), true, "0AD"));
+        QString waitShakeBedAreaXCommand = tcpCore->buildDeviceCommand("0A", "d", 0, 0);
+        messageQueue.enqueue(MessageQueueItem(waitShakeBedAreaXCommand.toUtf8(), true, "0Ad01"));
+        QString moveToShakeBedAreaYCommand = tcpCore->buildDeviceCommand("09", "D", shakeBedAreaTargetY, 8);
+        messageQueue.enqueue(MessageQueueItem(moveToShakeBedAreaYCommand.toUtf8(), true, "09D"));
+        QString waitShakeBedAreaYCommand = tcpCore->buildDeviceCommand("09", "d", 0, 0);
+        messageQueue.enqueue(MessageQueueItem(waitShakeBedAreaYCommand.toUtf8(), true, "09d01"));
+        QString moveToShakeBedAreaZCommand = tcpCore->buildDeviceCommand("06", "D", otherGripperZ, 8);
+        messageQueue.enqueue(MessageQueueItem(moveToShakeBedAreaZCommand.toUtf8(), true, "06D"));
+        QString waitShakeBedAreaZCommand = tcpCore->buildDeviceCommand("06", "d", 0, 0);
+        messageQueue.enqueue(MessageQueueItem(waitShakeBedAreaZCommand.toUtf8(), true, "06d01"));
+
+        // 松移动夹爪，上移零点
+        QString releaseGripperCommand = tcpCore->buildDeviceCommand("05", "06", "0105", 0, 4);
+        QString waitGripperReleaseCommand = tcpCore->buildDeviceCommand("05", "03", "0202", 1, 4);
+        messageQueue.enqueue(MessageQueueItem(releaseGripperCommand.toUtf8(), false));
+        messageQueue.enqueue(MessageQueueItem(waitGripperReleaseCommand.toUtf8(), false, "0503020001"));
+        messageQueue.enqueue(MessageQueueItem(raiseTransferZCommand.toUtf8(), true));
+        messageQueue.enqueue(MessageQueueItem(waitTransferZRaisedCommand.toUtf8(), true, "06d01"));
+
+        // 启动摇床
+        messageQueue.enqueue(MessageQueueItem("AAopenShakeBed", true));
+
+        // 记录摇床时间信息（传递selfLocation和摇床持续时间，默认15秒），确认已经使用值自加1（此时为3）
+        QString recordCmd = QString("AArecordShakeBedTime:%1:%2").arg(shakeBedAreaSelfLocation).arg(15);
+        messageQueue.enqueue(MessageQueueItem(recordCmd.toUtf8(), true));
+    }
+    catch (const std::exception& e)
+    {
+        qCritical() << "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━";
+        qCritical() << "transferToShaker 函数发生错误，触发紧急暂停";
+        qCritical() << "错误信息:" << e.what();
+        qCritical() << "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━";
+
+        if (ui && ui->pushButton_Stop) {
+            QMetaObject::invokeMethod(ui->pushButton_Stop, "click", Qt::QueuedConnection);
+        } else {
+            qWarning() << "无法触发紧急暂停按钮：UI对象未初始化";
+        }
+        throw;
+    }
+}
 
 
 
@@ -1230,7 +1267,7 @@ void MainWindow::closeBottleCap(QQueue<MessageQueueItem>& messageQueue)
     setMotor5Speed(27, messageQueue);
     setMotor6ZSpeed(35, messageQueue);
     setMotor5TighteningForce(20, messageQueue);
-    
+
     /**
      * 三、去数据库获取【夹持区】的z坐标，电机配合旋转。
      */

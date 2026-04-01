@@ -178,7 +178,8 @@ private:
     QLabel *m_recipeCurrentLabel = nullptr;   // 当前执行
     QListWidget *m_recipeQueueList = nullptr; // 即将执行列表
 
-    // 流程步骤勾选框（5个步骤）
+    // 流程步骤勾选框（6个步骤）
+    QCheckBox *m_processCheckBox_reset = nullptr;
     QCheckBox *m_processCheckBox_takeEmptyBottle = nullptr;
     QCheckBox *m_processCheckBox_getSolid = nullptr;
     QCheckBox *m_processCheckBox_resetXYZ = nullptr;
@@ -188,10 +189,14 @@ private:
     // 运行按钮
     QPushButton *m_runSelectedStepsButton = nullptr;
 
+    // 清除流程状态按钮
+    QPushButton *m_clearProcessStateButton = nullptr;
+
     // 步骤执行状态跟踪
-    QSet<QString> m_selectedSteps;      // 用户勾选的步骤
+    QSet<QString> m_selectedSteps;      // 本次运行选中的步骤
     QSet<QString> m_skippedSteps;       // 用户取消的步骤（执行中）
     QSet<QString> m_completedSteps;     // 已完成的步骤
+    QString m_currentStep;              // 当前正在执行的步骤
 
     /**
      * 更新流程状态显示
@@ -226,6 +231,28 @@ private:
      * @return 对应的QCheckBox指针
      */
     QCheckBox* getCheckBoxForStep(const QString& stepName);
+
+    /**
+     * 保存流程步骤的选中状态到ini文件
+     */
+    void saveProcessStepsState();
+
+    /**
+     * 从ini文件加载流程步骤的选中状态
+     */
+    void loadProcessStepsState();
+
+    /**
+     * 处理流程状态变更（接收 TcpClientCore 的 processStateChanged 信号）
+     * @param stateName 新的状态名称
+     */
+    void onProcessStateChanged(const QString& stateName);
+
+    /**
+     * 处理步骤跳过（接收 TcpClientCore 的 stepSkipped 信号）
+     * @param stepName 被跳过的步骤名称
+     */
+    void onStepSkipped(const QString& stepName);
 
     /**
      * 更新状态栏天平重量显示
@@ -264,8 +291,10 @@ private:
     bool getLiquid(const QString& liquidName, double volumeMl, QQueue<MessageQueueItem>& messageQueue);
     // 取固体（固体名称 + 质量 + 消息队列引用 + 固体盘位置索引）
     bool getSolid(const QString& solidName, double mass, QQueue<MessageQueueItem>& messageQueue, int currentIndex = 0);
-    // 拧紧瓶子（消息队列引用）
-    void tightenBottle(QQueue<MessageQueueItem>& messageQueue);
+    // 拧盖并送入摇床
+    void capBottleAndTransferToShaker(QQueue<MessageQueueItem>& messageQueue);
+    // 将已拧盖瓶子送入摇床
+    void transferToShaker(QQueue<MessageQueueItem>& messageQueue);
     // 关盖（关闭瓶盖）
     void closeBottleCap(QQueue<MessageQueueItem>& messageQueue);
     // 开盖（打开瓶盖）- 队列版本，将开盖相关命令写入消息队列

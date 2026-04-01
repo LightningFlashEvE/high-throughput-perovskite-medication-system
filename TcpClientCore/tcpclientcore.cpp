@@ -24,6 +24,7 @@ TcpClientCore::TcpClientCore(QObject *parent)
     , m_isQueuePaused(false)
     , m_expectedAsciiMode(true)
     , m_retryCount(0)
+    , m_motorRoundCount(0)
     , m_currentCommandAsciiMode(true)
     , m_responseTimeoutTimer(nullptr)
     , m_lastRemotePort(0)
@@ -749,6 +750,7 @@ void TcpClientCore::resetState()
     m_isWaitingForResponse = false;
     m_expectedResponse.clear();
     m_retryCount = 0;
+    m_motorRoundCount = 0;
     m_isSkippingStep = false;
     m_currentSkippingStep.clear();
 }
@@ -802,6 +804,7 @@ void TcpClientCore::onReadyRead()
             // 停止超时定时器
             m_responseTimeoutTimer->stop();
             m_retryCount = 0;
+            m_motorRoundCount = 0;
             m_expectedResponse.clear();
             m_isWaitingForResponse = false;
             m_justFinishedWaiting = true;  // 标记刚完成等待，下一条命令跳过间隔
@@ -1312,6 +1315,16 @@ void TcpClientCore::processMessageQueue()
                 QTimer::singleShot(0, this, &TcpClientCore::processMessageQueue);
                 return;
             }
+        } else if (contentStr.startsWith("AAskipStep:")) {
+            // 连续多条「仅插入队列、无实体命令」的步骤跳过时，上一条 AAskipStep 已打开跳过模式；
+            // 若这里仍走「跳过任意非 stateChange」分支，会把后续 AAskipStep 整条丢掉，UI 只更新第一个跳过步骤。
+            QString stepName = contentStr.mid(QString("AAskipStep:").length());
+            qDebug() << "跳过模式下收到下一条 AAskipStep:" << stepName;
+            emit stepSkipped(stepName);
+            m_currentSkippingStep = stepName;
+            m_isProcessingQueue = false;
+            QTimer::singleShot(0, this, &TcpClientCore::processMessageQueue);
+            return;
         } else {
             // 跳过当前步骤的所有命令
             qDebug() << "跳过步骤" << m_currentSkippingStep << "的命令:" << contentStr;
@@ -1605,10 +1618,10 @@ void TcpClientCore::processMessageQueue()
     qDebug() << "当前发送的命令是:" << QString::fromUtf8(item.content) << "，期待回复:" << (needsWait ? item.expectedSignature : "无需等待");
 
 
-    // 计算距离上次发送的时间间隔（刚完成响应等待时跳过间隔，直接发送）
+    // 计算距离上次发送的时间间隔（强制所有命令都必须间隔至少 MIN_SEND_INTERVAL）
     qint64 elapsed = m_lastSendTime.elapsed();
-    int delay = (m_justFinishedWaiting || elapsed >= MIN_SEND_INTERVAL) ? 0 : (MIN_SEND_INTERVAL - elapsed);
-    m_justFinishedWaiting = false;
+    int delay = (elapsed >= MIN_SEND_INTERVAL) ? 0 : (MIN_SEND_INTERVAL - elapsed);
+    m_justFinishedWaiting = false; // 重置标志（不再使用，保留以兼容其他代码）
 
     qDebug() << "距离上次发送已过" << elapsed << "ms，延迟" << delay << "ms后发送";
 
@@ -1623,6 +1636,7 @@ void TcpClientCore::processMessageQueue()
             m_currentCommand = item.content;
             m_currentCommandAsciiMode = item.asciiOrHex;
             m_retryCount = 0;
+            m_motorRoundCount = 0;
             m_isWaitingForResponse = true;
 
             // 发送消息
@@ -1720,24 +1734,37 @@ void TcpClientCore::onResponseTimeout()
         m_lastSendTime.restart();
         m_responseTimeoutTimer->start(isMotorWait ? MOTOR_RESPONSE_TIMEOUT : RESPONSE_TIMEOUT);
     } else {
-        // 重试次数用尽，发出信号触发紧急暂停
-        qCritical() << "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━";
-        qCritical() << "✗ 响应超时，已重试" << maxRetries << "次，触发紧急暂停";
-        qCritical() << "失败命令:" << QString::fromUtf8(m_currentCommand);
-        qCritical() << "期望响应:" << m_expectedResponse;
-        qCritical() << "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━";
+        if (isMotorWait && m_motorRoundCount + 1 < MOTOR_MAX_ROUNDS) {
+            // 电机轮询：本轮400次未到位，开始下一轮
+            m_motorRoundCount++;
+            m_retryCount = 0;
+            qDebug() << "电机轮询第" << m_motorRoundCount << "/" << MOTOR_MAX_ROUNDS
+                     << "轮开始，命令:" << QString::fromUtf8(m_currentCommand);
+            sendMessageInternal(m_currentCommand, m_currentCommandAsciiMode, true);
+            m_lastSendTime.restart();
+            m_responseTimeoutTimer->start(MOTOR_RESPONSE_TIMEOUT);
+        } else {
+            // 重试次数用尽，发出信号触发紧急暂停
+            qCritical() << "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━";
+            qCritical() << "✗ 响应超时，已重试" << maxRetries << "次，共"
+                        << (isMotorWait ? MOTOR_MAX_ROUNDS : 1) << "轮，触发紧急暂停";
+            qCritical() << "失败命令:" << QString::fromUtf8(m_currentCommand);
+            qCritical() << "期望响应:" << m_expectedResponse;
+            qCritical() << "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━";
 
-        // 保存失败信息
-        QString failedCommand = QString::fromUtf8(m_currentCommand);
-        QString expectedResp = m_expectedResponse;
+            // 保存失败信息
+            QString failedCommand = QString::fromUtf8(m_currentCommand);
+            QString expectedResp = m_expectedResponse;
 
-        // 重置状态
-        m_retryCount = 0;
-        m_expectedResponse.clear();
-        m_isWaitingForResponse = false;
+            // 重置状态
+            m_retryCount = 0;
+            m_motorRoundCount = 0;
+            m_expectedResponse.clear();
+            m_isWaitingForResponse = false;
 
-        // 发出响应超时失败信号，触发紧急暂停
-        emit responseTimeoutFailed(failedCommand, expectedResp);
+            // 发出响应超时失败信号，触发紧急暂停
+            emit responseTimeoutFailed(failedCommand, expectedResp);
+        }
     }
 }
 

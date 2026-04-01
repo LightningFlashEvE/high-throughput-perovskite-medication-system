@@ -22,6 +22,9 @@ public:
     // 规范化表名：将 '-' 替换为 '_'
     static QString normalizeTableName(const QString &name);
 
+    // 检查数据库是否已连接
+    bool isConnected() const;
+
     // 执行 SQL 查询，返回 QSqlQuery 对象
     QSqlQuery query(const QString &sql);
 

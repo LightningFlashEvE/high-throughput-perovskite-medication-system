@@ -64,6 +64,9 @@ INCLUDEPATH += $$PWD/RecipeQueue
 include($$PWD/QSqlDatabase/qsqldatabase.pri)
 INCLUDEPATH += $$PWD/QSqlDatabase
 
+include($$PWD/MotorControl/motorcontrol.pri)
+INCLUDEPATH += $$PWD/MotorControl
+
 
 RESOURCES += \
     picture.qrc

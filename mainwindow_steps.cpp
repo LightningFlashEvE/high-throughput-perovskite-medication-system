@@ -7,11 +7,12 @@
 // 获取步骤对应的勾选框
 QCheckBox* MainWindow::getCheckBoxForStep(const QString& stepName)
 {
+    if (stepName == "reset") return m_processCheckBox_reset;
     if (stepName == "takeEmptyBottle") return m_processCheckBox_takeEmptyBottle;
     if (stepName == "getSolid") return m_processCheckBox_getSolid;
     if (stepName == "resetXYZ") return m_processCheckBox_resetXYZ;
     if (stepName == "getLiquid") return m_processCheckBox_getLiquid;
-    if (stepName == "tightenBottle") return m_processCheckBox_tightenBottle;
+    if (stepName == "capBottleAndTransferToShaker") return m_processCheckBox_tightenBottle;
     return nullptr;
 }
 
@@ -29,25 +30,32 @@ void MainWindow::runSelectedSteps()
     newRecipe.createTime = QDateTime::currentDateTime();
     newRecipe.processState = RecipeNotProcessed;
 
-    // 2. 清空跳过步骤集合
+    // 2. 清空所有状态集合（开始新的运行）
+    m_selectedSteps.clear();
     m_skippedSteps.clear();
+    m_completedSteps.clear();
+    m_currentStep.clear();
 
     // 3. 按顺序检查每个步骤是否被勾选
-    QStringList allSteps = {"takeEmptyBottle", "getSolid", "resetXYZ", "getLiquid", "tightenBottle"};
+    QStringList allSteps = {"reset", "takeEmptyBottle", "getSolid", "resetXYZ", "getLiquid", "capBottleAndTransferToShaker"};
 
     for (const QString& step : allSteps) {
         QCheckBox* checkBox = getCheckBoxForStep(step);
         if (!checkBox || !checkBox->isChecked()) {
-            // 未勾选：插入跳过标记
+            // 未勾选：加入跳过集合，插入跳过标记
+            m_skippedSteps.insert(step);
             QString skipCmd = QString("AAskipStep:%1").arg(step);
             newRecipe.messageQueue.enqueue(MessageQueueItem(skipCmd.toUtf8(), true));
             qDebug() << "步骤未勾选，将跳过:" << step;
             continue;
         }
 
-        // 已勾选：调用对应的业务函数填充消息队列
+        // 已勾选：加入选中集合，调用对应的业务函数填充消息队列
+        m_selectedSteps.insert(step);
         qDebug() << "步骤已勾选，将执行:" << step;
-        if (step == "takeEmptyBottle") {
+        if (step == "reset") {
+            resetXYZMotorsToZero(newRecipe.messageQueue);
+        } else if (step == "takeEmptyBottle") {
             takeEmptyBottle("", newRecipe.messageQueue);
         } else if (step == "getSolid") {
             // 使用默认参数：固体名称和质量
@@ -57,10 +65,13 @@ void MainWindow::runSelectedSteps()
         } else if (step == "getLiquid") {
             // 使用默认参数：液体名称和体积
             getLiquid("DMF", 10.0, newRecipe.messageQueue);
-        } else if (step == "tightenBottle") {
-            tightenBottle(newRecipe.messageQueue);
+        } else if (step == "capBottleAndTransferToShaker") {
+            capBottleAndTransferToShaker(newRecipe.messageQueue);
         }
     }
+
+    // 3b. 立刻刷新流程状态：未勾选的步骤显示删除线，已勾选的显示灰色
+    updateProcessStateDisplay("");
 
     // 4. 保存并执行配方
     saveAndExecuteRecipe(newRecipe, false);

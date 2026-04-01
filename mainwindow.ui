@@ -44,7 +44,7 @@
          <widget class="QWidget" name="widget_m" native="true">
           <layout class="QVBoxLayout" name="verticalLayout_2">
            <item>
-            <layout class="QVBoxLayout" name="verticalLayout" stretch="2,0,2">
+            <layout class="QVBoxLayout" name="verticalLayout" stretch="0,0,2">
              <item>
               <widget class="QWidget" name="widget" native="true">
                <layout class="QVBoxLayout" name="verticalLayout_widget">
@@ -63,6 +63,22 @@
                    <string>流程状态</string>
                   </property>
                   <layout class="QVBoxLayout" name="verticalLayout_8">
+                   <item>
+                    <widget class="QCheckBox" name="m_processCheckBox_reset">
+                     <property name="font">
+                      <font>
+                       <pointsize>9</pointsize>
+                       <bold>false</bold>
+                      </font>
+                     </property>
+                     <property name="text">
+                      <string>0. 复位</string>
+                     </property>
+                     <property name="checked">
+                      <bool>true</bool>
+                     </property>
+                    </widget>
+                   </item>
                    <item>
                     <widget class="QCheckBox" name="m_processCheckBox_takeEmptyBottle">
                      <property name="font">
@@ -136,7 +152,7 @@
                       </font>
                      </property>
                      <property name="text">
-                      <string>5. 拧好瓶子取摇床</string>
+                      <string>5. 拧好瓶子去摇床</string>
                      </property>
                      <property name="checked">
                       <bool>true</bool>
@@ -144,11 +160,22 @@
                     </widget>
                    </item>
                    <item>
-                    <widget class="QPushButton" name="m_runSelectedStepsButton">
-                     <property name="text">
-                      <string>运行选中步骤</string>
-                     </property>
-                    </widget>
+                    <layout class="QHBoxLayout" name="horizontalLayout_processButtons">
+                     <item>
+                      <widget class="QPushButton" name="m_runSelectedStepsButton">
+                       <property name="text">
+                        <string>运行选中步骤</string>
+                       </property>
+                      </widget>
+                     </item>
+                     <item>
+                      <widget class="QPushButton" name="m_clearProcessStateButton">
+                       <property name="text">
+                        <string>清除状态</string>
+                       </property>
+                      </widget>
+                     </item>
+                    </layout>
                    </item>
                   </layout>
                  </widget>
@@ -157,7 +184,7 @@
               </widget>
              </item>
              <item>
-              <spacer name="verticalSpacer_2">
+              <spacer name="verticalSpacer_3">
                <property name="orientation">
                 <enum>Qt::Orientation::Vertical</enum>
                </property>
