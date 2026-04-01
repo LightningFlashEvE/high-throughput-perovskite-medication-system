@@ -554,7 +554,7 @@ void MainWindow::initializeSystemComponents()
 
 
 // 测试配方发送功能（接收JSON对象）
-void MainWindow::testRecipeSend(const QJsonObject& recipePacket)
+void MainWindow::testRecipeSend(const QJsonObject& recipePacket) 
 {
     // ============ 步骤1：创建新的配方队列项 ============
     RecipeQueueItem newRecipe;
@@ -610,40 +610,77 @@ void MainWindow::testRecipeSend(const QJsonObject& recipePacket)
         newRecipe.messageQueue.enqueue(MessageQueueItem(stateCmd.toUtf8(), true));
     }
 
-    // 打开空瓶
-    takeEmptyBottle("Box_Transfer_Area_Right", newRecipe.messageQueue);
+    // 初始化步骤状态集合（与 runSelectedSteps 保持一致）
+    m_selectedSteps.clear();
+    m_skippedSteps.clear();
+    m_completedSteps.clear();
+    m_currentStep.clear();
 
-
-    // 取固体：遍历溶质，传入名称与质量（g）
-    for (const auto &v : std::as_const(solutes)) {
-        const QJsonObject o = v.toObject();
-        const QString name = o.value("名称").toString();
-        const double mass = o.value("用量").toDouble();
-        if (name.isEmpty() || qFuzzyIsNull(mass)) {
-            qWarning() << "溶质参数不完整，跳过：" << o;
-            continue;
+    // 辅助函数：若步骤未勾选则插入跳过命令并返回 false，已勾选则返回 true
+    auto enqueueSkipIfNeeded = [&](const QString& step) -> bool {
+        QCheckBox* cb = getCheckBoxForStep(step);
+        if (!cb || !cb->isChecked()) {
+            m_skippedSteps.insert(step);
+            newRecipe.messageQueue.enqueue(MessageQueueItem(
+                QString("AAskipStep:%1").arg(step).toUtf8(), true));
+            return false;
         }
-        qDebug() << "准备取固体:" << name << "目标质量(g):" << mass/1000;
-        getSolid(name, mass/1000, newRecipe.messageQueue);
+        m_selectedSteps.insert(step);
+        return true;
+    };
+
+    // reset
+    if (enqueueSkipIfNeeded("reset")) {
+        resetXYZMotorsToZero(newRecipe.messageQueue);
     }
 
-    resetXYZMotorsToZero(newRecipe.messageQueue);
+    // 打开空瓶
+    if (enqueueSkipIfNeeded("takeEmptyBottle")) {
+        takeEmptyBottle("Box_Transfer_Area_Right", newRecipe.messageQueue, newRecipe.recipeName);
+    }
+
+    // 取固体：遍历溶质，传入名称与质量（g）
+    if (enqueueSkipIfNeeded("getSolid")) {
+        for (const auto &v : std::as_const(solutes)) {
+            const QJsonObject o = v.toObject();
+            const QString name = o.value("名称").toString();
+            const double mass = o.value("用量").toDouble();
+            if (name.isEmpty() || qFuzzyIsNull(mass)) {
+                qWarning() << "溶质参数不完整，跳过：" << o;
+                continue;
+            }
+            qDebug() << "准备取固体:" << name << "目标质量(g):" << mass/1000;
+            getSolid(name, mass/1000, newRecipe.messageQueue);
+        }
+    }
+
+    // resetXYZ
+    if (enqueueSkipIfNeeded("resetXYZ")) {
+        resetXYZMotorsToZero(newRecipe.messageQueue);
+    }
 
     // 取液体：遍历溶剂，传入名称与体积（ml）
-    for (const auto &v : std::as_const(solvents)) {
-        const QJsonObject o = v.toObject();
-        const QString name = o.value("名称").toString();
-        const double volume = o.value("用量").toDouble();
-        if (name.isEmpty() || qFuzzyIsNull(volume)) {
-            qWarning() << "溶剂参数不完整，跳过：" << o;
-            continue;
+    if (enqueueSkipIfNeeded("getLiquid")) {
+        for (const auto &v : std::as_const(solvents)) {
+            const QJsonObject o = v.toObject();
+            const QString name = o.value("名称").toString();
+            const double volume = o.value("用量").toDouble();
+            if (name.isEmpty() || qFuzzyIsNull(volume)) {
+                qWarning() << "溶剂参数不完整，跳过：" << o;
+                continue;
+            }
+            qDebug() << "准备取液体:" << name << "目标体积(ml):" << volume;
+            getLiquid(name, volume, newRecipe.messageQueue);
         }
-        qDebug() << "准备取液体:" << name << "目标体积(ml):" << volume;
-        getLiquid(name, volume, newRecipe.messageQueue);
     }
 
     // 拧盖并送入摇床
-    capBottleAndTransferToShaker(newRecipe.messageQueue);
+    if (enqueueSkipIfNeeded("capBottleAndTransferToShaker")) {
+        capBottleAndTransferToShaker(newRecipe.messageQueue);
+    }
+
+    // 刷新初始样式（未勾选显示删除线，已勾选显示灰色待执行）
+    updateProcessStateDisplay("");
 
     {
         int desiredState = RecipeFinished;

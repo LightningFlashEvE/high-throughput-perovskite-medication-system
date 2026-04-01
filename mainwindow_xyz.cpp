@@ -25,7 +25,7 @@ void MainWindow::on_pushButton_3_clicked()
 
 
 // 取空瓶 - 重载版本
-bool MainWindow::takeEmptyBottle(const QString& trayName, QQueue<MessageQueueItem>& messageQueue)
+bool MainWindow::takeEmptyBottle(const QString& trayName, QQueue<MessageQueueItem>& messageQueue, const QString& equation)
 {
     Q_UNUSED(trayName);
 
@@ -48,21 +48,28 @@ bool MainWindow::takeEmptyBottle(const QString& trayName, QQueue<MessageQueueIte
         transferCols       = transferAreaQuery.value("cols").toInt();
         transferRows       = transferAreaQuery.value("rows").toInt();
     } else {
-        qWarning() << "未找到 pan_init 表的 emptyPosition 数据";
+        qCritical() << "takeEmptyBottle: 未找到 pan_init 表的 emptyPosition 数据，触发紧急暂停";
+        if (ui && ui->pushButton_Stop)
+            QMetaObject::invokeMethod(ui->pushButton_Stop, "click", Qt::QueuedConnection);
         return false;
     }
 
-    // 2. 从 pan_EmptyBottlePosition 找 drug_name 不为空且 slot_index 最小的可用槽位
-    QString slotSql = "SELECT slot_index FROM pan_EmptyBottlePosition WHERE drug_name != '' ORDER BY slot_index ASC LIMIT 1";
+    // 2. 从 pan_EmptyBottlePosition 找 drug_name 不为空且 slot_index 最小的可用槽位，还得找到这个drug_name值
+    QString slotSql = "SELECT slot_index, drug_name FROM pan_EmptyBottlePosition WHERE drug_name != '' ORDER BY slot_index ASC LIMIT 1";
     QSqlQuery slotQuery = dbm->query(slotSql);
 
     int transferSlotIndex = -1;
+    QString transferDrugName = "";
     if (slotQuery.next()) {
         transferSlotIndex = slotQuery.value("slot_index").toInt();
+        transferDrugName = slotQuery.value("drug_name").toString();
     } else {
-        qWarning() << "pan_EmptyBottlePosition 中没有可用槽位（drug_name 均为空）";
+        qCritical() << "takeEmptyBottle: pan_EmptyBottlePosition 中没有可用槽位，触发紧急暂停";
+        if (ui && ui->pushButton_Stop)
+            QMetaObject::invokeMethod(ui->pushButton_Stop, "click", Qt::QueuedConnection);
         return false;
     }
+    slotQuery.finish();  // 关闭 ODBC 游标，避免后续 UPDATE 报"函数序列错误"
 
     // 校验槽位下标范围，超出范围就取首个位置坐标
     int maxSlot = transferCols * transferRows - 1;
@@ -77,12 +84,33 @@ bool MainWindow::takeEmptyBottle(const QString& trayName, QQueue<MessageQueueIte
     int emptyBottleAreaTargetX = targetPos.x();
     int emptyBottleAreaTargetY = targetPos.y();
 
-    // 4. 取走空瓶后将该槽位的 drug_name 清空（不修改 value 字段）
-    QString updateSlotSql = QString("UPDATE pan_EmptyBottlePosition SET drug_name = '' WHERE slot_index = %1").arg(transferSlotIndex);
-    QSqlQuery updateSlotQuery = dbm->query(updateSlotSql);
-    if (updateSlotQuery.lastError().isValid()) {
-        qWarning() << "清空 pan_EmptyBottlePosition drug_name 失败:" << updateSlotQuery.lastError().text();
+    // // 4. 取走空瓶后将该槽位的 drug_name 清空（不修改 value 字段）
+    // QString updateSlotSql = QString("UPDATE pan_EmptyBottlePosition SET drug_name = '' WHERE slot_index = %1").arg(transferSlotIndex);
+    // QSqlQuery updateSlotQuery = dbm->query(updateSlotSql);
+    // if (updateSlotQuery.lastError().isValid()) {
+    //     qCritical() << "takeEmptyBottle: 清空 pan_EmptyBottlePosition drug_name 失败，触发紧急暂停:" << updateSlotQuery.lastError().text();
+    //     if (ui && ui->pushButton_Stop)
+    //         QMetaObject::invokeMethod(ui->pushButton_Stop, "click", Qt::QueuedConnection);
+    //     return false;
+    // }
+    // updateSlotQuery.finish();  // 关闭 ODBC 语句句柄，避免后续 UPDATE 报"函数序列错误"
+
+    // 5. 把 live_code 表里该二维码占位值（transferDrugName，如 "007"）更新为化学式（equation 参数）
+    if (!equation.isEmpty()) {
+        QString updateLiveCodeSql = QString("UPDATE live_codes SET drug_name = '%1' WHERE drug_name = '%2'")
+                                        .arg(equation, transferDrugName);
+        QSqlQuery liveCodeQuery = dbm->query(updateLiveCodeSql);
+        if (liveCodeQuery.lastError().isValid()) {
+            qCritical() << "takeEmptyBottle: 更新 live_code drug_name 失败，触发紧急暂停:" << liveCodeQuery.lastError().text();
+            if (ui && ui->pushButton_Stop)
+                QMetaObject::invokeMethod(ui->pushButton_Stop, "click", Qt::QueuedConnection);
+            return false;
+        }
+        liveCodeQuery.finish();
     }
+
+
+
 
     // 添加命令到消息队列而不是直接发送
     QString moveToTransferXCommand = tcpCore->buildDeviceCommand("0A", "D", emptyBottleAreaTargetX, 8);
@@ -134,7 +162,9 @@ bool MainWindow::takeEmptyBottle(const QString& trayName, QQueue<MessageQueueIte
         gripAreaY = gripAreaQuery.value("originY").toInt();
         gripAreaZ = gripAreaQuery.value("gripperZ").toInt();
     } else {
-        qWarning() << "未找到 gripArea 的数据";
+        qCritical() << "takeEmptyBottle: 未找到 gripArea 的数据，触发紧急暂停";
+        if (ui && ui->pushButton_Stop)
+            QMetaObject::invokeMethod(ui->pushButton_Stop, "click", Qt::QueuedConnection);
         return false;
     }
     QString moveToGripAreaXCommand = tcpCore->buildDeviceCommand("0A", "D", gripAreaX, 8);
@@ -235,7 +265,9 @@ bool MainWindow::takeEmptyBottle(const QString& trayName, QQueue<MessageQueueIte
         balanceAreaZ = balanceAreaQuery.value("gripperZ").toInt();
         qDebug() << "-----------------------" << balanceAreaX << balanceAreaY << balanceAreaZ;
     } else {
-        qWarning() << "未找到 balanceArea 的数据";
+        qCritical() << "takeEmptyBottle: 未找到 balanceArea 的数据，触发紧急暂停";
+        if (ui && ui->pushButton_Stop)
+            QMetaObject::invokeMethod(ui->pushButton_Stop, "click", Qt::QueuedConnection);
         return false;
     }
     QString moveToBalanceAreaXCommand = tcpCore->buildDeviceCommand("0A", "D", balanceAreaX, 8);

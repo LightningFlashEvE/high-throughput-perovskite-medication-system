@@ -286,7 +286,7 @@ private:
     /****************** DOWN ********************/
 
     // 取空瓶（盘名称 + 消息队列引用）
-    bool takeEmptyBottle(const QString& trayName, QQueue<MessageQueueItem>& messageQueue);
+    bool takeEmptyBottle(const QString& trayName, QQueue<MessageQueueItem>& messageQueue, const QString& equation = QString());
     // 取液体（液体名称 + 体积 + tipsNum引用参数 + 消息队列引用）
     bool getLiquid(const QString& liquidName, double volumeMl, QQueue<MessageQueueItem>& messageQueue);
     // 取固体（固体名称 + 质量 + 消息队列引用 + 固体盘位置索引）
