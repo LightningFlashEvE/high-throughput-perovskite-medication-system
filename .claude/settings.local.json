@@ -22,7 +22,22 @@
       "Bash(grep -n \"takeEmptyBottle\\\\|getLiquid\\\\|getSolid\" /d/application/high-throughput-perovskite-medication-system/*.cpp)",
       "Bash(git add:*)",
       "Bash(git commit:*)",
-      "Bash(git push:*)"
+      "Bash(git push:*)",
+      "Bash(gh pr:*)",
+      "Read(//d D:/application/**)",
+      "Bash(qmake -r)",
+      "Bash(git -C \"D:/application/high-throughput-perovskite-medication-system\" diff mainwindow.cpp)",
+      "Bash(git:*)",
+      "Bash(node:*)",
+      "Bash(dir \"C:\\\\Program Files\")",
+      "Bash(xmllint --noout motorcontrol.ui)",
+      "Bash(make clean:*)",
+      "Bash(python3 -c \"import xml.etree.ElementTree as ET; ET.parse\\('motorcontrol.ui'\\)\")",
+      "Bash(/c/Python311/python.exe:*)",
+      "Bash(python -c \"import xml.etree.ElementTree as ET; ET.parse\\('MotorControl/motorcontrol.ui'\\); print\\('XML valid'\\)\")",
+      "Bash(cd /d \"D:\\\\application\\\\high-throughput-perovskite-medication-system\")",
+      "Bash(qmake --version)",
+      "Bash(xargs grep:*)"
     ]
   }
 }

@@ -378,35 +378,48 @@ void MainWindow::initializeSystemComponents()
             qDebug() << "连接前清理：将遗留的 processState=1 记录标记为 processState=2";
         }
 
-        // 连接到TCP服务器
-        bool okMain    = tcpCore->connectToTcp(localIP, tcpCoreRemoteIP,    tcpCoreRemotePort,    true);
-        bool okBalance = tcpBalanceCore->connectToTcp(localIP, tcpBalanceRemoteIP, tcpBalanceRemotePort, true);
+        // 两路 TCP 均连接成功后执行初始化（非阻塞，通过信号回调）
+        m_pendingTcpConnections = 2;
 
-        // 任意一个连接失败，都不继续后续初始化
-        if (!okMain || !okBalance) {
-            qWarning() << "TCP 连接失败，停止后续初始化。主机连接结果:" << okMain
-                       << "天平连接结果:" << okBalance;
-            return;
-        }
+        // 用 shared 指针存储连接句柄，以便在回调内安全断开（Qt5/6 兼容写法）
+        auto c1 = QSharedPointer<QMetaObject::Connection>::create();
+        auto c2 = QSharedPointer<QMetaObject::Connection>::create();
+        auto c3 = QSharedPointer<QMetaObject::Connection>::create();
+        auto c4 = QSharedPointer<QMetaObject::Connection>::create();
 
+        auto onBothConnected = [this, c1, c2, c3, c4]() mutable {
+            m_pendingTcpConnections--;
+            if (m_pendingTcpConnections > 0) return;
+            disconnect(*c1); disconnect(*c2); disconnect(*c3); disconnect(*c4);
 
-        RecipeQueueItem newRecipe;
-        newRecipe.recipeName = "开机初始化";
-        newRecipe.createTime = QDateTime::currentDateTime();
-        newRecipe.processState = RecipeNotProcessed;   // 未处理
+            RecipeQueueItem newRecipe;
+            newRecipe.recipeName = "开机初始化";
+            newRecipe.createTime = QDateTime::currentDateTime();
+            newRecipe.processState = RecipeNotProcessed;
+            initializeAllDevices(newRecipe.messageQueue);
+            newRecipe.messageQueue.enqueue(MessageQueueItem("AAallDevicesInitialized", true));
+            saveAndExecuteRecipe(newRecipe);
 
-        // 调用设备初始化函数，将初始化相关命令写入队列
-        initializeAllDevices(newRecipe.messageQueue);
-        newRecipe.messageQueue.enqueue(MessageQueueItem("AAallDevicesInitialized", true));
+            if (shakeBedCheckTimer && !shakeBedCheckTimer->isActive()) {
+                shakeBedCheckTimer->start(1000);
+                qDebug() << "摇床检查定时器已启动";
+            }
+        };
 
-        // 保存到数据库并执行
-        saveAndExecuteRecipe(newRecipe);
+        auto onConnectFailed = [this, c1, c2, c3, c4](const QString &err) mutable {
+            qWarning() << "TCP 连接失败，停止后续初始化:" << err;
+            disconnect(*c1); disconnect(*c2); disconnect(*c3); disconnect(*c4);
+            m_pendingTcpConnections = 0;
+        };
 
-        // 启动摇床检查定时器
-        if (shakeBedCheckTimer && !shakeBedCheckTimer->isActive()) {
-            shakeBedCheckTimer->start(1000);  // 每隔1秒检查一次
-            qDebug() << "摇床检查定时器已启动";
-        }
+        *c1 = connect(tcpCore,        &TcpClientCore::connected,      this, onBothConnected);
+        *c2 = connect(tcpBalanceCore, &TcpClientCore::connected,      this, onBothConnected);
+        *c3 = connect(tcpCore,        &TcpClientCore::errorOccurred,  this, onConnectFailed);
+        *c4 = connect(tcpBalanceCore, &TcpClientCore::errorOccurred,  this, onConnectFailed);
+
+        // 发起连接（立即返回，不阻塞 UI）
+        tcpCore->connectToTcp(localIP, tcpCoreRemoteIP,    tcpCoreRemotePort,    true);
+        tcpBalanceCore->connectToTcp(localIP, tcpBalanceRemoteIP, tcpBalanceRemotePort, true);
 
     });
     

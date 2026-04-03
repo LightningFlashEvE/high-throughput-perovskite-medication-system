@@ -184,10 +184,7 @@ bool TcpClientCore::connectToTcp(const QString& localIP, const QString& remoteIP
         m_tcpSocket->disconnectFromHost();
 
         if (m_tcpSocket->state() != QAbstractSocket::UnconnectedState) {
-            if (!m_tcpSocket->waitForDisconnected(1000)) {
-                qWarning() << "等待上一次连接断开超时，强制中止";
-                m_tcpSocket->abort();
-            }
+            m_tcpSocket->abort();
         }
     } else if (currentState != QAbstractSocket::UnconnectedState) {
         // 处于其他状态（比如 Connecting），直接强制中止，避免 waitForDisconnected 警告
@@ -224,33 +221,9 @@ bool TcpClientCore::connectToTcp(const QString& localIP, const QString& remoteIP
     // 启用 TCP keepalive，让 OS 在网络层断连时主动上报错误
     m_tcpSocket->setSocketOption(QAbstractSocket::KeepAliveOption, 1);
 
-    // 连接到远程服务器
+    // 连接到远程服务器（非阻塞，结果通过 onConnected / onSocketError 回调）
     qDebug() << "正在连接到" << remoteIP << ":" << remotePort;
     m_tcpSocket->connectToHost(remoteIP, remotePort);
-
-    // 等待连接建立（最多3秒）
-    if (!m_tcpSocket->waitForConnected(3000)) {
-        qWarning() << "TCP连接失败:" << m_tcpSocket->errorString();
-        return false;
-    }
-
-    // 连接成功后，将 keepalive 间隔缩短到 5s（Windows 平台）
-#ifdef Q_OS_WIN
-    {
-        SOCKET sock = static_cast<SOCKET>(m_tcpSocket->socketDescriptor());
-        if (sock != INVALID_SOCKET) {
-            struct tcp_keepalive ka;
-            ka.onoff             = 1;
-            ka.keepalivetime     = 5000;   // 空闲 5s 开始发探测包
-            ka.keepaliveinterval = 1000;   // 每隔 1s 重发一次
-            DWORD bytesReturned  = 0;
-            WSAIoctl(sock, SIO_KEEPALIVE_VALS, &ka, sizeof(ka),
-                     nullptr, 0, &bytesReturned, nullptr, nullptr);
-        }
-    }
-#endif
-
-    qDebug() << "TCP连接成功";
     return true;
 }
 
@@ -730,10 +703,7 @@ void TcpClientCore::disconnectFromTcp()
             m_tcpSocket->disconnectFromHost();
 
             if (m_tcpSocket->state() != QAbstractSocket::UnconnectedState) {
-                if (!m_tcpSocket->waitForDisconnected(1000)) {
-                    qWarning() << "TCP断开超时，强制中止连接";
-                    m_tcpSocket->abort();
-                }
+                m_tcpSocket->abort();
             }
         } else if (state != QAbstractSocket::UnconnectedState) {
             qWarning() << "TCP处于状态" << state << "，直接强制中止连接";
@@ -782,6 +752,23 @@ void TcpClientCore::resetState()
 void TcpClientCore::onConnected()
 {
     qDebug() << "TCP连接已建立";
+
+    // 连接成功后，将 keepalive 间隔缩短到 5s（Windows 平台）
+#ifdef Q_OS_WIN
+    {
+        SOCKET sock = static_cast<SOCKET>(m_tcpSocket->socketDescriptor());
+        if (sock != INVALID_SOCKET) {
+            struct tcp_keepalive ka;
+            ka.onoff             = 1;
+            ka.keepalivetime     = 5000;   // 空闲 5s 开始发探测包
+            ka.keepaliveinterval = 1000;   // 每隔 1s 重发一次
+            DWORD bytesReturned  = 0;
+            WSAIoctl(sock, SIO_KEEPALIVE_VALS, &ka, sizeof(ka),
+                     nullptr, 0, &bytesReturned, nullptr, nullptr);
+        }
+    }
+#endif
+
     emit connected();
 }
 

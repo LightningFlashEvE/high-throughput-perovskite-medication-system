@@ -122,6 +122,7 @@ private:
     QTimer *timer;
     QTimer *shakeBedCheckTimer;  // 摇床检查定时器
     QTimer *shakeBedEmptyCheckTimer;  // 摇床为空检查定时器（10秒执行一次，当摇床为空时停止摇床）
+    int m_pendingTcpConnections = 0;   // 等待连接成功的 TCP 数量
 
     /**
      * 初始化data.ini文件
@@ -171,6 +172,8 @@ private:
     QLabel *m_ledBalance = nullptr;  // 天平 TCP
     QLabel *m_ledDb      = nullptr;  // 数据库
     QTimer *m_connectionStatusTimer = nullptr;  // 连接状态轮询定时器
+    QTimer *m_dbHealthCheckTimer    = nullptr;  // DB 慢速健康检查定时器（10s）
+    bool    m_dbLastKnownConnected  = false;    // DB 连接状态缓存
 
     // 更新三个连接状态灯
     void updateConnectionStatusLeds();

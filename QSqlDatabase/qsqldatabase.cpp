@@ -90,7 +90,8 @@ bool AppSqlDatabase::openDatabase()
                        "SERVER=%1;PORT=%2;"
                        "DATABASE=%3;"
                        "USER=%4;PASSWORD=%5;"
-                       "OPTION=3;")
+                       "OPTION=3;"
+                       "Connect Timeout=5;")
         .arg(host).arg(port).arg(database).arg(user).arg(password)
     );
 

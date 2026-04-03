@@ -345,18 +345,27 @@ MainWindow::MainWindow(QWidget *parent)
 
     // 居中布局：stretch - LED - LED - LED - stretch
     ledLayout->addStretch();
+    ledLayout->addWidget(m_ledDb);
     ledLayout->addWidget(m_ledMain);
     ledLayout->addWidget(m_ledBalance);
-    ledLayout->addWidget(m_ledDb);
     ledLayout->addStretch();
 
     // 插入到状态栏中间（index 1，在 weight label 右侧）
     ui->statusbar->insertWidget(1, ledContainer);
 
-    // 启动 1s 定时器轮询连接状态
+    // 启动 1s 定时器更新 LED（读缓存，不阻塞 UI）
     m_connectionStatusTimer = new QTimer(this);
     connect(m_connectionStatusTimer, &QTimer::timeout, this, &MainWindow::updateConnectionStatusLeds);
     m_connectionStatusTimer->start(1000);
+
+    // 启动 10s 慢速定时器做真实 DB 探测（SELECT 1），结果写入缓存
+    m_dbLastKnownConnected = dbm && dbm->isConnected();
+    m_dbHealthCheckTimer = new QTimer(this);
+    connect(m_dbHealthCheckTimer, &QTimer::timeout, this, [this]() {
+        m_dbLastKnownConnected = dbm && dbm->isConnected();
+    });
+    m_dbHealthCheckTimer->start(10000);
+
     updateConnectionStatusLeds();
 
 }
@@ -612,7 +621,7 @@ void MainWindow::updateConnectionStatusLeds()
     };
     setLed(m_ledMain,    tcpCore        && tcpCore->isConnected(),       "主控 TCP");
     setLed(m_ledBalance, tcpBalanceCore  && tcpBalanceCore->isConnected(), "天平 TCP");
-    setLed(m_ledDb,      dbm            && dbm->isConnected(),            "数据库");
+    setLed(m_ledDb,      m_dbLastKnownConnected,                          "数据库");
 }
 
 // 更新状态栏天平重量显示（三列：当前 / 目标 / 目的，各占8位，靠左对齐）
