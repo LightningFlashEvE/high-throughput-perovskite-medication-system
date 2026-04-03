@@ -18,6 +18,8 @@
 #include <QSettings>
 #include <QFileInfo>
 #include <QDebug>
+#include <QHBoxLayout>
+#include <QWidget>
 #include <QApplication>
 #include "rtspplayer.h"
 #include "tcpclientcore.h"
@@ -293,8 +295,9 @@ MainWindow::MainWindow(QWidget *parent)
         QAction *settingsActionMotor = new QAction("电机控制", this);
         ui->menuSettings->addAction(settingsActionMotor);
         connect(settingsActionMotor, &QAction::triggered, this, [this] {
-            MotorControl dlg(tcpCore, tcpBalanceCore, dbm, this);
-            dlg.exec();
+            auto *dlg = new MotorControl(tcpCore, tcpBalanceCore, dbm, this);
+            dlg->setAttribute(Qt::WA_DeleteOnClose);
+            dlg->show();
         });
     }
 
@@ -320,6 +323,41 @@ MainWindow::MainWindow(QWidget *parent)
     m_statusDateTimeLabel->setAlignment(Qt::AlignRight | Qt::AlignVCenter);
     m_statusDateTimeLabel->setContentsMargins(8, 0, 4, 0);
     ui->statusbar->addPermanentWidget(m_statusDateTimeLabel);
+
+    /*** 初始化状态栏三个连接状态指示灯（居中显示） ***/
+    QWidget *ledContainer = new QWidget(this);
+    QHBoxLayout *ledLayout = new QHBoxLayout(ledContainer);
+    ledLayout->setContentsMargins(0, 0, 0, 0);
+    ledLayout->setSpacing(6);
+
+    // 创建三个灯（无文字，hover 显示 tooltip）
+    m_ledMain = new QLabel(ledContainer);
+    m_ledBalance = new QLabel(ledContainer);
+    m_ledDb = new QLabel(ledContainer);
+
+    for (QLabel *led : {m_ledMain, m_ledBalance, m_ledDb}) {
+        led->setMinimumSize(16, 16);
+        led->setMaximumSize(16, 16);
+    }
+    m_ledMain->setToolTip("主控 TCP");
+    m_ledBalance->setToolTip("天平 TCP");
+    m_ledDb->setToolTip("数据库");
+
+    // 居中布局：stretch - LED - LED - LED - stretch
+    ledLayout->addStretch();
+    ledLayout->addWidget(m_ledMain);
+    ledLayout->addWidget(m_ledBalance);
+    ledLayout->addWidget(m_ledDb);
+    ledLayout->addStretch();
+
+    // 插入到状态栏中间（index 1，在 weight label 右侧）
+    ui->statusbar->insertWidget(1, ledContainer);
+
+    // 启动 1s 定时器轮询连接状态
+    m_connectionStatusTimer = new QTimer(this);
+    connect(m_connectionStatusTimer, &QTimer::timeout, this, &MainWindow::updateConnectionStatusLeds);
+    m_connectionStatusTimer->start(1000);
+    updateConnectionStatusLeds();
 
 }
 
@@ -542,6 +580,39 @@ void MainWindow::cleanupResources()
     QApplication::processEvents(QEventLoop::ExcludeUserInputEvents, 100);
     
     qDebug() << "资源清理完成";
+}
+
+void MainWindow::updateConnectionStatusLeds()
+{
+    // 防御：组件未初始化时直接跳过
+    if (!m_ledMain || !m_ledBalance || !m_ledDb)
+        return;
+
+    auto setLed = [](QLabel *led, bool on, const QString &name) {
+        if (!led) return;
+        if (on) {
+            led->setStyleSheet(
+                "QLabel {"
+                "  background-color: #4caf50;"
+                "  border-radius: 8px;"
+                "  border: 2px solid #388e3c;"
+                "}"
+            );
+            led->setToolTip(name + " - 已连接");
+        } else {
+            led->setStyleSheet(
+                "QLabel {"
+                "  background-color: #f44336;"
+                "  border-radius: 8px;"
+                "  border: 2px solid #c62828;"
+                "}"
+            );
+            led->setToolTip(name + " - 未连接");
+        }
+    };
+    setLed(m_ledMain,    tcpCore        && tcpCore->isConnected(),       "主控 TCP");
+    setLed(m_ledBalance, tcpBalanceCore  && tcpBalanceCore->isConnected(), "天平 TCP");
+    setLed(m_ledDb,      dbm            && dbm->isConnected(),            "数据库");
 }
 
 // 更新状态栏天平重量显示（三列：当前 / 目标 / 目的，各占8位，靠左对齐）
@@ -970,126 +1041,63 @@ void MainWindow::initializeDataIni()
 {
     QString iniFilePath = "BoxData.ini";
     QFileInfo fileInfo(iniFilePath);
-    
-    // 检查文件是否存在
+    QSettings settings(iniFilePath, QSettings::IniFormat);
+
+    // 辅助lambda：检查并补全指定组的键
+    auto ensureGroup = [&settings](const char* group, const QMap<QString, QVariant>& defaults) {
+        settings.beginGroup(group);
+        bool groupExists = false;
+        for (auto it = defaults.constBegin(); it != defaults.constEnd(); ++it) {
+            if (settings.contains(it.key())) {
+                groupExists = true;
+                break;
+            }
+        }
+        if (!groupExists) {
+            qDebug() << "[" << group << "] 组不存在或为空，正在创建默认配置...";
+            for (auto it = defaults.constBegin(); it != defaults.constEnd(); ++it) {
+                settings.setValue(it.key(), it.value());
+            }
+        } else {
+            qDebug() << "[" << group << "] 组已存在";
+        }
+        settings.endGroup();
+    };
+
     if (!fileInfo.exists()) {
         qDebug() << "BoxData.ini文件不存在，正在创建默认配置文件...";
-        
-        // 创建QSettings对象来写入INI文件
-        QSettings settings(iniFilePath, QSettings::IniFormat);
-        
-        // 设置默认配置值
-        settings.beginGroup("Box-Solid-Top"); // 盒子-固体-上面
-        settings.setValue("axisX", "0");
-        settings.setValue("axisY", "0");
-        settings.setValue("gripperDepth", "0"); // 夹爪深度 /ˈɡrɪpər/
-        settings.setValue("liquidExtractionDepth", "0"); // 取液深度 /ɪkˈstrækʃ(ə)n/
-        settings.setValue("solidDepth", "0"); // 固体深度 /ˈsɑːlɪd/
-        settings.endGroup();
-        
-        settings.beginGroup("Box-Solid-Bottom"); // 盒子-固体-下面
-        settings.setValue("axisX", "0");
-        settings.setValue("axisY", "0");
-        settings.setValue("gripperDepth", "0"); // 夹爪深度
-        settings.setValue("liquidExtractionDepth", "0"); // 取液深度
-        settings.setValue("solidDepth", "0"); // 固体深度
-        settings.endGroup();
-        
-        settings.beginGroup("Box-Tips-Left"); // 盒子-tips左边
-        settings.setValue("axisX", "0");
-        settings.setValue("axisY", "0");
-        settings.setValue("gripperDepth", "0"); // 夹爪深度
-        settings.setValue("liquidExtractionDepth", "0"); // 取液深度
-        settings.setValue("solidDepth", "0"); // 固体深度
-        settings.endGroup();
-        
-        settings.beginGroup("Box-Tips-Right"); // 盒子-tips右边
-        settings.setValue("axisX", "0");
-        settings.setValue("axisY", "0");
-        settings.setValue("gripperDepth", "0"); // 夹爪深度
-        settings.setValue("liquidExtractionDepth", "0"); // 取液深度
-        settings.setValue("solidDepth", "0"); // 固体深度
-        settings.endGroup();
-        
-        settings.beginGroup("Box-Shake-Bed"); // 盒子-摇床 /ʃeɪk/
-        settings.setValue("axisX", "0");
-        settings.setValue("axisY", "0");
-        settings.setValue("gripperDepth", "0"); // 夹爪深度
-        settings.setValue("liquidExtractionDepth", "0"); // 取液深度
-        settings.setValue("solidDepth", "0"); // 固体深度
-        settings.endGroup();
-        
-        settings.beginGroup("Box-Liquid-Material"); // 盒子-液体材料
-        settings.setValue("axisX", "0");
-        settings.setValue("axisY", "0");
-        settings.setValue("gripperDepth", "0"); // 夹爪深度
-        settings.setValue("liquidExtractionDepth", "0"); // 取液深度
-        settings.setValue("solidDepth", "0"); // 固体深度
-        settings.endGroup();
-        
-        settings.beginGroup("Box-Empty-Bottle"); // 盒子-空瓶
-        settings.setValue("axisX", "0");
-        settings.setValue("axisY", "0");
-        settings.setValue("gripperDepth", "0"); // 夹爪深度
-        settings.setValue("liquidExtractionDepth", "0"); // 取液深度
-        settings.setValue("solidDepth", "0"); // 固体深度
-        settings.endGroup();
-        
-        settings.beginGroup("Box-Transfer-Area-Left"); // 盒子-转移区左边
-        settings.setValue("axisX", "00003A99");
-        settings.setValue("axisY", "000058DF");
-        settings.setValue("gripperDepth", "00041AC7"); // 夹爪深度
-        settings.setValue("liquidExtractionDepth", "0"); // 取液深度
-        settings.setValue("solidDepth", "0"); // 固体深度
-        settings.endGroup();
-        
-        settings.beginGroup("Box-Transfer-Area-Right"); // 盒子-转移区右边
-        settings.setValue("axisX", "0");
-        settings.setValue("axisY", "0");
-        settings.setValue("gripperDepth", "0"); // 夹爪深度
-        settings.setValue("liquidExtractionDepth", "0"); // 取液深度
-        settings.setValue("solidDepth", "0"); // 固体深度
-        settings.endGroup();
-        
-        settings.beginGroup("Box-Hold-Region");  // 夹持区域 /ˈriːdʒən/
-        settings.setValue("axisX", "20326");
-        settings.setValue("axisY", "35517");
-        settings.setValue("gripperDepth", "265192"); // 夹爪深度
-        settings.setValue("liquidExtractionDepth", "0"); // 取液深度
-        settings.setValue("solidDepth", "0"); // 固体深度
-        settings.endGroup();
-
-        settings.beginGroup("TCP-Info");
-        settings.setValue("LocalIP", "192.168.5.22");        // 本机IP
-        settings.setValue("RemoteIP", "192.168.5.201");      // 远端IP
-        settings.setValue("RemotePort", "4196");      // 远端端口
-        settings.setValue("ProxyDisabled", true); // 是否禁用代理
-        settings.endGroup();
-
-        settings.beginGroup("Liquid-Info");
-        settings.setValue("LocalIP", "192.168.5.22");
-        settings.setValue("RemoteIP", "192.168.5.201");
-        settings.setValue("RemotePort", "4196");
-        settings.setValue("ProxyDisabled", true); // 是否禁用代理
-        settings.endGroup();
-
-        // 流程步骤选中状态（默认全部勾选）
-        settings.beginGroup("Process-Steps");
-        settings.setValue("reset", true);           // 复位
-        settings.setValue("takeEmptyBottle", true); // 取空瓶
-        settings.setValue("getSolid", true);        // 获取固体
-        settings.setValue("resetXYZ", true);        // 重置XYZ
-        settings.setValue("getLiquid", true);       // 获取液体
-        settings.setValue("capBottleAndTransferToShaker", true);   // 拧盖并送入摇床
-        settings.endGroup();
-
-        // 确保文件被写入磁盘
-        settings.sync();
-
-        qDebug() << "data.ini文件创建成功，默认配置已写入";
-    } else {
-        qDebug() << "data.ini文件已存在，跳过初始化";
     }
+
+    // [TCP]
+    ensureGroup("TCP", {
+        {"localIP", "192.168.5.27"},
+        {"tcpCoreRemoteIP", "192.168.5.201"},
+        {"tcpCoreRemotePort", "4196"},
+        {"tcpBalanceRemoteIP", "192.168.5.201"},
+        {"tcpBalanceRemotePort", "4197"}
+    });
+
+    // [Database]
+    ensureGroup("Database", {
+        {"host", "192.168.10.170"},
+        {"port", "3306"},
+        {"database", "PhenoLabHT"},
+        {"user", "root"},
+        {"password", "Zq17122320_"}
+    });
+
+    // [Process-Steps]
+    ensureGroup("Process-Steps", {
+        {"reset", true},
+        {"takeEmptyBottle", true},
+        {"getSolid", false},
+        {"resetXYZ", true},
+        {"getLiquid", true},
+        {"capBottleAndTransferToShaker", true}
+    });
+
+    settings.sync();
+    qDebug() << "BoxData.ini 初始化完成";
 }
 
 // 流程步骤定义（顺序即执行顺序）

@@ -9,9 +9,6 @@
 #include <QtSql/QSqlQuery>
 #include <QtSql/QSqlDatabase>
 #include "qsqldatabase.h"
-#include "box.h"
-#include "reagentbottle.h"
-#include "slot.h"
 #include "ui_mainwindow.h"
 #include <QNetworkInterface>
 #include <QNetworkAddressEntry>
@@ -34,48 +31,6 @@ void MainWindow::initializeSystemComponents()
     // ========== 检查并重置中断的配方（开机时调用）==========
     checkAndResetInterruptedRecipes();
 
-
-
-    // ========== 初始化转移区左边区域（15槽位）==========
-    // 这里传入this是为了将MainWindow作为Box的父对象，从而利用Qt的对象树管理Box的生命周期
-    transferAreaBox = new Box(15, "Box-Transfer-Area-Left", this); // 使用带名称的构造函数，自动从配置文件加载坐标信息
-
-    // ========== 初始化ABC试剂 ==========
-    // A试剂
-    reagentA = new ReagentBottle();
-    reagentA->setName("A试剂");
-    reagentA->setInitial(100);
-    reagentA->setRemaining(90);
-    reagentA->setHeight(95);
-    reagentA->setPos(0, 0);
-    transferAreaBox->addReagentBottleToSlot(0, reagentA);  // 放在槽位0
-    qDebug() << "A试剂初始化完成，放入槽位0";
-
-    // B试剂
-    reagentB = new ReagentBottle();
-    reagentB->setName("B试剂");
-    reagentB->setInitial(100);
-    reagentB->setRemaining(191);
-    reagentB->setHeight(95);
-    reagentB->setPos(1, 0);
-    transferAreaBox->addReagentBottleToSlot(1, reagentB);  // 放在槽位1
-    qDebug() << "B试剂初始化完成，放入槽位1";
-
-    // C试剂
-    reagentC = new ReagentBottle();
-    reagentC->setName("C试剂");
-    reagentC->setInitial(100);
-    reagentC->setRemaining(92);
-    reagentC->setHeight(95);
-    reagentC->setPos(2, 0);
-    transferAreaBox->addReagentBottleToSlot(2, reagentC);  // 放在槽位2
-    qDebug() << "C试剂初始化完成，放入槽位2";
-
-    // 读取试剂信息
-    if (transferAreaBox->hasBottle(0)) {
-        auto *rb = transferAreaBox->bottleAt(0);
-        qDebug() << "槽位0:" << rb->getName() << "剩余:" << rb->getRemaining() << "ml";
-    }
 
     // ==========     初始化TCP用来收取485信息     ==========
     tcpCore = new TcpClientCore(this);
@@ -617,7 +572,7 @@ void MainWindow::testRecipeSend(const QJsonObject& recipePacket)
     m_currentStep.clear();
 
     // 辅助函数：若步骤未勾选则插入跳过命令并返回 false，已勾选则返回 true
-    auto enqueueSkipIfNeeded = [&](const QString& step) -> bool {
+    auto enqueueSkipIfNeeded = [this, &newRecipe](const QString& step) -> bool {
         QCheckBox* cb = getCheckBoxForStep(step);
         if (!cb || !cb->isChecked()) {
             m_skippedSteps.insert(step);
@@ -1223,7 +1178,7 @@ bool MainWindow::saveRecipeToDatabase(const RecipeQueueItem& recipe, bool insert
     qDebug() << "配方已保存到数据库，ID:" << recipeId;
     
     // 3. 插入消息队列
-    QSqlDatabase db = QSqlDatabase::database("app_sqlite_conn");
+    QSqlDatabase db = QSqlDatabase::database(AppSqlDatabase::kConnName);
     if (!db.isOpen()) {
         qWarning() << "数据库未打开，无法插入消息队列";
         return false;

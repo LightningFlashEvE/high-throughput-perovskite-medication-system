@@ -175,19 +175,17 @@ void NetworkSettingsDialog::onDbConnect()
     ).arg(m_dbHost->text(), m_dbPort->text(), m_dbDatabase->text(),
           m_dbUser->text(), m_dbPassword->text());
 
-    QSqlDatabase db = QSqlDatabase::addDatabase("QODBC", "app_sqlite_conn");
+    QSqlDatabase db = QSqlDatabase::addDatabase("QODBC", AppSqlDatabase::kConnName);
     db.setDatabaseName(dsn);
 
     if (!db.open()) {
         QMessageBox::critical(this, "连接失败", db.lastError().text());
-        QSqlDatabase::removeDatabase("app_sqlite_conn");
+        QSqlDatabase::removeDatabase(AppSqlDatabase::kConnName);
         return;
     }
 
     qDebug() << "QODBC 已连接:" << m_dbHost->text() << m_dbPort->text() << m_dbDatabase->text();
     saveDbToIni();
-    QMessageBox::information(this, "连接成功",
-        QString("已连接到 %1:%2/%3").arg(m_dbHost->text(), m_dbPort->text(), m_dbDatabase->text()));
 }
 
 void NetworkSettingsDialog::onDbDisconnect()
@@ -211,8 +209,6 @@ void NetworkSettingsDialog::onTcpCoreConnect()
         true);
     if (ok) {
         saveTcpToIni();
-        QMessageBox::information(this, "tcpCore 连接成功",
-            QString("已连接到 %1:%2").arg(m_tcpCoreRemoteIP->text(), m_tcpCoreRemotePort->text()));
     } else {
         QMessageBox::critical(this, "tcpCore 连接失败",
             QString("无法连接到 %1:%2").arg(m_tcpCoreRemoteIP->text(), m_tcpCoreRemotePort->text()));
@@ -237,8 +233,6 @@ void NetworkSettingsDialog::onTcpBalanceConnect()
         true);
     if (ok) {
         saveTcpToIni();
-        QMessageBox::information(this, "tcpBalanceCore 连接成功",
-            QString("已连接到 %1:%2").arg(m_tcpBalanceRemoteIP->text(), m_tcpBalanceRemotePort->text()));
     } else {
         QMessageBox::critical(this, "tcpBalanceCore 连接失败",
             QString("无法连接到 %1:%2").arg(m_tcpBalanceRemoteIP->text(), m_tcpBalanceRemotePort->text()));

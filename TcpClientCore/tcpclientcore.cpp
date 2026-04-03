@@ -4,6 +4,10 @@
 #include <QRegularExpression>
 #include <QRegularExpressionMatch>
 #include <cmath>
+#ifdef Q_OS_WIN
+#  include <winsock2.h>
+#  include <mstcpip.h>
+#endif
 
 // 静态成员变量初始化
 // 静态变量初始化（使用 g_ 前缀表示全局共享）
@@ -217,18 +221,37 @@ bool TcpClientCore::connectToTcp(const QString& localIP, const QString& remoteIP
     m_reconnectAttempts = 0;  // 重置重连计数
     m_manualDisconnect = false;  // 重置手动断开标志
 
+    // 启用 TCP keepalive，让 OS 在网络层断连时主动上报错误
+    m_tcpSocket->setSocketOption(QAbstractSocket::KeepAliveOption, 1);
+
     // 连接到远程服务器
     qDebug() << "正在连接到" << remoteIP << ":" << remotePort;
     m_tcpSocket->connectToHost(remoteIP, remotePort);
 
     // 等待连接建立（最多3秒）
-    if (m_tcpSocket->waitForConnected(3000)) {
-        qDebug() << "TCP连接成功";
-        return true;
-    } else {
+    if (!m_tcpSocket->waitForConnected(3000)) {
         qWarning() << "TCP连接失败:" << m_tcpSocket->errorString();
         return false;
     }
+
+    // 连接成功后，将 keepalive 间隔缩短到 5s（Windows 平台）
+#ifdef Q_OS_WIN
+    {
+        SOCKET sock = static_cast<SOCKET>(m_tcpSocket->socketDescriptor());
+        if (sock != INVALID_SOCKET) {
+            struct tcp_keepalive ka;
+            ka.onoff             = 1;
+            ka.keepalivetime     = 5000;   // 空闲 5s 开始发探测包
+            ka.keepaliveinterval = 1000;   // 每隔 1s 重发一次
+            DWORD bytesReturned  = 0;
+            WSAIoctl(sock, SIO_KEEPALIVE_VALS, &ka, sizeof(ka),
+                     nullptr, 0, &bytesReturned, nullptr, nullptr);
+        }
+    }
+#endif
+
+    qDebug() << "TCP连接成功";
+    return true;
 }
 
 // 计算CRC16

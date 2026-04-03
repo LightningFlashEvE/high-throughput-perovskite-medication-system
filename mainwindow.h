@@ -39,7 +39,6 @@ class QResizeEvent;
 class QShowEvent;
 class QCloseEvent;
 class RtspPlayer;
-class Box;
 class ReagentBottle;
 class TcpClientCore;
 class AppSqlDatabase;
@@ -99,8 +98,6 @@ private slots:
      */
     void onEmergencyStopButtonClicked();
 
-    void on_pushButton_3_clicked();
-
     void updateRecipeQueuePanel();
 
 protected:
@@ -155,11 +152,6 @@ private:
     int zhuaCol = 4;
     int zhuaRow = 5;
 
-    // 转移区域和试剂管理
-    Box *transferAreaBox = nullptr;          // 转移区左边区域（15槽位）
-    ReagentBottle *reagentA = nullptr;       // A试剂
-    ReagentBottle *reagentB = nullptr;       // B试剂
-    ReagentBottle *reagentC = nullptr;       // C试剂
 
     // TCP客户端核心
     TcpClientCore *tcpCore = nullptr;        // TCP通信核心对象
@@ -173,6 +165,15 @@ private:
     QLabel *m_statusWeightLabel = nullptr;
     // 状态栏：日期时间显示标签（最右侧固定区域）
     QLabel *m_statusDateTimeLabel = nullptr;
+
+    // 状态栏：三个连接状态指示灯（居中显示）
+    QLabel *m_ledMain    = nullptr;  // 主控 TCP
+    QLabel *m_ledBalance = nullptr;  // 天平 TCP
+    QLabel *m_ledDb      = nullptr;  // 数据库
+    QTimer *m_connectionStatusTimer = nullptr;  // 连接状态轮询定时器
+
+    // 更新三个连接状态灯
+    void updateConnectionStatusLeds();
 
     // 配方队列面板子控件
     QLabel *m_recipeCurrentLabel = nullptr;   // 当前执行

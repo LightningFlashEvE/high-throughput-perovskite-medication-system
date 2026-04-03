@@ -28,6 +28,9 @@ public:
     // 执行 SQL 查询，返回 QSqlQuery 对象
     QSqlQuery query(const QString &sql);
 
+    // ODBC 连接名称（供外部共用）
+    static const char* kConnName;
+
 private:
     bool openDatabase();
 };

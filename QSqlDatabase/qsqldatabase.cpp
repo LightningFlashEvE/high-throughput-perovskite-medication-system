@@ -2,16 +2,16 @@
 
 #include <QDebug>
 #include <QWidget>
+#include <QSettings>
 #include <QtSql/QSqlDatabase>
 #include <QtSql/QSqlQuery>
 #include <QtSql/QSqlError>
 #include <QtSql/QSqlRecord>
 #include <QVariant>
 #include <QMessageBox>
+#include <QTimer>
 
-namespace {
-const char* kConnName = "app_sqlite_conn";
-}
+const char* AppSqlDatabase::kConnName = "app_sqlite_conn";
 
 AppSqlDatabase::AppSqlDatabase(QObject *parent)
     : QObject{parent}
@@ -20,7 +20,11 @@ AppSqlDatabase::AppSqlDatabase(QObject *parent)
         const QString errorMsg = QStringLiteral("无法连接 MySQL (ODBC): 192.168.10.170:3306/PhenoLabHT");
         qWarning() << errorMsg;
         if (auto *parentWidget = qobject_cast<QWidget*>(parent)) {
-            QMessageBox::warning(parentWidget, QStringLiteral("数据库连接失败"), errorMsg);
+            // 事件循环未启动时不能直接show QMessageBox，否则会阻塞
+            // 改用 QTimer::singleShot 延迟到事件循环启动后再弹框
+            QTimer::singleShot(0, parentWidget, [parentWidget, errorMsg]() {
+                QMessageBox::warning(parentWidget, QStringLiteral("数据库连接失败"), errorMsg);
+            });
         }
         return;
     }
@@ -59,6 +63,17 @@ QString AppSqlDatabase::normalizeTableName(const QString &name)
 
 bool AppSqlDatabase::openDatabase()
 {
+    // 从 INI 文件读取数据库配置
+    QSettings settings("BoxData.ini", QSettings::IniFormat);
+    settings.beginGroup("Database");
+
+    QString host = settings.value("host", "192.168.10.170").toString();
+    QString port = settings.value("port", "3306").toString();
+    QString database = settings.value("database", "PhenoLabHT").toString();
+    QString user = settings.value("user", "root").toString();
+    QString password = settings.value("password", "Zq17122320_").toString();
+
+    settings.endGroup();
 
     if (QSqlDatabase::contains(kConnName)) {
         QSqlDatabase existingDb = QSqlDatabase::database(kConnName);
@@ -72,10 +87,11 @@ bool AppSqlDatabase::openDatabase()
     QSqlDatabase db = QSqlDatabase::addDatabase("QODBC", kConnName);
     db.setDatabaseName(
         QStringLiteral("DRIVER={MySQL ODBC 9.6 Unicode Driver};"
-                       "SERVER=192.168.10.170;PORT=3306;"
-                       "DATABASE=PhenoLabHT;"
-                       "USER=root;PASSWORD=Zq17122320_;"
+                       "SERVER=%1;PORT=%2;"
+                       "DATABASE=%3;"
+                       "USER=%4;PASSWORD=%5;"
                        "OPTION=3;")
+        .arg(host).arg(port).arg(database).arg(user).arg(password)
     );
 
     if (!db.open()) {
@@ -83,7 +99,7 @@ bool AppSqlDatabase::openDatabase()
         return false;
     }
 
-    qDebug() << "QODBC 已连接: 192.168.10.170:3306/PhenoLabHT";
+    qDebug() << "QODBC 已连接:" << host << ":" << port << "/" << database;
     return true;
 }
 
@@ -91,7 +107,12 @@ bool AppSqlDatabase::isConnected() const
 {
     if (!QSqlDatabase::contains(kConnName))
         return false;
-    return QSqlDatabase::database(kConnName, false).isOpen();
+    QSqlDatabase db = QSqlDatabase::database(kConnName, false);
+    if (!db.isOpen())
+        return false;
+    // isOpen() 不检测网络层断连，用轻量探测确认连接真实可用
+    QSqlQuery q(db);
+    return q.exec("SELECT 1");
 }
 
 QSqlQuery AppSqlDatabase::query(const QString &sql)

@@ -16,11 +16,6 @@
 
 
 
-void MainWindow::on_pushButton_3_clicked()
-{
-    tcpCore->resumeQueue();
-}
-
 
 
 
@@ -84,18 +79,7 @@ bool MainWindow::takeEmptyBottle(const QString& trayName, QQueue<MessageQueueIte
     int emptyBottleAreaTargetX = targetPos.x();
     int emptyBottleAreaTargetY = targetPos.y();
 
-    // // 4. 取走空瓶后将该槽位的 drug_name 清空（不修改 value 字段）
-    // QString updateSlotSql = QString("UPDATE pan_EmptyBottlePosition SET drug_name = '' WHERE slot_index = %1").arg(transferSlotIndex);
-    // QSqlQuery updateSlotQuery = dbm->query(updateSlotSql);
-    // if (updateSlotQuery.lastError().isValid()) {
-    //     qCritical() << "takeEmptyBottle: 清空 pan_EmptyBottlePosition drug_name 失败，触发紧急暂停:" << updateSlotQuery.lastError().text();
-    //     if (ui && ui->pushButton_Stop)
-    //         QMetaObject::invokeMethod(ui->pushButton_Stop, "click", Qt::QueuedConnection);
-    //     return false;
-    // }
-    // updateSlotQuery.finish();  // 关闭 ODBC 语句句柄，避免后续 UPDATE 报"函数序列错误"
-
-    // 5. 把 live_code 表里该二维码占位值（transferDrugName，如 "007"）更新为化学式（equation 参数）
+    // 4. 把 live_code 表里该二维码占位值（transferDrugName，如 "007"）更新为化学式（equation 参数）
     if (!equation.isEmpty()) {
         QString updateLiveCodeSql = QString("UPDATE live_codes SET drug_name = '%1' WHERE drug_name = '%2'")
                                         .arg(equation, transferDrugName);

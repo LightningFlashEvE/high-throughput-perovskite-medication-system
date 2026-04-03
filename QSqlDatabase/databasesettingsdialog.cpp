@@ -100,12 +100,12 @@ void DatabaseSettingsDialog::onConnect()
     ).arg(m_host->text(), m_port->text(), m_database->text(),
           m_user->text(), m_password->text());
 
-    QSqlDatabase db = QSqlDatabase::addDatabase("QODBC", "app_sqlite_conn");
+    QSqlDatabase db = QSqlDatabase::addDatabase("QODBC", AppSqlDatabase::kConnName);
     db.setDatabaseName(dsn);
 
     if (!db.open()) {
         QMessageBox::critical(this, "连接失败", db.lastError().text());
-        QSqlDatabase::removeDatabase("app_sqlite_conn");
+        QSqlDatabase::removeDatabase(AppSqlDatabase::kConnName);
         return;
     }
 
