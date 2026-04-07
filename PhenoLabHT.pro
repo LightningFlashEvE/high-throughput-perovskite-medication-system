@@ -67,6 +67,9 @@ INCLUDEPATH += $$PWD/QSqlDatabase
 include($$PWD/MotorControl/motorcontrol.pri)
 INCLUDEPATH += $$PWD/MotorControl
 
+include($$PWD/PrintDebug/printdebug.pri)
+INCLUDEPATH += $$PWD/PrintDebug
+
 
 RESOURCES += \
     picture.qrc

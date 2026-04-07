@@ -184,6 +184,7 @@ private:
 
     // 流程步骤勾选框（6个步骤）
     QCheckBox *m_processCheckBox_reset = nullptr;
+    QCheckBox *m_processCheckBox_xyzBackToOrigin = nullptr;
     QCheckBox *m_processCheckBox_takeEmptyBottle = nullptr;
     QCheckBox *m_processCheckBox_getSolid = nullptr;
     QCheckBox *m_processCheckBox_resetXYZ = nullptr;

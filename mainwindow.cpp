@@ -27,6 +27,7 @@
 #include "databasesettingsdialog.h"
 #include "networksettingsdialog.h"
 #include "motorcontrol.h"
+#include "printdebug.h"
 #include <QtSql/QSqlQuery>
 #include <QSqlError>
 
@@ -95,6 +96,7 @@ MainWindow::MainWindow(QWidget *parent)
 
     // 绑定流程步骤勾选框
     m_processCheckBox_reset = ui->m_processCheckBox_reset;
+    m_processCheckBox_xyzBackToOrigin = ui->m_processCheckBox_xyzBackToOrigin;
     m_processCheckBox_takeEmptyBottle = ui->m_processCheckBox_takeEmptyBottle;
     m_processCheckBox_getSolid = ui->m_processCheckBox_getSolid;
     m_processCheckBox_resetXYZ = ui->m_processCheckBox_resetXYZ;
@@ -106,6 +108,7 @@ MainWindow::MainWindow(QWidget *parent)
 
     // 连接复选框状态改变信号，保存到ini文件
     connect(m_processCheckBox_reset, &QCheckBox::stateChanged, this, &MainWindow::saveProcessStepsState);
+    connect(m_processCheckBox_xyzBackToOrigin, &QCheckBox::stateChanged, this, &MainWindow::saveProcessStepsState);
     connect(m_processCheckBox_takeEmptyBottle, &QCheckBox::stateChanged, this, &MainWindow::saveProcessStepsState);
     connect(m_processCheckBox_getSolid, &QCheckBox::stateChanged, this, &MainWindow::saveProcessStepsState);
     connect(m_processCheckBox_resetXYZ, &QCheckBox::stateChanged, this, &MainWindow::saveProcessStepsState);
@@ -135,12 +138,8 @@ MainWindow::MainWindow(QWidget *parent)
         ui->menuStatus->addAction(statusAction2);
 
         // 连接菜单项的点击事件
-        connect(statusAction, &QAction::triggered, this, []{
-            qDebug() << "哈哈哈";
-        });
-        connect(statusAction2, &QAction::triggered, this, []{
-            qDebug() << "哈哈哈";
-        });
+        connect(statusAction, &QAction::triggered, this, []{});
+        connect(statusAction2, &QAction::triggered, this, []{});
     }
 
     if (ui->menuSettings) {
@@ -298,6 +297,22 @@ MainWindow::MainWindow(QWidget *parent)
             auto *dlg = new MotorControl(tcpCore, tcpBalanceCore, dbm, this);
             dlg->setAttribute(Qt::WA_DeleteOnClose);
             dlg->show();
+        });
+
+        // 打印调试菜单项
+        QAction *settingsActionPrintDebug = new QAction("打印调试", this);
+        ui->menuSettings->addAction(settingsActionPrintDebug);
+        connect(settingsActionPrintDebug, &QAction::triggered, this, [] {
+            if (!g_debugWindow) {
+                g_debugWindow = new DebugLogWindow(nullptr);
+                g_debugWindow->setAttribute(Qt::WA_DeleteOnClose);
+                QObject::connect(g_debugWindow, &QObject::destroyed, [] {
+                    g_debugWindow = nullptr;
+                });
+            }
+            g_debugWindow->show();
+            g_debugWindow->raise();
+            g_debugWindow->activateWindow();
         });
     }
 
@@ -798,7 +813,7 @@ void MainWindow::checkShakeBedTimeout()
             newRecipeTianPing.processState = RecipeNotProcessed;
 
             // ++++ 2.填充配方内容 ++++
-            qDebug() << QString("摇床位置 %1 的结束时间已到，正在停止摇床...").arg(selfLocation);
+            qWarning() << QString("摇床位置 %1 的结束时间已到，正在停止摇床...").arg(selfLocation);
             // 停止摇床
             controlShakeBed(false, newRecipeTianPing.messageQueue, true);
             // 取到放置区（摇床到成品区）
@@ -1127,6 +1142,8 @@ void MainWindow::saveProcessStepsState()
 
     if (m_processCheckBox_reset)
         settings.setValue("reset", m_processCheckBox_reset->isChecked());
+    if (m_processCheckBox_xyzBackToOrigin)
+        settings.setValue("xyzBackToOrigin", m_processCheckBox_xyzBackToOrigin->isChecked());
     if (m_processCheckBox_takeEmptyBottle)
         settings.setValue("takeEmptyBottle", m_processCheckBox_takeEmptyBottle->isChecked());
     if (m_processCheckBox_getSolid)
@@ -1150,6 +1167,8 @@ void MainWindow::loadProcessStepsState()
 
     if (m_processCheckBox_reset)
         m_processCheckBox_reset->setChecked(settings.value("reset", true).toBool());
+    if (m_processCheckBox_xyzBackToOrigin)
+        m_processCheckBox_xyzBackToOrigin->setChecked(settings.value("xyzBackToOrigin", true).toBool());
     if (m_processCheckBox_takeEmptyBottle)
         m_processCheckBox_takeEmptyBottle->setChecked(settings.value("takeEmptyBottle", true).toBool());
     if (m_processCheckBox_getSolid)
@@ -1170,6 +1189,7 @@ void MainWindow::resetProcessStateDisplay()
     m_skippedSteps.clear();
     const QString grayStyle = "color: gray;";
     if (m_processCheckBox_reset)           m_processCheckBox_reset->setStyleSheet(grayStyle);
+    if (m_processCheckBox_xyzBackToOrigin)  m_processCheckBox_xyzBackToOrigin->setStyleSheet(grayStyle);
     if (m_processCheckBox_takeEmptyBottle) m_processCheckBox_takeEmptyBottle->setStyleSheet(grayStyle);
     if (m_processCheckBox_getSolid)        m_processCheckBox_getSolid->setStyleSheet(grayStyle);
     if (m_processCheckBox_resetXYZ)        m_processCheckBox_resetXYZ->setStyleSheet(grayStyle);
@@ -1182,9 +1202,10 @@ void MainWindow::updateProcessStateDisplay(const QString& stateName)
     // 状态名称 -> 对应的 QCheckBox 指针
     QMap<QString, QCheckBox*> checkBoxMap = {
         {"reset",           m_processCheckBox_reset},
+        {"xyzBackToOrigin", m_processCheckBox_xyzBackToOrigin},
+        {"xyzBackToOrigin", m_processCheckBox_resetXYZ},
         {"takeEmptyBottle", m_processCheckBox_takeEmptyBottle},
         {"getSolid",        m_processCheckBox_getSolid},
-        {"resetXYZ",        m_processCheckBox_resetXYZ},
         {"getLiquid",       m_processCheckBox_getLiquid},
         {"capBottleAndTransferToShaker",   m_processCheckBox_tightenBottle}
     };

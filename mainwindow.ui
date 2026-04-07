@@ -80,6 +80,22 @@
                     </widget>
                    </item>
                    <item>
+                    <widget class="QCheckBox" name="m_processCheckBox_xyzBackToOrigin">
+                     <property name="font">
+                      <font>
+                       <pointsize>9</pointsize>
+                       <bold>false</bold>
+                      </font>
+                     </property>
+                     <property name="text">
+                      <string>1. xyz回到原点</string>
+                     </property>
+                     <property name="checked">
+                      <bool>true</bool>
+                     </property>
+                    </widget>
+                   </item>
+                   <item>
                     <widget class="QCheckBox" name="m_processCheckBox_takeEmptyBottle">
                      <property name="font">
                       <font>
@@ -88,7 +104,7 @@
                       </font>
                      </property>
                      <property name="text">
-                      <string>1. 打开空瓶</string>
+                      <string>2. 打开空瓶</string>
                      </property>
                      <property name="checked">
                       <bool>true</bool>
@@ -104,7 +120,7 @@
                       </font>
                      </property>
                      <property name="text">
-                      <string>2. 取出固体</string>
+                      <string>3. 取出固体</string>
                      </property>
                      <property name="checked">
                       <bool>true</bool>
@@ -120,7 +136,7 @@
                       </font>
                      </property>
                      <property name="text">
-                      <string>3. XYZ复位</string>
+                      <string>4. xyz回到原点</string>
                      </property>
                      <property name="checked">
                       <bool>true</bool>
@@ -136,7 +152,7 @@
                       </font>
                      </property>
                      <property name="text">
-                      <string>4. 取液体</string>
+                      <string>5. 取液体</string>
                      </property>
                      <property name="checked">
                       <bool>true</bool>
@@ -152,7 +168,7 @@
                       </font>
                      </property>
                      <property name="text">
-                      <string>5. 拧好瓶子去摇床</string>
+                      <string>6. 拧好瓶子去摇床</string>
                      </property>
                      <property name="checked">
                       <bool>true</bool>

@@ -148,6 +148,7 @@ void MainWindow::initializeSystemComponents()
         });
     };
 
+    setupContextMenu(m_processCheckBox_xyzBackToOrigin, "xyzBackToOrigin");
     setupContextMenu(m_processCheckBox_takeEmptyBottle, "takeEmptyBottle");
     setupContextMenu(m_processCheckBox_getSolid, "getSolid");
     setupContextMenu(m_processCheckBox_resetXYZ, "resetXYZ");
@@ -599,6 +600,11 @@ void MainWindow::testRecipeSend(const QJsonObject& recipePacket)
 
     // reset
     if (enqueueSkipIfNeeded("reset")) {
+        initializeAllDevices(newRecipe.messageQueue);
+    }
+
+    // xyz回到原点
+    if (enqueueSkipIfNeeded("xyzBackToOrigin")) {  
         resetXYZMotorsToZero(newRecipe.messageQueue);
     }
 
@@ -622,8 +628,8 @@ void MainWindow::testRecipeSend(const QJsonObject& recipePacket)
         }
     }
 
-    // resetXYZ
-    if (enqueueSkipIfNeeded("resetXYZ")) {
+    // xyz回到原点
+    if (enqueueSkipIfNeeded("xyzBackToOrigin")) {
         resetXYZMotorsToZero(newRecipe.messageQueue);
     }
 
@@ -909,8 +915,8 @@ void MainWindow::shakeBed(int parameter)
  */
 void MainWindow::resetXYZMotorsToZero(QQueue<MessageQueueItem>& messageQueue)
 {
-    // ★ 插入状态标记：XYZ复位
-    messageQueue.enqueue(MessageQueueItem("AAstateChange:resetXYZ", true));
+    // ★ 插入状态标记：xyz回到原点
+    messageQueue.enqueue(MessageQueueItem("AAstateChange:xyzBackToOrigin", false));
 
     // 复位时停止天平打印
     if (tcpBalanceCore) {

@@ -205,8 +205,12 @@ bool TcpClientCore::connectToTcp(const QString& localIP, const QString& remoteIP
     if (!localIP.isEmpty()) {
         QHostAddress localAddress(localIP);
         if (!localAddress.isNull()) {
-            m_tcpSocket->bind(localAddress);
-            qDebug() << "绑定本地地址:" << localIP;
+            const bool bindOk = m_tcpSocket->bind(localAddress);
+            qDebug() << "绑定本地地址:" << localIP
+                     << (bindOk ? QStringLiteral("成功") : QStringLiteral("失败"))
+                     << (bindOk ? QString() : m_tcpSocket->errorString());
+        } else {
+            qWarning() << "本地IP地址无效:" << localIP;
         }
     }
 
@@ -311,7 +315,7 @@ void TcpClientCore::setExpectedWeight(double weight)
         weight = 0.0003;
     }
 
-    qDebug() << "设置期望重量值顶顶顶顶顶顶顶顶顶顶顶顶顶顶顶顶顶顶顶顶:" << weight << "mg";
+    qDebug() << "设置期望重量值:" << weight << "mg";
     g_expectedWeight = weight;
 
     // 清空阈值和触发标记
@@ -1737,7 +1741,7 @@ void TcpClientCore::onResponseTimeout()
         if (isMotorWait) {
             qDebug() << "电机轮询第" << m_retryCount << "/" << maxRetries << "次，命令:" << QString::fromUtf8(m_currentCommand);
         } else {
-            qDebug() << "⚠ 响应超时，第" << m_retryCount << "次重试，命令:" << QString::fromUtf8(m_currentCommand);
+            qWarning() << "⚠ 响应超时，第" << m_retryCount << "次重试，命令:" << QString::fromUtf8(m_currentCommand);
         }
         // 重新发送命令
         sendMessageInternal(m_currentCommand, m_currentCommandAsciiMode, true);

@@ -37,7 +37,8 @@
       "Bash(python -c \"import xml.etree.ElementTree as ET; ET.parse\\('MotorControl/motorcontrol.ui'\\); print\\('XML valid'\\)\")",
       "Bash(cd /d \"D:\\\\application\\\\high-throughput-perovskite-medication-system\")",
       "Bash(qmake --version)",
-      "Bash(xargs grep:*)"
+      "Bash(xargs grep:*)",
+      "Bash(find D:\\\\application\\\\high-throughput-perovskite-medication-system:*)"
     ]
   }
 }
