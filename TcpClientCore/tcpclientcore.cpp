@@ -801,7 +801,30 @@ void TcpClientCore::onReadyRead()
 
     QByteArray data = m_tcpSocket->readAll();
 
-    qDebug() << "<<<<<<<<收到数据:" << QString::fromUtf8(data) << " " << QString(data.toHex().toUpper()) << " 期望：" << m_expectedResponse;
+    // 构造时间戳 HH:mm:ss.zzz
+    QTime now = QTime::currentTime();
+    QString timestamp = now.toString("HH:mm:ss.zzz");
+
+    // 构造hex格式: "3E 30 39 ..." (空格分隔的hex)
+    QStringList hexList;
+    for (unsigned char c : data) {
+        hexList.append(QString("%1").arg(c, 2, 16, QChar('0')).toUpper());
+    }
+    QString hexStr = hexList.join(" ");
+
+    // 0B和05只显示hex，其他显示ASCII
+    QString cmdStr = QString::fromUtf8(m_currentCommand);
+    bool isHexOnly = cmdStr.contains("0B", Qt::CaseInsensitive) || cmdStr.contains("05", Qt::CaseInsensitive);
+    if (isHexOnly) {
+        qDebug("RECV[%s]     hex: %s 期望：%s",
+               qPrintable(timestamp), qPrintable(hexStr),
+               qPrintable(m_expectedResponse));
+    } else {
+        qDebug("RECV[%s]   ASCII: %s 期望：%s",
+               qPrintable(timestamp),
+               qPrintable(QString::fromUtf8(data).trimmed()),
+               qPrintable(m_expectedResponse));
+    }
 
     // 如果正在等待响应，检查是否匹配期望值
     if (m_isWaitingForResponse && !m_expectedResponse.isEmpty()) {
@@ -1629,7 +1652,19 @@ void TcpClientCore::processMessageQueue()
                      ? true
                      : needsWaitForResponse(item.content, item.asciiOrHex);
 
-    qDebug() << "当前发送的命令是:" << QString::fromUtf8(item.content) << "，期待回复:" << (needsWait ? item.expectedSignature : "无需等待");
+    {
+        QString sendCmdStr = QString::fromUtf8(item.content);
+        bool sendHexOnly = sendCmdStr.contains("0B", Qt::CaseInsensitive) || sendCmdStr.contains("05", Qt::CaseInsensitive);
+        QString sendReplyStr = needsWait ? item.expectedSignature : "无需等待";
+        if (sendHexOnly || !item.asciiOrHex) {
+            QStringList hexList;
+            for (unsigned char c : item.content)
+                hexList.append(QString("%1").arg(c, 2, 16, QChar('0')).toUpper());
+            qDebug("SEND hex: %s 期望：%s", qPrintable(hexList.join(" ")), qPrintable(sendReplyStr));
+        } else {
+            qDebug("SEND ASCII: %s 期望：%s", qPrintable(sendCmdStr.trimmed()), qPrintable(sendReplyStr));
+        }
+    }
 
 
     // 计算距离上次发送的时间间隔（强制所有命令都必须间隔至少 MIN_SEND_INTERVAL）
@@ -1741,7 +1776,28 @@ void TcpClientCore::onResponseTimeout()
         if (isMotorWait) {
             qDebug() << "电机轮询第" << m_retryCount << "/" << maxRetries << "次，命令:" << QString::fromUtf8(m_currentCommand);
         } else {
-            qWarning() << "⚠ 响应超时，第" << m_retryCount << "次重试，命令:" << QString::fromUtf8(m_currentCommand);
+            QString cmdStr = QString::fromUtf8(m_currentCommand);
+            bool isHexCmd = !m_currentCommandAsciiMode
+                            || cmdStr.contains("0B", Qt::CaseInsensitive)
+                            || cmdStr.contains("05", Qt::CaseInsensitive);
+            QString ts = QTime::currentTime().toString("HH:mm:ss.zzz");
+            if (isHexCmd) {
+                QStringList hexList;
+                QByteArray cmdBytes = QByteArray::fromHex(m_currentCommand);
+                for (unsigned char c : cmdBytes)
+                    hexList.append(QString("%1").arg(c, 2, 16, QChar('0')).toUpper());
+                qWarning("SEND[%s]     hex: %s 期望：%s        --⚠ 响应超时，第 %d 次重试",
+                         qPrintable(ts),
+                         qPrintable(hexList.join(" ")),
+                         qPrintable(m_expectedResponse),
+                         m_retryCount);
+            } else {
+                qWarning("SEND[%s]   ASCII: %s 期望：%s        --⚠ 响应超时，第 %d 次重试",
+                         qPrintable(ts),
+                         qPrintable(cmdStr.trimmed()),
+                         qPrintable(m_expectedResponse),
+                         m_retryCount);
+            }
         }
         // 重新发送命令
         sendMessageInternal(m_currentCommand, m_currentCommandAsciiMode, true);

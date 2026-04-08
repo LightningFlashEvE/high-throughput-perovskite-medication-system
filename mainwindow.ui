@@ -47,7 +47,7 @@
          <widget class="QWidget" name="widget_m" native="true">
           <layout class="QVBoxLayout" name="verticalLayout_2">
            <item>
-            <layout class="QVBoxLayout" name="verticalLayout" stretch="1,5">
+            <layout class="QVBoxLayout" name="verticalLayout" stretch="1,3">
              <item>
               <widget class="QWidget" name="widget" native="true">
                <layout class="QVBoxLayout" name="verticalLayout_widget">
