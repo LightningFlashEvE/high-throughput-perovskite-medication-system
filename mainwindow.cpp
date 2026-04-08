@@ -616,9 +616,9 @@ void MainWindow::updateTime()
     }
     updateRecipeQueuePanel();
 
-    // 每5秒刷新一次四盘看板
+    // 每2秒刷新一次四盘看板
     ++m_dashboardRefreshTick;
-    if (m_dashboardRefreshTick >= 5) {
+    if (m_dashboardRefreshTick >= 2) {
         m_dashboardRefreshTick = 0;
         renderDashboardScene();
     }
