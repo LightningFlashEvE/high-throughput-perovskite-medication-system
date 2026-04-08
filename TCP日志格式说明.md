@@ -130,3 +130,45 @@
 5. `期望` 字段来源：
    - 首次 SEND → `item.expectedSignature`
    - 超时重试 SEND / RECV → `m_expectedResponse`
+
+---
+
+## 七、轮询 vs 超时 判断规则（260408更新）
+
+> 判断变量：`isMotorWait` / `isPolling`，位于 `onReadyRead`、`processMessageQueue`、`onResponseTimeout` 三处，逻辑相同。
+
+### 7-1. 走轮询分支的条件（满足其一即可）
+
+| 条件 | 匹配示例 | 说明 |
+|------|----------|------|
+| `m_expectedResponse.contains('d')` | `08d01`、`06D01` | ASCII协议电机到位查询（小写d命令） |
+| `m_expectedResponse.contains('g')` | `08g01`、`0Ag01` | ASCII协议电机状态查询（g命令） |
+| `m_expectedResponse.startsWith("0B0302")` | `0B03020001` | 0B号电爪初始化状态查询（Modbus） |
+| `m_expectedResponse.startsWith("050302")` | `0503020001` | 05号电爪初始化状态查询（Modbus） |
+
+**轮询行为：**
+- 定时器间隔：`MOTOR_RESPONSE_TIMEOUT = 50ms`
+- 最大次数：`MOTOR_MAX_RETRIES = 400次 × MOTOR_MAX_ROUNDS = 3轮`
+- 收到非期望值（如 `09` 初始化中、`00` 运行中）→ **静默**，50ms 后重发
+- RECV 日志末尾附加：`--电机轮询第 N / 400 次，命令: "xxx"`
+- 超过上限才触发紧急停止
+
+### 7-2. 走超时重试分支的条件
+
+不满足上述任何一条的命令均走超时分支。
+
+**超时行为：**
+- 定时器间隔：`RESPONSE_TIMEOUT = 90ms`
+- 最大次数：`MAX_RETRIES = 300次`
+- 每次未收到匹配响应 → 打印 `⚠ 响应超时，第 N 次重试` 警告
+- 超过 300 次触发紧急停止
+
+### 7-3. 已知设备归类
+
+| 设备号 | 期望值示例 | 分支 |
+|--------|-----------|------|
+| 01~09 ASCII电机 | `06d01`、`08g01` | 轮询 |
+| 0B（电爪，Modbus） | `0B03020001` | 轮询 |
+| 05（电爪，Modbus） | `0503020001` | 轮询 |
+| 09、0A（摇床等） | `09D01`、`0CD` | 超时重试 |
+| 其他普通命令 | 各类ASCII响应 | 超时重试 |

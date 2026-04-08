@@ -812,18 +812,22 @@ void TcpClientCore::onReadyRead()
     }
     QString hexStr = hexList.join(" ");
 
-    // 0B和05只显示hex，其他显示ASCII
+    // 0B和05只显示hex，其他显示ASCII；轮询命令附加轮询计数
     QString cmdStr = QString::fromUtf8(m_currentCommand);
     bool isHexOnly = cmdStr.contains("0B", Qt::CaseInsensitive) || cmdStr.contains("05", Qt::CaseInsensitive);
+    bool isPolling = m_expectedResponse.contains('d')
+                     || m_expectedResponse.contains('g')
+                     || m_expectedResponse.startsWith("0B0302", Qt::CaseInsensitive)
+                     || m_expectedResponse.startsWith("050302", Qt::CaseInsensitive);
+    QString pollSuffix = isPolling
+        ? QString("    --电机轮询第 %1 / 400 次，命令: \"%2\"").arg(m_retryCount + 1).arg(cmdStr.trimmed())
+        : QString();
     if (isHexOnly) {
-        qDebug("RECV[%s]     hex: %s 期望：%s",
-               qPrintable(timestamp), qPrintable(hexStr),
-               qPrintable(m_expectedResponse));
+        qDebug().noquote() << QString("RECV[%1]     hex: %2 期望：%3%4")
+            .arg(timestamp, hexStr, m_expectedResponse, pollSuffix);
     } else {
-        qDebug("RECV[%s]   ASCII: %s 期望：%s",
-               qPrintable(timestamp),
-               qPrintable(QString::fromUtf8(data).trimmed()),
-               qPrintable(m_expectedResponse));
+        qDebug().noquote() << QString("RECV[%1]   ASCII: %2 期望：%3%4")
+            .arg(timestamp, QString::fromUtf8(data).trimmed(), m_expectedResponse, pollSuffix);
     }
 
     // 如果正在等待响应，检查是否匹配期望值
@@ -837,7 +841,7 @@ void TcpClientCore::onReadyRead()
         }
 
         if (conditionMet) {
-            qDebug() << "✓ 响应匹配成功:" << m_expectedResponse;
+            qDebug() << "✓ 响应匹配成功:" << m_expectedResponse << "\n";
             // 停止超时定时器
             m_responseTimeoutTimer->stop();
             m_retryCount = 0;
@@ -1692,8 +1696,11 @@ void TcpClientCore::processMessageQueue()
             sendMessageInternal(item.content, item.asciiOrHex, needsWait);
             m_lastSendTime.restart();
 
-            // 启动超时定时器：等电机到位（期望值含小写'd'）用长超时，其他用默认超时
-            bool isMotorWait = m_expectedResponse.contains('d');
+            // 启动超时定时器：轮询类命令（d/g电机、0B电爪初始化）用短间隔静默轮询，其他用默认超时
+            bool isMotorWait = m_expectedResponse.contains('d')
+                               || m_expectedResponse.contains('g')
+                               || m_expectedResponse.startsWith("0B0302", Qt::CaseInsensitive)
+                     || m_expectedResponse.startsWith("050302", Qt::CaseInsensitive);
             int timeout = isMotorWait ? MOTOR_RESPONSE_TIMEOUT : RESPONSE_TIMEOUT;
             m_responseTimeoutTimer->start(timeout);
             qDebug() << "等待响应，期望:" << m_expectedResponse << "，超时:" << timeout << "ms";
@@ -1768,14 +1775,15 @@ void TcpClientCore::onResponseTimeout()
 {
     if (!m_isWaitingForResponse) return;
 
-    bool isMotorWait = m_expectedResponse.contains('d');
+    bool isMotorWait = m_expectedResponse.contains('d')
+                       || m_expectedResponse.contains('g')
+                       || m_expectedResponse.startsWith("0B0302", Qt::CaseInsensitive)
+                     || m_expectedResponse.startsWith("050302", Qt::CaseInsensitive);
     int maxRetries = isMotorWait ? MOTOR_MAX_RETRIES : MAX_RETRIES;
 
     m_retryCount++;
     if (m_retryCount <= maxRetries) {
-        if (isMotorWait) {
-            qDebug() << "电机轮询第" << m_retryCount << "/" << maxRetries << "次，命令:" << QString::fromUtf8(m_currentCommand);
-        } else {
+        if (!isMotorWait) {
             QString cmdStr = QString::fromUtf8(m_currentCommand);
             bool isHexCmd = !m_currentCommandAsciiMode
                             || cmdStr.contains("0B", Qt::CaseInsensitive)
