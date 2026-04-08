@@ -812,11 +812,10 @@ void TcpClientCore::onReadyRead()
     }
     QString hexStr = hexList.join(" ");
 
-    // 0B和05只显示hex，其他显示ASCII；轮询命令附加轮询计数
+    // 协议类型由 m_currentCommandAsciiMode 决定；轮询命令附加轮询计数
     QString cmdStr = QString::fromUtf8(m_currentCommand);
-    bool isHexOnly = cmdStr.contains("0B", Qt::CaseInsensitive) || cmdStr.contains("05", Qt::CaseInsensitive);
-    bool isPolling = m_expectedResponse.contains('d')
-                     || m_expectedResponse.contains('g')
+    bool isHexOnly = !m_currentCommandAsciiMode;
+    bool isPolling = m_expectedResponse.contains(QRegularExpression("^[0-9A-Fa-f]{2}[dg]"))
                      || m_expectedResponse.startsWith("0B0302", Qt::CaseInsensitive)
                      || m_expectedResponse.startsWith("050302", Qt::CaseInsensitive);
     QString pollSuffix = isPolling
@@ -1657,16 +1656,14 @@ void TcpClientCore::processMessageQueue()
                      : needsWaitForResponse(item.content, item.asciiOrHex);
 
     {
-        QString sendCmdStr = QString::fromUtf8(item.content);
-        bool sendHexOnly = sendCmdStr.contains("0B", Qt::CaseInsensitive) || sendCmdStr.contains("05", Qt::CaseInsensitive);
         QString sendReplyStr = needsWait ? item.expectedSignature : "无需等待";
-        if (sendHexOnly || !item.asciiOrHex) {
+        if (!item.asciiOrHex) {
             QStringList hexList;
             for (unsigned char c : item.content)
                 hexList.append(QString("%1").arg(c, 2, 16, QChar('0')).toUpper());
-            qDebug("SEND hex: %s 期望：%s", qPrintable(hexList.join(" ")), qPrintable(sendReplyStr));
+            qDebug().noquote() << QString("SEND hex: %1 期望：%2").arg(hexList.join(" "), sendReplyStr);
         } else {
-            qDebug("SEND ASCII: %s 期望：%s", qPrintable(sendCmdStr.trimmed()), qPrintable(sendReplyStr));
+            qDebug().noquote() << QString("SEND ASCII: %1 期望：%2").arg(QString::fromUtf8(item.content).trimmed(), sendReplyStr);
         }
     }
 
@@ -1697,10 +1694,9 @@ void TcpClientCore::processMessageQueue()
             m_lastSendTime.restart();
 
             // 启动超时定时器：轮询类命令（d/g电机、0B电爪初始化）用短间隔静默轮询，其他用默认超时
-            bool isMotorWait = m_expectedResponse.contains('d')
-                               || m_expectedResponse.contains('g')
+            bool isMotorWait = m_expectedResponse.contains(QRegularExpression("^[0-9A-Fa-f]{2}[dg]"))
                                || m_expectedResponse.startsWith("0B0302", Qt::CaseInsensitive)
-                     || m_expectedResponse.startsWith("050302", Qt::CaseInsensitive);
+                               || m_expectedResponse.startsWith("050302", Qt::CaseInsensitive);
             int timeout = isMotorWait ? MOTOR_RESPONSE_TIMEOUT : RESPONSE_TIMEOUT;
             m_responseTimeoutTimer->start(timeout);
             qDebug() << "等待响应，期望:" << m_expectedResponse << "，超时:" << timeout << "ms";
@@ -1775,36 +1771,27 @@ void TcpClientCore::onResponseTimeout()
 {
     if (!m_isWaitingForResponse) return;
 
-    bool isMotorWait = m_expectedResponse.contains('d')
-                       || m_expectedResponse.contains('g')
+    bool isMotorWait = m_expectedResponse.contains(QRegularExpression("^[0-9A-Fa-f]{2}[dg]"))
                        || m_expectedResponse.startsWith("0B0302", Qt::CaseInsensitive)
-                     || m_expectedResponse.startsWith("050302", Qt::CaseInsensitive);
+                       || m_expectedResponse.startsWith("050302", Qt::CaseInsensitive);
     int maxRetries = isMotorWait ? MOTOR_MAX_RETRIES : MAX_RETRIES;
 
     m_retryCount++;
     if (m_retryCount <= maxRetries) {
         if (!isMotorWait) {
             QString cmdStr = QString::fromUtf8(m_currentCommand);
-            bool isHexCmd = !m_currentCommandAsciiMode
-                            || cmdStr.contains("0B", Qt::CaseInsensitive)
-                            || cmdStr.contains("05", Qt::CaseInsensitive);
+            bool isHexCmd = !m_currentCommandAsciiMode;
             QString ts = QTime::currentTime().toString("HH:mm:ss.zzz");
             if (isHexCmd) {
                 QStringList hexList;
                 QByteArray cmdBytes = QByteArray::fromHex(m_currentCommand);
                 for (unsigned char c : cmdBytes)
                     hexList.append(QString("%1").arg(c, 2, 16, QChar('0')).toUpper());
-                qWarning("SEND[%s]     hex: %s 期望：%s        --⚠ 响应超时，第 %d 次重试",
-                         qPrintable(ts),
-                         qPrintable(hexList.join(" ")),
-                         qPrintable(m_expectedResponse),
-                         m_retryCount);
+                qWarning().noquote() << QString("SEND[%1]     hex: %2 期望：%3        --⚠ 响应超时，第 %4 次重试")
+                    .arg(ts, hexList.join(" "), m_expectedResponse, QString::number(m_retryCount));
             } else {
-                qWarning("SEND[%s]   ASCII: %s 期望：%s        --⚠ 响应超时，第 %d 次重试",
-                         qPrintable(ts),
-                         qPrintable(cmdStr.trimmed()),
-                         qPrintable(m_expectedResponse),
-                         m_retryCount);
+                qWarning().noquote() << QString("SEND[%1]   ASCII: %2 期望：%3        --⚠ 响应超时，第 %4 次重试")
+                    .arg(ts, cmdStr.trimmed(), m_expectedResponse, QString::number(m_retryCount));
             }
         }
         // 重新发送命令
