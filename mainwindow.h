@@ -5,7 +5,9 @@
 #include <QVector>
 #include <QPointF>
 #include <QQueue>
-#include "chessboardview.h"
+#include <QGraphicsScene>
+#include <QGraphicsRectItem>
+#include <QGraphicsTextItem>
 #include "settingsbutton.h"
 #include "tcpclient.h"
 #include "recipeanalyzer.h"
@@ -136,8 +138,9 @@ private:
      */
     void cleanupResources();
 
-    // 棋盘封装类
-    ChessBoardView *chessBoard = nullptr;
+    // 四盘看板场景
+    QGraphicsScene *m_dashboardScene = nullptr;
+    int m_dashboardRefreshTick = 0;  // 每秒计数，每5秒刷新一次
     // TcpFramedClient 已移除
 
     // 设置面板（非模态，可频繁打开关闭）
@@ -330,11 +333,10 @@ private:
     void resetXYZMotorsToZero(QQueue<MessageQueueItem>& messageQueue);
 
 public:
-    /**
-     * 将指定索引的棋子移动到网格坐标 (col, row) 的中心
-     * 该方法会转发给 `ChessBoardView`
-     */
-    void moveChessPiece(int pieceIndex, int col, int row);
+    /** 初始化四盘看板（创建 QGraphicsScene 并挂入 graphicsView） */
+    void initDashboardScene();
+    /** 刷新四盘看板（查询数据库并更新格子文字） */
+    void renderDashboardScene();
 
     /**
      * 计算槽位坐标

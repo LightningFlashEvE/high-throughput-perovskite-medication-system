@@ -78,17 +78,11 @@ MainWindow::MainWindow(QWidget *parent)
     connect(shakeBedEmptyCheckTimer, &QTimer::timeout, this, &MainWindow::onShakeBedEmptyCheckTimeout);
     // 定时器间隔将在 start() 时设置
 
-    /*** 初始化棋盘视图与棋子（封装为 ChessBoardView） ***/
+    /*** 初始化四盘数据库看板 ***/
     if (ui->graphicsView) {
         ui->graphicsView->setMinimumSize(650, 440);
-        // 让 QGraphicsView 背景跟随全局主题（明/暗）
-        ui->graphicsView->setBackgroundBrush(palette().window());
-        if (ui->graphicsView->viewport()) {
-            ui->graphicsView->viewport()->setAutoFillBackground(false);
-        }
     }
-    chessBoard = new ChessBoardView(this);
-    chessBoard->init(ui->graphicsView);
+    initDashboardScene();
 
     /*** 绑定 widget_m 配方队列面板子控件 ***/
     m_recipeCurrentLabel = ui->m_recipeCurrentLabel;
@@ -156,73 +150,28 @@ MainWindow::MainWindow(QWidget *parent)
                 // 方向按键信号 -> 移动 zhua
                 const int step = 1; // 每次移动一个网格
                 connect(settingsPanel, &SettingsButton::moveUpClicked, this, [this] {
-                    int maxRow = chessBoard ? chessBoard->gridMaxRow() : 99;
-                    //int maxCol = chessBoard ? chessBoard->gridMaxCol() : 99;
-                    zhuaRow = std::clamp(zhuaRow - step, 0, maxRow);
-                    moveChessPiece(0, zhuaCol, zhuaRow);
+                    zhuaRow = std::clamp(zhuaRow - step, 0, 99);
                     settingsPanel->setLocation(zhuaCol, zhuaRow);
                 });
                 connect(settingsPanel, &SettingsButton::moveDownClicked, this, [this] {
-                    int maxRow = chessBoard ? chessBoard->gridMaxRow() : 99;
-                    zhuaRow = std::clamp(zhuaRow + step, 0, maxRow);
-                    moveChessPiece(0, zhuaCol, zhuaRow);
+                    zhuaRow = std::clamp(zhuaRow + step, 0, 99);
                     settingsPanel->setLocation(zhuaCol, zhuaRow);
                 });
                 connect(settingsPanel, &SettingsButton::moveLeftClicked, this, [this] {
-                    int maxCol = chessBoard ? chessBoard->gridMaxCol() : 99;
-                    zhuaCol = std::clamp(zhuaCol - step, 0, maxCol);
-                    moveChessPiece(0, zhuaCol, zhuaRow);
+                    zhuaCol = std::clamp(zhuaCol - step, 0, 99);
                     settingsPanel->setLocation(zhuaCol, zhuaRow);
                 });
                 connect(settingsPanel, &SettingsButton::moveRightClicked, this, [this] {
-                    int maxCol = chessBoard ? chessBoard->gridMaxCol() : 99;
-                    zhuaCol = std::clamp(zhuaCol + step, 0, maxCol);
-                    moveChessPiece(0, zhuaCol, zhuaRow);
+                    zhuaCol = std::clamp(zhuaCol + step, 0, 99);
                     settingsPanel->setLocation(zhuaCol, zhuaRow);
                 });
 
-                // 坐标文本框提交后，移动至指定网格
+                // 坐标文本框提交后同步显示
                 connect(settingsPanel, &SettingsButton::positionEdited, this, [this](int col, int row){
-                    int maxCol = chessBoard ? chessBoard->gridMaxCol() : 199;
-                    int maxRow = chessBoard ? chessBoard->gridMaxRow() : 199;
-                    zhuaCol = std::clamp(col, 0, maxCol);
-                    zhuaRow = std::clamp(row, 0, maxRow);
-                    moveChessPiece(0, zhuaCol, zhuaRow);
+                    zhuaCol = std::clamp(col, 0, 199);
+                    zhuaRow = std::clamp(row, 0, 199);
                     if (settingsPanel) settingsPanel->setLocation(zhuaCol, zhuaRow);
                 });
-
-                /******  试管状态机  up ******/
-                // 步骤4：UI按钮 -> 触发状态切换
-                // 1) 用户点击设置页按钮（Empty/Full/Using/Error/Disable）
-                // 2) 这里监听到点击后，调用 chessBoard->setTubeState(...)
-                // 3) setTubeState 内部修改状态并调用 applyTubeStyle 套用样式，圆形外观立即变化
-                // 将按钮作用于棋盘上(50,50)的试管状态
-                if (settingsPanel->findChild<QPushButton*>("pushButtonUsing")) {
-                    connect(settingsPanel->findChild<QPushButton*>("pushButtonUsing"), &QPushButton::clicked, this, [this]{
-                        if (chessBoard) chessBoard->setTubeState(ChessBoardView::TubeState::Using);
-                    });
-                }
-                if (settingsPanel->findChild<QPushButton*>("pushButtonFull")) {
-                    connect(settingsPanel->findChild<QPushButton*>("pushButtonFull"), &QPushButton::clicked, this, [this]{
-                        if (chessBoard) chessBoard->setTubeState(ChessBoardView::TubeState::Full);
-                    });
-                }
-                if (settingsPanel->findChild<QPushButton*>("pushButtonError")) {
-                    connect(settingsPanel->findChild<QPushButton*>("pushButtonError"), &QPushButton::clicked, this, [this]{
-                        if (chessBoard) chessBoard->setTubeState(ChessBoardView::TubeState::Error);
-                    });
-                }
-                if (settingsPanel->findChild<QPushButton*>("pushButtonDisable")) {
-                    connect(settingsPanel->findChild<QPushButton*>("pushButtonDisable"), &QPushButton::clicked, this, [this]{
-                        if (chessBoard) chessBoard->setTubeState(ChessBoardView::TubeState::Disabled);
-                    });
-                }
-                if (settingsPanel->findChild<QPushButton*>("pushButtonEmpty")) {
-                    connect(settingsPanel->findChild<QPushButton*>("pushButtonEmpty"), &QPushButton::clicked, this, [this]{
-                        if (chessBoard) chessBoard->setTubeState(ChessBoardView::TubeState::Empty);
-                    });
-                }
-                /******  试管状态机  down ******/
             }
             settingsPanel->show();
             settingsPanel->raise();
@@ -595,11 +544,6 @@ void MainWindow::cleanupResources()
         QApplication::processEvents(QEventLoop::ExcludeUserInputEvents, 50);
     }
     
-    // 清理棋盘（是 this 的子对象，会自动清理）
-    if (chessBoard) {
-        chessBoard = nullptr; // 是 this 的子对象，会在析构时自动删除
-    }
-    
     // 最后处理一次事件，确保所有删除操作完成
     QApplication::processEvents(QEventLoop::ExcludeUserInputEvents, 100);
     
@@ -671,6 +615,148 @@ void MainWindow::updateTime()
             currentDateTime.toString("yyyy.M.d") + "  " + currentDateTime.toString("hh:mm:ss"));
     }
     updateRecipeQueuePanel();
+
+    // 每5秒刷新一次四盘看板
+    ++m_dashboardRefreshTick;
+    if (m_dashboardRefreshTick >= 5) {
+        m_dashboardRefreshTick = 0;
+        renderDashboardScene();
+    }
+}
+
+// 初始化四盘看板：创建场景并挂入 graphicsView
+void MainWindow::initDashboardScene()
+{
+    if (!ui->graphicsView) return;
+    m_dashboardScene = new QGraphicsScene(this);
+    ui->graphicsView->setScene(m_dashboardScene);
+    ui->graphicsView->setRenderHint(QPainter::Antialiasing);
+    ui->graphicsView->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+    ui->graphicsView->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+    renderDashboardScene();
+}
+
+// 刷新四盘看板：查询四张表，按槽位绘制格子
+void MainWindow::renderDashboardScene()
+{
+    if (!m_dashboardScene) return;
+    m_dashboardScene->clear();
+
+    // 视口尺寸
+    const QRectF vr = ui->graphicsView->rect();
+    const double W  = vr.width()  > 10 ? vr.width()  - 4 : 650;
+    const double H  = vr.height() > 10 ? vr.height() - 4 : 440;
+
+    // 单盘区块尺寸（2列2行，留少量间距）
+    const double gapOuter = 6;
+    const double gapInner = 4;
+    const double panW = (W - gapOuter * 3) / 2.0;
+    const double panH = (H - gapOuter * 3) / 2.0;
+
+    // 四盘：名称 + 数据表
+    struct PanInfo { QString title; QString tableName; double ox; double oy; };
+    PanInfo pans[4] = {
+        { "液体盘",   "pan_LiquidPosition",         gapOuter,         gapOuter         },
+        { "空瓶盘",   "pan_EmptyBottlePosition",     gapOuter * 2 + panW, gapOuter         },
+        { "药品盘",   "tray2",                       gapOuter,         gapOuter * 2 + panH },
+        { "成品盘",   "pan_FinishedProductLocation", gapOuter * 2 + panW, gapOuter * 2 + panH }
+    };
+
+    // 每盘 15 个槽（3列5行）
+    const int COLS = 5;
+    const int ROWS = 3;
+    const int SLOTS = COLS * ROWS;    // 15
+
+    for (auto& pan : pans) {
+        // 盘背景
+        QGraphicsRectItem *bg = m_dashboardScene->addRect(
+            pan.ox, pan.oy, panW, panH,
+            QPen(QColor(180, 180, 180), 1),
+            QBrush(QColor(245, 245, 250)));
+        Q_UNUSED(bg);
+
+        // 盘标题
+        QGraphicsTextItem *titleItem = m_dashboardScene->addText(pan.title);
+        titleItem->setDefaultTextColor(QColor(60, 60, 60));
+        QFont tf = titleItem->font();
+        tf.setPixelSize(12);
+        tf.setBold(true);
+        titleItem->setFont(tf);
+        titleItem->setPos(pan.ox + 4, pan.oy + 2);
+
+        // 标题栏高度
+        const double titleH = 20;
+        const double cellAreaW = panW - gapInner * 2;
+        const double cellAreaH = panH - titleH - gapInner * 2;
+        const double cellW = cellAreaW / COLS;
+        const double cellH = cellAreaH / ROWS;
+
+        // 查询槽位数据（slot_index, drug_name, value）
+        // 用 map 缓存，未出现的槽位保持空
+        QMap<int, QPair<QString, QString>> slotData;  // slot_index -> (drug_name, value)
+        if (dbm) {
+            QString sql = QString("SELECT slot_index, drug_name, value FROM %1").arg(pan.tableName);
+            QSqlQuery q = dbm->query(sql);
+            while (q.next()) {
+                int idx = q.value("slot_index").toInt();
+                QString name = q.value("drug_name").toString().trimmed();
+                QString val  = q.value("value").toString().trimmed();
+                slotData[idx] = qMakePair(name, val);
+            }
+        }
+
+        // 绘制 15 个格子
+        for (int slot = 0; slot < SLOTS; ++slot) {
+            int col = slot % COLS;
+            int row = slot / COLS;
+            double cx = pan.ox + gapInner + col * cellW;
+            double cy = pan.oy + titleH + gapInner + row * cellH;
+
+            // 格子背景
+            bool hasContent = slotData.contains(slot) && !slotData[slot].first.isEmpty();
+            QColor cellBg = hasContent ? QColor(235, 245, 255) : QColor(252, 252, 252);
+            m_dashboardScene->addRect(cx, cy, cellW - 2, cellH - 2,
+                QPen(QColor(210, 210, 210), 0.5), QBrush(cellBg));
+
+            // 槽位编号（左上角灰色小字）
+            QGraphicsTextItem *numItem = m_dashboardScene->addText(QString::number(slot));
+            numItem->setDefaultTextColor(QColor(160, 160, 160));
+            QFont nf = numItem->font();
+            nf.setPixelSize(9);
+            numItem->setFont(nf);
+            numItem->setPos(cx + 2, cy + 1);
+
+            if (hasContent) {
+                QString drugName = slotData[slot].first;
+                QString valueStr = slotData[slot].second;
+
+                // drug_name（中间加粗）
+                QGraphicsTextItem *nameItem = m_dashboardScene->addText(drugName);
+                nameItem->setDefaultTextColor(QColor(30, 30, 30));
+                QFont dnf = nameItem->font();
+                dnf.setPixelSize(10);
+                dnf.setBold(true);
+                nameItem->setFont(dnf);
+                // 水平居中
+                double nameW = nameItem->boundingRect().width();
+                nameItem->setPos(cx + (cellW - 2 - nameW) / 2.0, cy + cellH * 0.3);
+
+                // value mg（底部）
+                if (!valueStr.isEmpty()) {
+                    QGraphicsTextItem *valItem = m_dashboardScene->addText(valueStr + " mg");
+                    valItem->setDefaultTextColor(QColor(80, 80, 80));
+                    QFont vf = valItem->font();
+                    vf.setPixelSize(9);
+                    valItem->setFont(vf);
+                    double valW = valItem->boundingRect().width();
+                    valItem->setPos(cx + (cellW - 2 - valW) / 2.0, cy + cellH * 0.62);
+                }
+            }
+        }
+    }
+
+    m_dashboardScene->setSceneRect(0, 0, W, H);
+    ui->graphicsView->fitInView(m_dashboardScene->sceneRect(), Qt::KeepAspectRatio);
 }
 
 // 刷新 widget_m 配方队列面板（当前执行 + 即将执行）
@@ -1040,24 +1126,16 @@ void MainWindow::moveShakeBedToFinishedProductArea(int selfLocation, QQueue<Mess
     qDebug() << QString("摇床位置 %1 的瓶子已成功移动到成品区").arg(selfLocation);
 }
 
-// 将指定棋子移动到网格(col,row)
-void MainWindow::moveChessPiece(int pieceIndex, int col, int row)
-{
-    if (!chessBoard) return;
-    chessBoard->movePiece(pieceIndex, col, row);
-}
-
 void MainWindow::resizeEvent(QResizeEvent *event)
 {
     QMainWindow::resizeEvent(event);
-    if (chessBoard) chessBoard->relayout();
+    renderDashboardScene();
 }
 
 void MainWindow::showEvent(QShowEvent *event)
 {
     QMainWindow::showEvent(event);
-    // 首次显示后再次自适应
-    if (chessBoard) chessBoard->relayout();
+    renderDashboardScene();
 }
 
 // 初始化data.ini文件G
