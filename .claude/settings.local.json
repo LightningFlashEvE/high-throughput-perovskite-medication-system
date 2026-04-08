@@ -38,7 +38,8 @@
       "Bash(cd /d \"D:\\\\application\\\\high-throughput-perovskite-medication-system\")",
       "Bash(qmake --version)",
       "Bash(xargs grep:*)",
-      "Bash(find D:\\\\application\\\\high-throughput-perovskite-medication-system:*)"
+      "Bash(find D:\\\\application\\\\high-throughput-perovskite-medication-system:*)",
+      "WebSearch"
     ]
   }
 }

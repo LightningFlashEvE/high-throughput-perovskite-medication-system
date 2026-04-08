@@ -7,6 +7,32 @@
 #include <QClipboard>
 #include <QApplication>
 #include <QFont>
+#include <QSyntaxHighlighter>
+#include <QTextCharFormat>
+#include <QColor>
+
+// 日志颜色高亮器：按行前缀染色
+class LogHighlighter : public QSyntaxHighlighter {
+public:
+    using QSyntaxHighlighter::QSyntaxHighlighter;
+protected:
+    void highlightBlock(const QString &text) override {
+        QTextCharFormat fmt;
+        fmt.setFontWeight(QFont::Bold);
+        if (text.startsWith("[CRT]") || text.startsWith("[FTL]")) {
+            fmt.setForeground(QColor(210, 40, 40));       // 红
+        } else if (text.startsWith("[WRN]")) {
+            fmt.setForeground(QColor(200, 140, 0));       // 黄
+        } else if (text.startsWith("[DBG] SEND")) {
+            fmt.setForeground(QColor(30, 140, 60));       // 绿
+        } else if (text.startsWith("[DBG] RECV")) {
+            fmt.setForeground(QColor(20, 20, 20));        // 黑
+        } else {
+            fmt.setForeground(QColor(160, 160, 160));     // 浅灰
+        }
+        setFormat(0, text.length(), fmt);
+    }
+};
 
 DebugLogWindow::DebugLogWindow(QWidget *parent)
     : QWidget(parent)
@@ -18,6 +44,7 @@ DebugLogWindow::DebugLogWindow(QWidget *parent)
     m_text = new QPlainTextEdit(this);
     m_text->setReadOnly(true);
     m_text->setFont(QFont("Courier New", 9));
+    new LogHighlighter(m_text->document());
 
     auto *btnClear = new QPushButton("清空", this);
     auto *btnCopy  = new QPushButton("复制全部", this);

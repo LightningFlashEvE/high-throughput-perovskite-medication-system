@@ -947,6 +947,28 @@ void MainWindow::resetXYZMotorsToZero(QQueue<MessageQueueItem>& messageQueue)
     messageQueue.enqueue(MessageQueueItem(zeroMotorCommand.toUtf8(), true));
     waitZeroMotorCommand = tcpCore->buildDeviceCommand("0A", "d", 0, 0);
     messageQueue.enqueue(MessageQueueItem(waitZeroMotorCommand.toUtf8(), true, "0Ad01"));
+
+    //02号电机恢复到零点
+    zeroMotorCommand = tcpCore->buildDeviceCommand("02", "D", 10, 8);
+    messageQueue.enqueue(MessageQueueItem(zeroMotorCommand.toUtf8(), true));
+    waitZeroMotorCommand = tcpCore->buildDeviceCommand("02", "d", 0, 0);
+    messageQueue.enqueue(MessageQueueItem(waitZeroMotorCommand.toUtf8(), true, "02d01"));
+
+    //03号电机恢复到零点
+    zeroMotorCommand = tcpCore->buildDeviceCommand("03", "D", 10, 8);
+    messageQueue.enqueue(MessageQueueItem(zeroMotorCommand.toUtf8(), true));
+    waitZeroMotorCommand = tcpCore->buildDeviceCommand("03", "d", 0, 0);
+    messageQueue.enqueue(MessageQueueItem(waitZeroMotorCommand.toUtf8(), true, "03d01"));
+
+    //04号电机恢复到零点
+    zeroMotorCommand = tcpCore->buildDeviceCommand("04", "D", 10, 8);
+    messageQueue.enqueue(MessageQueueItem(zeroMotorCommand.toUtf8(), true));
+    waitZeroMotorCommand = tcpCore->buildDeviceCommand("04", "d", 0, 0);
+    messageQueue.enqueue(MessageQueueItem(waitZeroMotorCommand.toUtf8(), true, "04d01"));
+
+
+
+
 }
 
 void MainWindow::placeShakenReagentBottle()

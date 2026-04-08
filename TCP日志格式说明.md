@@ -172,3 +172,76 @@
 | 05（电爪，Modbus） | `0503020001` | 轮询 |
 | 09、0A（摇床等） | `09D01`、`0CD` | 超时重试 |
 | 其他普通命令 | 各类ASCII响应 | 超时重试 |
+
+---
+
+## 八、打印调试窗口颜色方案（260408更新）
+
+> 源文件：`PrintDebug/printdebug.cpp`
+
+### 8-1. 实现方式
+
+使用 Qt 原生 **`QSyntaxHighlighter`**，挂载在 `QPlainTextEdit` 的 `QTextDocument` 上。
+不使用 ANSI 转义码（不依赖终端或 Qt Creator 版本支持）。
+
+```cpp
+new LogHighlighter(m_text->document());
+```
+
+`LogHighlighter` 以 `m_text->document()` 为 parent，生命周期由 document 管理，无需手动 delete。
+
+---
+
+### 8-2. 核心方法
+
+| 方法 | 说明 |
+|------|------|
+| `highlightBlock(const QString &text)` | Qt 每次渲染一行时自动调用，`text` 为当前行内容 |
+| `setFormat(int start, int count, QTextCharFormat)` | 对 `[start, start+count)` 范围内字符应用格式 |
+| `QTextCharFormat::setForeground(QColor)` | 设置前景色（文字颜色） |
+| `QTextCharFormat::setFontWeight(QFont::Bold)` | 设置字体加粗 |
+
+`setFormat(0, text.length(), fmt)` 表示整行应用同一格式。
+
+---
+
+### 8-3. 颜色规则
+
+判断依据：每行的 **前缀标签**（由 `appMessageHandler` 在 `main.cpp` 拼接）。
+
+| 前缀 | 颜色 | RGB | 说明 |
+|------|------|-----|------|
+| `[CRT]` / `[FTL]` | 红 | `(210, 40, 40)` | 严重错误 / 致命错误 |
+| `[WRN]` | 黄 | `(200, 140, 0)` | 警告 |
+| `[DBG] SEND` | 绿 | `(30, 140, 60)` | 发送命令 |
+| `[DBG] RECV` | 黑 | `(20, 20, 20)` | 接收数据 |
+| 其余 `[DBG]` | 浅灰 | `(160, 160, 160)` | 普通调试信息 |
+
+所有行统一加粗：`fmt.setFontWeight(QFont::Bold)`，在颜色判断前设置。
+
+---
+
+### 8-4. 执行顺序
+
+```
+每次 appendLine() / setPlainText() 触发 document 变化
+    → Qt 自动调用 highlightBlock(当前行文本)
+        → 判断前缀 → 设置 fmt 颜色 + 加粗
+        → setFormat(0, text.length(), fmt)  // 整行染色
+```
+
+历史记录回填（`setPlainText`）时高亮器也会自动对所有行重新渲染。
+
+---
+
+### 8-5. 前缀来源（main.cpp）
+
+```cpp
+const char *level = "DBG";
+if      (type == QtWarningMsg)  level = "WRN";
+else if (type == QtCriticalMsg) level = "CRT";
+else if (type == QtFatalMsg)    level = "FTL";
+QString line = QString("[%1] %2").arg(level, msg);
+```
+
+`msg` 是 `qDebug()` / `qWarning()` 输出的原始内容（如 `SEND hex: ...`、`RECV[时间戳] ...`）。

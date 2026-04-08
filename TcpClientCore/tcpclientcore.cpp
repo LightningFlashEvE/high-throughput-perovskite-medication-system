@@ -1648,6 +1648,15 @@ void TcpClientCore::processMessageQueue()
         return;
     }
 
+    {
+        QString decodedContent = QString::fromUtf8(item.content).trimmed();
+        if (decodedContent.startsWith("AAskipStep:")) {
+            qDebug().noquote() << QString("SEND hex(no send): %1").arg(decodedContent);
+            m_isProcessingQueue = false;
+            QTimer::singleShot(0, this, &TcpClientCore::processMessageQueue);
+            return;
+        }
+    }
 
 
     // 检查是否需要等待响应（优先依据期望接收值，"-----" 或 空 表示不等待）
@@ -1659,7 +1668,7 @@ void TcpClientCore::processMessageQueue()
         QString sendReplyStr = needsWait ? item.expectedSignature : "无需等待";
         if (!item.asciiOrHex) {
             QStringList hexList;
-            for (unsigned char c : item.content)
+            for (unsigned char c : QByteArray::fromHex(item.content))
                 hexList.append(QString("%1").arg(c, 2, 16, QChar('0')).toUpper());
             qDebug().noquote() << QString("SEND hex: %1 期望：%2").arg(hexList.join(" "), sendReplyStr);
         } else {

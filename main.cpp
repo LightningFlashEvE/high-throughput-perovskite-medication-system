@@ -23,8 +23,7 @@ static void appMessageHandler(QtMsgType type,
     // 拼接成带标签的单行字符串，例如 "[DBG] 收到配方"
     QString line = QString("[%1] %2").arg(level, msg);
 
-    // 1. 用 C 标准库打印到 stderr，保持和未装 handler 时一样的控制台输出行为。
-    //    qPrintable() 把 QString 转为 const char*，因为 fprintf 不认识 QString。
+    // 1. 用 C 标准库打印到 stderr
     fprintf(stderr, "%s\n", qPrintable(line));
 
     // 2. 写入全局环形缓冲，供"打印调试"窗口打开时回填历史记录。
