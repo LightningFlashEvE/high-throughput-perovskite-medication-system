@@ -187,10 +187,10 @@ private:
 
     // 流程步骤勾选框（6个步骤）
     QCheckBox *m_processCheckBox_reset = nullptr;
-    QCheckBox *m_processCheckBox_xyzBackToOrigin = nullptr;
+    QCheckBox *m_processCheckBox_xyzBackToOrigin1 = nullptr;
     QCheckBox *m_processCheckBox_takeEmptyBottle = nullptr;
     QCheckBox *m_processCheckBox_getSolid = nullptr;
-    QCheckBox *m_processCheckBox_resetXYZ = nullptr;
+    QCheckBox *m_processCheckBox_xyzBackToOrigin2 = nullptr;    
     QCheckBox *m_processCheckBox_getLiquid = nullptr;
     QCheckBox *m_processCheckBox_tightenBottle = nullptr;
 
@@ -330,7 +330,7 @@ private:
     // 初始化所有设备（TCP连接和设备初始化）
     void initializeAllDevices(QQueue<MessageQueueItem>& messageQueue);
     // xyz轴恢复到零点（06，08，09，0A号电机恢复到零点）
-    void resetXYZMotorsToZero(QQueue<MessageQueueItem>& messageQueue);
+    void resetXYZMotorsToZero(QQueue<MessageQueueItem>& messageQueue, const QString& stepName);
 
 public:
     /** 初始化四盘看板（创建 QGraphicsScene 并挂入 graphicsView） */

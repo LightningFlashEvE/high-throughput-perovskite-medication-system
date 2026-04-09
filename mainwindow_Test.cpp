@@ -148,10 +148,10 @@ void MainWindow::initializeSystemComponents()
         });
     };
 
-    setupContextMenu(m_processCheckBox_xyzBackToOrigin, "xyzBackToOrigin");
+    setupContextMenu(m_processCheckBox_xyzBackToOrigin1, "xyzBackToOrigin1");
     setupContextMenu(m_processCheckBox_takeEmptyBottle, "takeEmptyBottle");
     setupContextMenu(m_processCheckBox_getSolid, "getSolid");
-    setupContextMenu(m_processCheckBox_resetXYZ, "resetXYZ");
+    setupContextMenu(m_processCheckBox_xyzBackToOrigin2, "xyzBackToOrigin2");
     setupContextMenu(m_processCheckBox_getLiquid, "getLiquid");
     setupContextMenu(m_processCheckBox_tightenBottle, "capBottleAndTransferToShaker");
 
@@ -604,8 +604,8 @@ void MainWindow::testRecipeSend(const QJsonObject& recipePacket)
     }
 
     // xyz回到原点
-    if (enqueueSkipIfNeeded("xyzBackToOrigin")) {  
-        resetXYZMotorsToZero(newRecipe.messageQueue);
+    if (enqueueSkipIfNeeded("xyzBackToOrigin1")) {  
+        resetXYZMotorsToZero(newRecipe.messageQueue, "xyzBackToOrigin1");
     }
 
     // 打开空瓶
@@ -629,8 +629,8 @@ void MainWindow::testRecipeSend(const QJsonObject& recipePacket)
     }
 
     // xyz回到原点
-    if (enqueueSkipIfNeeded("xyzBackToOrigin")) {
-        resetXYZMotorsToZero(newRecipe.messageQueue);
+    if (enqueueSkipIfNeeded("xyzBackToOrigin2")) {
+        resetXYZMotorsToZero(newRecipe.messageQueue, "xyzBackToOrigin2");
     }
 
     // 取液体：遍历溶剂，传入名称与体积（ml）
@@ -913,13 +913,13 @@ void MainWindow::shakeBed(int parameter)
  * xyz轴恢复到零点
  * 将06，08，09，0A号电机恢复到零点
  */
-void MainWindow::resetXYZMotorsToZero(QQueue<MessageQueueItem>& messageQueue)
+void MainWindow::resetXYZMotorsToZero(QQueue<MessageQueueItem>& messageQueue, const QString& stepName)
 {
     // ★ 插入状态标记：xyz回到原点
-    messageQueue.enqueue(MessageQueueItem("AAstateChange:xyzBackToOrigin", false));
+    messageQueue.enqueue(MessageQueueItem(("AAstateChange:" + stepName).toUtf8(), true));
 
     // 复位时停止天平打印
-    if (tcpBalanceCore) {
+    if (tcpBalanceCore) {   
         tcpBalanceCore->disconnectReceiveForBalance();
     }
     messageQueue.enqueue(MessageQueueItem("AA0", true)); // 关闭天平打印

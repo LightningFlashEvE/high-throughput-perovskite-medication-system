@@ -52,3 +52,6 @@ cmake_install.cmake
 
 # CMake生成的文件
 build/
+
+# 开发文档
+docs/开发说明.md

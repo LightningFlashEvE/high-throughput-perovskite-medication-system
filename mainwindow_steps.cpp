@@ -8,10 +8,10 @@
 QCheckBox* MainWindow::getCheckBoxForStep(const QString& stepName)
 {
     if (stepName == "reset") return m_processCheckBox_reset;
-    if (stepName == "xyzBackToOrigin") return m_processCheckBox_xyzBackToOrigin;
+    if (stepName == "xyzBackToOrigin1") return m_processCheckBox_xyzBackToOrigin1;
     if (stepName == "takeEmptyBottle") return m_processCheckBox_takeEmptyBottle;
     if (stepName == "getSolid") return m_processCheckBox_getSolid;
-    if (stepName == "resetXYZ") return m_processCheckBox_resetXYZ;
+    if (stepName == "xyzBackToOrigin2") return m_processCheckBox_xyzBackToOrigin2;
     if (stepName == "getLiquid") return m_processCheckBox_getLiquid;
     if (stepName == "capBottleAndTransferToShaker") return m_processCheckBox_tightenBottle;
     return nullptr;
@@ -38,7 +38,7 @@ void MainWindow::runSelectedSteps()
     m_currentStep.clear();
 
     // 3. 按顺序检查每个步骤是否被勾选
-    QStringList allSteps = {"reset", "xyzBackToOrigin", "takeEmptyBottle", "getSolid", "xyzBackToOrigin", "getLiquid", "capBottleAndTransferToShaker"};
+    QStringList allSteps = {"reset", "xyzBackToOrigin1", "takeEmptyBottle", "getSolid", "xyzBackToOrigin2", "getLiquid", "capBottleAndTransferToShaker"};
 
     for (const QString& step : allSteps) {
         QCheckBox* checkBox = getCheckBoxForStep(step);
@@ -56,12 +56,14 @@ void MainWindow::runSelectedSteps()
         qDebug() << "步骤已勾选，将执行:" << step;
         if (step == "reset") {
             initializeAllDevices(newRecipe.messageQueue);
-        } else if (step == "xyzBackToOrigin") {
-            resetXYZMotorsToZero(newRecipe.messageQueue);
+        } else if (step == "xyzBackToOrigin1") {
+            resetXYZMotorsToZero(newRecipe.messageQueue, "xyzBackToOrigin1");
         } else if (step == "takeEmptyBottle") {
             takeEmptyBottle("", newRecipe.messageQueue);
         } else if (step == "getSolid") { // 使用默认参数：固体名称和质量
             getSolid("PbI2", 100.0, newRecipe.messageQueue);
+        } else if (step == "xyzBackToOrigin2") {
+            resetXYZMotorsToZero(newRecipe.messageQueue, "xyzBackToOrigin2");
         } else if (step == "getLiquid") { // 使用默认参数：液体名称和体积
             getLiquid("DMF", 10.0, newRecipe.messageQueue);
         } else if (step == "capBottleAndTransferToShaker") {

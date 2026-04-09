@@ -40,6 +40,7 @@ DebugLogWindow::DebugLogWindow(QWidget *parent)
     setWindowTitle("打印调试");
     resize(900, 600);
     setWindowFlags(Qt::Window);
+    setWindowIcon(QPixmap(":/main/pic/logo2.png"));
 
     m_text = new QPlainTextEdit(this);
     m_text->setReadOnly(true);

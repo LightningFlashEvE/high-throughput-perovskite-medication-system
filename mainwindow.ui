@@ -83,7 +83,7 @@
                     </widget>
                    </item>
                    <item>
-                    <widget class="QCheckBox" name="m_processCheckBox_xyzBackToOrigin">
+                    <widget class="QCheckBox" name="m_processCheckBox_xyzBackToOrigin1">
                      <property name="font">
                       <font>
                        <pointsize>9</pointsize>
@@ -131,7 +131,7 @@
                     </widget>
                    </item>
                    <item>
-                    <widget class="QCheckBox" name="m_processCheckBox_resetXYZ">
+                    <widget class="QCheckBox" name="m_processCheckBox_xyzBackToOrigin2">
                      <property name="font">
                       <font>
                        <pointsize>9</pointsize>

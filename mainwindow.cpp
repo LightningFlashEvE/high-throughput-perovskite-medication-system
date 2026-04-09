@@ -90,10 +90,10 @@ MainWindow::MainWindow(QWidget *parent)
 
     // 绑定流程步骤勾选框
     m_processCheckBox_reset = ui->m_processCheckBox_reset;
-    m_processCheckBox_xyzBackToOrigin = ui->m_processCheckBox_xyzBackToOrigin;
+    m_processCheckBox_xyzBackToOrigin1 = ui->m_processCheckBox_xyzBackToOrigin1;
     m_processCheckBox_takeEmptyBottle = ui->m_processCheckBox_takeEmptyBottle;
     m_processCheckBox_getSolid = ui->m_processCheckBox_getSolid;
-    m_processCheckBox_resetXYZ = ui->m_processCheckBox_resetXYZ;
+    m_processCheckBox_xyzBackToOrigin2 = ui->m_processCheckBox_xyzBackToOrigin2;
     m_processCheckBox_getLiquid = ui->m_processCheckBox_getLiquid;
     m_processCheckBox_tightenBottle = ui->m_processCheckBox_tightenBottle;
 
@@ -102,10 +102,10 @@ MainWindow::MainWindow(QWidget *parent)
 
     // 连接复选框状态改变信号，保存到ini文件
     connect(m_processCheckBox_reset, &QCheckBox::stateChanged, this, &MainWindow::saveProcessStepsState);
-    connect(m_processCheckBox_xyzBackToOrigin, &QCheckBox::stateChanged, this, &MainWindow::saveProcessStepsState);
+    connect(m_processCheckBox_xyzBackToOrigin1, &QCheckBox::stateChanged, this, &MainWindow::saveProcessStepsState);
     connect(m_processCheckBox_takeEmptyBottle, &QCheckBox::stateChanged, this, &MainWindow::saveProcessStepsState);
     connect(m_processCheckBox_getSolid, &QCheckBox::stateChanged, this, &MainWindow::saveProcessStepsState);
-    connect(m_processCheckBox_resetXYZ, &QCheckBox::stateChanged, this, &MainWindow::saveProcessStepsState);
+    connect(m_processCheckBox_xyzBackToOrigin2, &QCheckBox::stateChanged, this, &MainWindow::saveProcessStepsState);
     connect(m_processCheckBox_getLiquid, &QCheckBox::stateChanged, this, &MainWindow::saveProcessStepsState);
     connect(m_processCheckBox_tightenBottle, &QCheckBox::stateChanged, this, &MainWindow::saveProcessStepsState);
 
@@ -908,7 +908,7 @@ void MainWindow::checkShakeBedTimeout()
             QString leaveCmd = QString("AAleaveTheShaker:%1").arg(selfLocation);
             newRecipeTianPing.messageQueue.enqueue(MessageQueueItem(leaveCmd.toUtf8(), true));
 
-            resetXYZMotorsToZero(newRecipeTianPing.messageQueue);
+            resetXYZMotorsToZero(newRecipeTianPing.messageQueue, "xyzBackToOrigin2");
 
             // ++++ 3.保存到数据库并执行（插队模式：插入到第一个未执行配方之前） ++++
             saveAndExecuteRecipe(newRecipeTianPing, true);
@@ -1191,9 +1191,10 @@ void MainWindow::initializeDataIni()
     // [Process-Steps]
     ensureGroup("Process-Steps", {
         {"reset", true},
+        {"xyzBackToOrigin1", true},
         {"takeEmptyBottle", true},
         {"getSolid", false},
-        {"resetXYZ", true},
+        {"xyzBackToOrigin2", true},
         {"getLiquid", true},
         {"capBottleAndTransferToShaker", true}
     });
@@ -1205,9 +1206,10 @@ void MainWindow::initializeDataIni()
 // 流程步骤定义（顺序即执行顺序）
 static const QStringList PROCESS_STEPS = {
     "reset",
+    "xyzBackToOrigin1",
     "takeEmptyBottle",
     "getSolid",
-    "resetXYZ",
+    "xyzBackToOrigin2",
     "getLiquid",
     "capBottleAndTransferToShaker"
 };
@@ -1220,14 +1222,14 @@ void MainWindow::saveProcessStepsState()
 
     if (m_processCheckBox_reset)
         settings.setValue("reset", m_processCheckBox_reset->isChecked());
-    if (m_processCheckBox_xyzBackToOrigin)
-        settings.setValue("xyzBackToOrigin", m_processCheckBox_xyzBackToOrigin->isChecked());
-    if (m_processCheckBox_takeEmptyBottle)
+    if (m_processCheckBox_xyzBackToOrigin1)
+        settings.setValue("xyzBackToOrigin1", m_processCheckBox_xyzBackToOrigin1->isChecked());
+    if (m_processCheckBox_takeEmptyBottle)  
         settings.setValue("takeEmptyBottle", m_processCheckBox_takeEmptyBottle->isChecked());
     if (m_processCheckBox_getSolid)
         settings.setValue("getSolid", m_processCheckBox_getSolid->isChecked());
-    if (m_processCheckBox_resetXYZ)
-        settings.setValue("resetXYZ", m_processCheckBox_resetXYZ->isChecked());
+    if (m_processCheckBox_xyzBackToOrigin2)
+        settings.setValue("xyzBackToOrigin2", m_processCheckBox_xyzBackToOrigin2->isChecked());
     if (m_processCheckBox_getLiquid)
         settings.setValue("getLiquid", m_processCheckBox_getLiquid->isChecked());
     if (m_processCheckBox_tightenBottle)
@@ -1245,14 +1247,14 @@ void MainWindow::loadProcessStepsState()
 
     if (m_processCheckBox_reset)
         m_processCheckBox_reset->setChecked(settings.value("reset", true).toBool());
-    if (m_processCheckBox_xyzBackToOrigin)
-        m_processCheckBox_xyzBackToOrigin->setChecked(settings.value("xyzBackToOrigin", true).toBool());
+    if (m_processCheckBox_xyzBackToOrigin1)
+        m_processCheckBox_xyzBackToOrigin1->setChecked(settings.value("xyzBackToOrigin1", true).toBool());
     if (m_processCheckBox_takeEmptyBottle)
         m_processCheckBox_takeEmptyBottle->setChecked(settings.value("takeEmptyBottle", true).toBool());
     if (m_processCheckBox_getSolid)
         m_processCheckBox_getSolid->setChecked(settings.value("getSolid", true).toBool());
-    if (m_processCheckBox_resetXYZ)
-        m_processCheckBox_resetXYZ->setChecked(settings.value("resetXYZ", true).toBool());
+    if (m_processCheckBox_xyzBackToOrigin2)
+        m_processCheckBox_xyzBackToOrigin2->setChecked(settings.value("xyzBackToOrigin2", true).toBool());
     if (m_processCheckBox_getLiquid)
         m_processCheckBox_getLiquid->setChecked(settings.value("getLiquid", true).toBool());
     if (m_processCheckBox_tightenBottle)
@@ -1267,10 +1269,10 @@ void MainWindow::resetProcessStateDisplay()
     m_skippedSteps.clear();
     const QString grayStyle = "color: gray;";
     if (m_processCheckBox_reset)           m_processCheckBox_reset->setStyleSheet(grayStyle);
-    if (m_processCheckBox_xyzBackToOrigin)  m_processCheckBox_xyzBackToOrigin->setStyleSheet(grayStyle);
+    if (m_processCheckBox_xyzBackToOrigin1) m_processCheckBox_xyzBackToOrigin1->setStyleSheet(grayStyle);
     if (m_processCheckBox_takeEmptyBottle) m_processCheckBox_takeEmptyBottle->setStyleSheet(grayStyle);
     if (m_processCheckBox_getSolid)        m_processCheckBox_getSolid->setStyleSheet(grayStyle);
-    if (m_processCheckBox_resetXYZ)        m_processCheckBox_resetXYZ->setStyleSheet(grayStyle);
+    if (m_processCheckBox_xyzBackToOrigin2)        m_processCheckBox_xyzBackToOrigin2->setStyleSheet(grayStyle);
     if (m_processCheckBox_getLiquid)       m_processCheckBox_getLiquid->setStyleSheet(grayStyle);
     if (m_processCheckBox_tightenBottle)   m_processCheckBox_tightenBottle->setStyleSheet(grayStyle);
 }
@@ -1280,11 +1282,11 @@ void MainWindow::updateProcessStateDisplay(const QString& stateName)
     // 状态名称 -> 对应的 QCheckBox 指针
     QMap<QString, QCheckBox*> checkBoxMap = {
         {"reset",           m_processCheckBox_reset},
-        {"xyzBackToOrigin", m_processCheckBox_xyzBackToOrigin},
-        {"xyzBackToOrigin", m_processCheckBox_resetXYZ},
+        {"xyzBackToOrigin1", m_processCheckBox_xyzBackToOrigin1},
         {"takeEmptyBottle", m_processCheckBox_takeEmptyBottle},
         {"getSolid",        m_processCheckBox_getSolid},
         {"getLiquid",       m_processCheckBox_getLiquid},
+        {"xyzBackToOrigin2", m_processCheckBox_xyzBackToOrigin2},
         {"capBottleAndTransferToShaker",   m_processCheckBox_tightenBottle}
     };
 
