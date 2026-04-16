@@ -5,8 +5,9 @@
 #include <QVector>
 #include <QPointF>
 #include <QQueue>
-#include "chessboardview.h"
-#include "flowviewmanager.h"
+#include <QGraphicsScene>
+#include <QGraphicsRectItem>
+#include <QGraphicsTextItem>
 #include "settingsbutton.h"
 #include "tcpclient.h"
 #include "recipeanalyzer.h"
@@ -39,12 +40,12 @@ class QGraphicsPixmapItem;
 class QResizeEvent;
 class QShowEvent;
 class QCloseEvent;
-class QLabel;
 class RtspPlayer;
-class Box;
 class ReagentBottle;
 class TcpClientCore;
 class AppSqlDatabase;
+class QLabel;
+class QListWidget;
 
 /**
  * MainWindow
@@ -75,24 +76,6 @@ public:
     /** 析构函数：释放 UI 资源 */
     ~MainWindow();
 
-    /**
-     * 获取MainWindow单例
-     * @return MainWindow实例指针
-     */
-    static MainWindow* getInstance();
-
-    /**
-     * 获取TCP核心对象
-     * @return tcpCore指针
-     */
-    TcpClientCore* getTcpCore() const { return tcpCore; }
-
-    /**
-     * 获取天平TCP核心对象
-     * @return tcpBalanceCore指针
-     */
-    TcpClientCore* getTcpBalanceCore() const { return tcpBalanceCore; }
-
 private slots:
     /**
      * 定时回调：每秒更新一次日期与时间标签
@@ -111,17 +94,13 @@ private slots:
      */
     void checkShakeBedTimeout();
 
-    void on_pushButton_7_clicked();
-
-    void on_pushButton_8_clicked();
-
     /**
      * 紧急停止按钮（UI上的“紧急暂停”）点击槽
      * 目前为空实现，后续可填入紧急停止逻辑
      */
     void onEmergencyStopButtonClicked();
 
-    void on_pushButton_3_clicked();
+    void updateRecipeQueuePanel();
 
 protected:
     /**
@@ -141,13 +120,11 @@ protected:
     void closeEvent(QCloseEvent *event) override;
 
 private:
-    static MainWindow* instance;  // 单例实例
-
     Ui::MainWindow *ui;
     QTimer *timer;
     QTimer *shakeBedCheckTimer;  // 摇床检查定时器
     QTimer *shakeBedEmptyCheckTimer;  // 摇床为空检查定时器（10秒执行一次，当摇床为空时停止摇床）
-    QLabel *sliderValueLabel;  // 滑块值显示标签
+    int m_pendingTcpConnections = 0;   // 等待连接成功的 TCP 数量
 
     /**
      * 初始化data.ini文件
@@ -161,16 +138,9 @@ private:
      */
     void cleanupResources();
 
-    /**
-     * 检查TCP连接状态和对象有效性
-     * @return 如果TCP核心对象存在且已连接，返回true；否则返回false
-     */
-    bool checkTcpConnection();
-
-    // 棋盘封装类
-    ChessBoardView *chessBoard = nullptr;
-    // 流程图封装类（挂载在 frame_2）
-    FlowViewManager *flowManager = nullptr;
+    // 四盘看板场景
+    QGraphicsScene *m_dashboardScene = nullptr;
+    int m_dashboardRefreshTick = 0;  // 每秒计数，每5秒刷新一次
     // TcpFramedClient 已移除
 
     // 设置面板（非模态，可频繁打开关闭）
@@ -186,31 +156,134 @@ private:
     int zhuaCol = 4;
     int zhuaRow = 5;
 
-    // 转移区域和试剂管理
-    Box *transferAreaBox = nullptr;          // 转移区左边区域（15槽位）
-    ReagentBottle *reagentA = nullptr;       // A试剂
-    ReagentBottle *reagentB = nullptr;       // B试剂
-    ReagentBottle *reagentC = nullptr;       // C试剂
 
     // TCP客户端核心
     TcpClientCore *tcpCore = nullptr;        // TCP通信核心对象
     // TCP负责接收天平的串口信息
     TcpClientCore *tcpBalanceCore = nullptr;        // 天平TCP通信核心对象
 
-    // 称量达标暂停队列：每次 weightReached 入队，按顺序逐个处理（每个暂停10s）
-    QQueue<double> m_pendingWeightPauses;
-    bool m_isProcessingWeightPause = false;
-
-    void processNextWeightPause();
-
     // 数据库管理
     AppSqlDatabase *dbm = nullptr;           // 数据库管理对象
+
+    // 状态栏：天平重量实时显示标签
+    QLabel *m_statusWeightLabel = nullptr;
+    // 状态栏：日期时间显示标签（最右侧固定区域）
+    QLabel *m_statusDateTimeLabel = nullptr;
+
+    // 状态栏：三个连接状态指示灯（居中显示）
+    QLabel *m_ledMain    = nullptr;  // 主控 TCP
+    QLabel *m_ledBalance = nullptr;  // 天平 TCP
+    QLabel *m_ledDb      = nullptr;  // 数据库
+    QTimer *m_connectionStatusTimer = nullptr;  // 连接状态轮询定时器
+    QTimer *m_dbHealthCheckTimer    = nullptr;  // DB 慢速健康检查定时器（10s）
+    bool    m_dbLastKnownConnected  = false;    // DB 连接状态缓存
+
+    // 更新三个连接状态灯
+    void updateConnectionStatusLeds();
+
+    // 配方队列面板子控件
+    QLabel *m_recipeCurrentLabel = nullptr;   // 当前执行
+    QListWidget *m_recipeQueueList = nullptr; // 即将执行列表
+
+    // 流程步骤勾选框（6个步骤）
+    QCheckBox *m_processCheckBox_reset = nullptr;
+    QCheckBox *m_processCheckBox_xyzBackToOrigin1 = nullptr;
+    QCheckBox *m_processCheckBox_takeEmptyBottle = nullptr;
+    QCheckBox *m_processCheckBox_getSolid = nullptr;
+    QCheckBox *m_processCheckBox_xyzBackToOrigin2 = nullptr;    
+    QCheckBox *m_processCheckBox_getLiquid = nullptr;
+    QCheckBox *m_processCheckBox_tightenBottle = nullptr;
+
+    // 运行按钮
+    QPushButton *m_runSelectedStepsButton = nullptr;
+
+    // 清除流程状态按钮
+    QPushButton *m_clearProcessStateButton = nullptr;
+
+    // 步骤执行状态跟踪
+    QSet<QString> m_selectedSteps;      // 本次运行选中的步骤
+    QSet<QString> m_skippedSteps;       // 用户取消的步骤（执行中）
+    QSet<QString> m_completedSteps;     // 已完成的步骤
+    QString m_currentStep;              // 当前正在执行的步骤
+
+    /**
+     * 更新流程状态显示
+     * @param stateName 当前执行的状态名称
+     */
+    void updateProcessStateDisplay(const QString& stateName);
+
+    /**
+     * 重置流程状态显示（全部恢复为灰色）
+     */
+    void resetProcessStateDisplay();
+
+    /**
+     * 运行选中的步骤
+     */
+    void runSelectedSteps();
+
+    /**
+     * 取消步骤（在执行过程中调用）
+     * @param stepName 要取消的步骤名称
+     */
+    void cancelStep(const QString& stepName);
+
+    /**
+     * 更新步骤勾选框的可用状态
+     */
+    void updateStepCheckBoxStates();
+
+    /**
+     * 获取步骤对应的勾选框
+     * @param stepName 步骤名称
+     * @return 对应的QCheckBox指针
+     */
+    QCheckBox* getCheckBoxForStep(const QString& stepName);
+
+    /**
+     * 保存流程步骤的选中状态到ini文件
+     */
+    void saveProcessStepsState();
+
+    /**
+     * 从ini文件加载流程步骤的选中状态
+     */
+    void loadProcessStepsState();
+
+    /**
+     * 处理流程状态变更（接收 TcpClientCore 的 processStateChanged 信号）
+     * @param stateName 新的状态名称
+     */
+    void onProcessStateChanged(const QString& stateName);
+
+    /**
+     * 处理步骤跳过（接收 TcpClientCore 的 stepSkipped 信号）
+     * @param stepName 被跳过的步骤名称
+     */
+    void onStepSkipped(const QString& stepName);
+
+    /**
+     * 更新状态栏天平重量显示
+     * @param current  天平当前读数（g）
+     * @param target   当前阶段瞄准的重量阈值（g），0 表示无目标
+     * @param goal     最终目标重量（g），0 表示无目标
+     */
+    void updateWeightStatusBar(double current, double target, double goal);
 
     // 摇床初始化连接（用于监听启动回复）
     QMetaObject::Connection m_shakeBedInitConnection;
 
     // 设备是否已经完成一次初始化（initializeAllDevices 调用后置为 true）
     bool m_allDevicesInitialized = false;
+
+    // 紧急暂停按钮状态：false=运行中（显示"紧急暂停"红色），true=已暂停（显示"继续运行"绿色）
+    bool m_isEmergencyPaused = false;
+
+    // 更新紧急暂停按钮的文字和颜色
+    void updateEmergencyStopButton();
+
+    // 放弃当前配方并预载下一条
+    void abandonCurrentRecipeAndLoadNext();
 
 
     /***************** UP *********************/
@@ -221,13 +294,15 @@ private:
     /****************** DOWN ********************/
 
     // 取空瓶（盘名称 + 消息队列引用）
-    bool takeEmptyBottle(const QString& trayName, QQueue<MessageQueueItem>& messageQueue);
+    bool takeEmptyBottle(const QString& trayName, QQueue<MessageQueueItem>& messageQueue, const QString& equation = QString());
     // 取液体（液体名称 + 体积 + tipsNum引用参数 + 消息队列引用）
     bool getLiquid(const QString& liquidName, double volumeMl, QQueue<MessageQueueItem>& messageQueue);
     // 取固体（固体名称 + 质量 + 消息队列引用 + 固体盘位置索引）
     bool getSolid(const QString& solidName, double mass, QQueue<MessageQueueItem>& messageQueue, int currentIndex = 0);
-    // 拧紧瓶子（消息队列引用）
-    void tightenBottle(QQueue<MessageQueueItem>& messageQueue);
+    // 拧盖并送入摇床
+    void capBottleAndTransferToShaker(QQueue<MessageQueueItem>& messageQueue);
+    // 将已拧盖瓶子送入摇床
+    void transferToShaker(QQueue<MessageQueueItem>& messageQueue);
     // 关盖（关闭瓶盖）
     void closeBottleCap(QQueue<MessageQueueItem>& messageQueue);
     // 开盖（打开瓶盖）- 队列版本，将开盖相关命令写入消息队列
@@ -255,14 +330,13 @@ private:
     // 初始化所有设备（TCP连接和设备初始化）
     void initializeAllDevices(QQueue<MessageQueueItem>& messageQueue);
     // xyz轴恢复到零点（06，08，09，0A号电机恢复到零点）
-    void resetXYZMotorsToZero(QQueue<MessageQueueItem>& messageQueue);
+    void resetXYZMotorsToZero(QQueue<MessageQueueItem>& messageQueue, const QString& stepName);
 
 public:
-    /**
-     * 将指定索引的棋子移动到网格坐标 (col, row) 的中心
-     * 该方法会转发给 `ChessBoardView`
-     */
-    void moveChessPiece(int pieceIndex, int col, int row);
+    /** 初始化四盘看板（创建 QGraphicsScene 并挂入 graphicsView） */
+    void initDashboardScene();
+    /** 刷新四盘看板（查询数据库并更新格子文字） */
+    void renderDashboardScene();
 
     /**
      * 计算槽位坐标

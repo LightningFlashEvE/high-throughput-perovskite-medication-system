@@ -11,6 +11,7 @@
 #include <QDateTime>
 #include <QVector>
 #include <QMap>
+#include <QMutex>
 
 
 
@@ -222,6 +223,10 @@ signals:
     // 6号电机Z轴坐标信号（当收到"06E"查询响应时发出）
     void z6CoordinateReceived(int coordinate);
     
+    // 天平实时重量更新信号（每次收到天平数据都发出，用于状态栏实时显示）
+    // currentWeight: 当前天平读数; targetThreshold: 当前正在瞄准的阈值; goalWeight: 最终目标重量
+    void balanceWeightReceived(double currentWeight, double targetThreshold, double goalWeight);
+
     // 天平重量达标信号
     void weightReached(double weight);
     
@@ -270,6 +275,12 @@ signals:
     // 摇床离开请求信号（当检测到AAleaveTheShaker命令时发出，携带selfLocation）
     void leaveTheShakerRequested(int selfLocation);
 
+    // 流程状态变更信号（当检测到AAstateChange命令时发出，携带状态名称）
+    void processStateChanged(const QString& stateName);
+
+    // 步骤跳过信号（当检测到AAskipStep命令时发出，携带步骤名称）
+    void stepSkipped(const QString& stepName);
+
     // 所有设备初始化完成的请求信号（当检测到AAallDevicesInitialized命令时发出）
     void allDevicesInitializedRequested();
 
@@ -277,8 +288,8 @@ signals:
     // MainWindow 可以在此信号中调用 sendMessage(m_recipeMessageQueues) 导入下一个配方
     void messageQueueEmpty();
 
-    // 配方被放弃信号（当发生错误时，当前配方被放弃，等待用户确认后继续下一个配方）
-    void recipeAborted(const QString& errorMsg);
+    // 响应超时且重试失败信号（当命令重试次数用尽后发出，携带失败的命令和期望的响应）
+    void responseTimeoutFailed(const QString& command, const QString& expectedResponse);
 
 private slots:
     void onConnected();
@@ -291,64 +302,77 @@ private slots:
     void onBalanceDisconnected();
     void onBalanceReadyRead();
     void onBalanceSocketError(QAbstractSocket::SocketError error);
-    
-    // 轮询检查电机是否到位
-    void pollMotorPosition();
+
+    // 响应超时处理
+    void onResponseTimeout();
 
 public:
     QTcpSocket* m_tcpSocket;
-    
-    // 轮询机制相关
-    QTimer* m_pollTimer;              // 轮询定时器
-    bool m_isPolling;                 // 是否正在轮询
-    QString m_pollingDeviceNum;       // 正在轮询的设备编号
-    QString m_pollingCommand;         // 轮询命令（完整的带CRC的命令）
-    QEventLoop* m_pollEventLoop;      // 用于阻塞等待的事件循环
-    
+
     // 消息队列相关
     QQueue<MessageQueueItem> m_messageQueue;  // 消息队列
     bool m_isProcessingQueue;                  // 是否正在处理队列
     QTimer* m_queueTimer;                     // 队列处理定时器
     bool m_isWaitingForResponse;              // 是否正在等待响应
     bool m_isQueuePaused;                     // 队列是否被用户暂停（新增）
-    QString m_currentExpectedNormalized;      // 当前等待的标准化期望前缀
-    bool m_currentAsciiMode;                  // 当前等待是否ASCII模式
+
+    // 响应等待机制（新）
+    QString m_expectedResponse;               // 期望的响应内容
+    bool m_expectedAsciiMode;                 // 期望响应是否为ASCII模式
+    QElapsedTimer m_responseTimer;            // 响应超时计时器
+    int m_retryCount;                         // 当前命令的重试次数
+    int m_motorRoundCount;                    // 电机轮询已完成的轮次（每轮400次）
+    QByteArray m_currentCommand;              // 当前正在等待响应的命令
+    bool m_currentCommandAsciiMode;           // 当前命令是否为ASCII模式
+    QTimer* m_responseTimeoutTimer;           // 响应超时定时器
+    static const int MAX_RETRIES = 300;                // 普通命令最大重试次数
+    static const int MOTOR_MAX_RETRIES = 400;        // 电机到位最大重试次数（400次×50ms = 20秒）
+    static const int MOTOR_MAX_ROUNDS = 2;           // 电机轮询最大轮次（每轮400次，共3轮才报错）
+    static const int RESPONSE_TIMEOUT = 90;        // 响应超时时间（毫秒）
+    static const int MOTOR_RESPONSE_TIMEOUT = 50;   // 电机到位轮询间隔（毫秒，设备不主动上报需主动查询）
+
+    // 命令发送间隔控制
+    QElapsedTimer m_lastSendTime;             // 上次发送命令的时间戳
+    bool m_justFinishedWaiting;               // 刚完成响应等待，下一条命令跳过间隔（已废弃，保留以兼容）
+    static const int MIN_SEND_INTERVAL = 40; // 最小发送间隔（毫秒）- 两条命令之间必须至少间隔40ms
+
+    // 步骤跳过相关
+    bool m_isSkippingStep;                    // 是否正在跳过步骤
+    QString m_currentSkippingStep;            // 当前正在跳过的步骤名称
     
-    // 天平称重相关
-    static double m_expectedWeight;            // 期望重量值（用于对比，默认为0，所有对象共用）
-    static bool m_balancePrintEnabled;         // 是否打印天平接收数据（默认关闭，所有对象共用）
-    static double m_weightThresholds[3];       // 3个重量阈值（所有对象共用）
-    static bool m_thresholdTriggered[3];       // 标记每个阈值是否已触发（所有对象共用）
+    // 天平称重相关（静态变量使用 g_ 前缀表示全局共享）
+    static double g_expectedWeight;            // 期望重量值（用于对比，默认为0，所有对象共用）
+    static bool g_balancePrintEnabled;         // 是否打印天平接收数据（默认关闭，所有对象共用）
+    static double g_weightThresholds[3];       // 3个重量阈值（所有对象共用）
+    static bool g_thresholdTriggered[3];       // 标记每个阈值是否已触发（所有对象共用）
+    static bool g_isWeightPauseActive;         // 重量暂停标志位（防止重复触发，所有对象共用）
+    static QMutex g_weightCheckMutex;          // 称重检测互斥锁（防止多线程同时访问）
     
     // 计时器相关
     QMap<QString, QDateTime> m_timerStartTimes;  // 存储各个计时器的开始时间（timerName -> startTime）
     QMap<QString, qint64> m_timerResults;        // 存储各个计时器的耗时结果（timerName -> elapsedMs）
     
+    // 自动重连相关
+    QString m_lastRemoteIP;                       // 上次连接的远程IP
+    quint16 m_lastRemotePort;                     // 上次连接的远程端口
+    QString m_lastLocalIP;                        // 上次连接的本地IP
+    bool m_lastProxyDisabled;                     // 上次连接是否禁用代理
+    bool m_autoReconnectEnabled;                  // 是否启用自动重连
+    bool m_manualDisconnect;                      // 是否手动断开（手动断开时不自动重连）
+    int m_reconnectAttempts;                      // 当前重连尝试次数
+    static const int MAX_RECONNECT_ATTEMPTS = 5;  // 最大重连尝试次数
+    QTimer* m_reconnectTimer;                     // 重连定时器
+
     /**
-     * @brief 检查收到的数据是否是到位响应（XYZ电机）
-     * @param data 收到的数据
-     * @return true 表示已到位
+     * @brief 尝试重连
      */
-    bool checkIfReachedPosition(const QByteArray& data);
+    void attemptReconnect();
     
     /**
-     * @brief 检查收到的数据是否是电爪初始化完成响应（ModBus RTU）
-     * @param data 收到的数据
-     * @return true 表示初始化完成
+     * @brief 设置是否启用自动重连
+     * @param enabled 是否启用
      */
-    bool checkIfGripperInitialized(const QByteArray& data);
-    
-    /**
-     * @brief 启动轮询机制
-     * @param deviceNum 设备编号
-     * @param command 查询命令
-     */
-    void startPolling(const QString& deviceNum, const QString& command);
-    
-    /**
-     * @brief 停止轮询机制
-     */
-    void stopPolling();
+    void setAutoReconnectEnabled(bool enabled) { m_autoReconnectEnabled = enabled; }
     
     /**
      * @brief 处理消息队列

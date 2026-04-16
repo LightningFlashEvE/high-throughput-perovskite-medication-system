@@ -1,6 +1,6 @@
 #include "mainwindow.h"
-#include "tcpCamera.h"
 #include "ui_mainwindow.h"
+#include <QMessageBox>
 #include <QTimer>
 #include <QDateTime>
 #include <QGraphicsView>
@@ -9,6 +9,8 @@
 #include <QCloseEvent>
 #include <QPainter>
 #include <algorithm> // for std::clamp
+#include <QLabel>
+#include <QListWidget>
 #include <QMenu>
 #include <QPushButton>
 #include <QPixmap>
@@ -16,12 +18,16 @@
 #include <QSettings>
 #include <QFileInfo>
 #include <QDebug>
+#include <QHBoxLayout>
+#include <QWidget>
 #include <QApplication>
-#include <QLabel>
-#include <QSlider>
 #include "rtspplayer.h"
 #include "tcpclientcore.h"
 #include "qsqldatabase.h"
+#include "databasesettingsdialog.h"
+#include "networksettingsdialog.h"
+#include "motorcontrol.h"
+#include "printdebug.h"
 #include <QtSql/QSqlQuery>
 #include <QSqlError>
 
@@ -29,9 +35,6 @@ MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
     , ui(new Ui::MainWindow)
 {
-    // 设置单例实例
-    instance = this;
-    
     ui->setupUi(this);
 
     // 将“停止”按钮（pushButton_Stop）关联到紧急停止槽
@@ -75,28 +78,51 @@ MainWindow::MainWindow(QWidget *parent)
     connect(shakeBedEmptyCheckTimer, &QTimer::timeout, this, &MainWindow::onShakeBedEmptyCheckTimeout);
     // 定时器间隔将在 start() 时设置
 
-    /*** 初始化棋盘视图与棋子（封装为 ChessBoardView） ***/
+    /*** 初始化四盘数据库看板 ***/
     if (ui->graphicsView) {
         ui->graphicsView->setMinimumSize(650, 440);
-        // 让 QGraphicsView 背景跟随全局主题（明/暗）
-        ui->graphicsView->setBackgroundBrush(palette().window());
-        if (ui->graphicsView->viewport()) {
-            ui->graphicsView->viewport()->setAutoFillBackground(false);
-        }
     }
-    chessBoard = new ChessBoardView(this);
-    chessBoard->init(ui->graphicsView);
+    initDashboardScene();
 
-    /*** 初始化流程视图（封装到 FlowViewManager，挂载 frame_2） ***/
-    if (ui->frame_2) {
-        ui->frame_2->setMinimumSize(450, 440);
-        // 让 frame_2 背景随主题，由样式/调色板统一控制
-        ui->frame_2->setAttribute(Qt::WA_StyledBackground, true);
-        ui->frame_2->setStyleSheet("background-color: palette(window);");
-    }
-    flowManager = new FlowViewManager(this);
-    flowManager->init(ui->frame_2);
+    /*** 绑定 widget_m 配方队列面板子控件 ***/
+    m_recipeCurrentLabel = ui->m_recipeCurrentLabel;
+    m_recipeQueueList    = ui->listWidget_recipeQueue;
 
+    // 绑定流程步骤勾选框
+    m_processCheckBox_reset = ui->m_processCheckBox_reset;
+    m_processCheckBox_xyzBackToOrigin1 = ui->m_processCheckBox_xyzBackToOrigin1;
+    m_processCheckBox_takeEmptyBottle = ui->m_processCheckBox_takeEmptyBottle;
+    m_processCheckBox_getSolid = ui->m_processCheckBox_getSolid;
+    m_processCheckBox_xyzBackToOrigin2 = ui->m_processCheckBox_xyzBackToOrigin2;
+    m_processCheckBox_getLiquid = ui->m_processCheckBox_getLiquid;
+    m_processCheckBox_tightenBottle = ui->m_processCheckBox_tightenBottle;
+
+    // 先加载保存的状态（在连接信号之前，避免触发保存）
+    loadProcessStepsState();
+
+    // 连接复选框状态改变信号，保存到ini文件
+    connect(m_processCheckBox_reset, &QCheckBox::stateChanged, this, &MainWindow::saveProcessStepsState);
+    connect(m_processCheckBox_xyzBackToOrigin1, &QCheckBox::stateChanged, this, &MainWindow::saveProcessStepsState);
+    connect(m_processCheckBox_takeEmptyBottle, &QCheckBox::stateChanged, this, &MainWindow::saveProcessStepsState);
+    connect(m_processCheckBox_getSolid, &QCheckBox::stateChanged, this, &MainWindow::saveProcessStepsState);
+    connect(m_processCheckBox_xyzBackToOrigin2, &QCheckBox::stateChanged, this, &MainWindow::saveProcessStepsState);
+    connect(m_processCheckBox_getLiquid, &QCheckBox::stateChanged, this, &MainWindow::saveProcessStepsState);
+    connect(m_processCheckBox_tightenBottle, &QCheckBox::stateChanged, this, &MainWindow::saveProcessStepsState);
+
+    // 绑定运行按钮
+    m_runSelectedStepsButton = ui->m_runSelectedStepsButton;
+
+    // 连接运行按钮的点击事件
+    connect(m_runSelectedStepsButton, &QPushButton::clicked, this, &MainWindow::runSelectedSteps);
+
+    // 绑定清除状态按钮
+    m_clearProcessStateButton = ui->m_clearProcessStateButton;
+
+    // 连接清除状态按钮的点击事件
+    connect(m_clearProcessStateButton, &QPushButton::clicked, this, &MainWindow::resetProcessStateDisplay);
+
+    // 初始化流程状态显示为灰色
+    resetProcessStateDisplay();
 
     if (ui->menuStatus) {
         // 创建一个菜单项
@@ -106,12 +132,8 @@ MainWindow::MainWindow(QWidget *parent)
         ui->menuStatus->addAction(statusAction2);
 
         // 连接菜单项的点击事件
-        connect(statusAction, &QAction::triggered, this, []{
-            qDebug() << "哈哈哈";
-        });
-        connect(statusAction2, &QAction::triggered, this, []{
-            qDebug() << "哈哈哈";
-        });
+        connect(statusAction, &QAction::triggered, this, []{});
+        connect(statusAction2, &QAction::triggered, this, []{});
     }
 
     if (ui->menuSettings) {
@@ -128,73 +150,28 @@ MainWindow::MainWindow(QWidget *parent)
                 // 方向按键信号 -> 移动 zhua
                 const int step = 1; // 每次移动一个网格
                 connect(settingsPanel, &SettingsButton::moveUpClicked, this, [this] {
-                    int maxRow = chessBoard ? chessBoard->gridMaxRow() : 99;
-                    //int maxCol = chessBoard ? chessBoard->gridMaxCol() : 99;
-                    zhuaRow = std::clamp(zhuaRow - step, 0, maxRow);
-                    moveChessPiece(0, zhuaCol, zhuaRow);
+                    zhuaRow = std::clamp(zhuaRow - step, 0, 99);
                     settingsPanel->setLocation(zhuaCol, zhuaRow);
                 });
                 connect(settingsPanel, &SettingsButton::moveDownClicked, this, [this] {
-                    int maxRow = chessBoard ? chessBoard->gridMaxRow() : 99;
-                    zhuaRow = std::clamp(zhuaRow + step, 0, maxRow);
-                    moveChessPiece(0, zhuaCol, zhuaRow);
+                    zhuaRow = std::clamp(zhuaRow + step, 0, 99);
                     settingsPanel->setLocation(zhuaCol, zhuaRow);
                 });
                 connect(settingsPanel, &SettingsButton::moveLeftClicked, this, [this] {
-                    int maxCol = chessBoard ? chessBoard->gridMaxCol() : 99;
-                    zhuaCol = std::clamp(zhuaCol - step, 0, maxCol);
-                    moveChessPiece(0, zhuaCol, zhuaRow);
+                    zhuaCol = std::clamp(zhuaCol - step, 0, 99);
                     settingsPanel->setLocation(zhuaCol, zhuaRow);
                 });
                 connect(settingsPanel, &SettingsButton::moveRightClicked, this, [this] {
-                    int maxCol = chessBoard ? chessBoard->gridMaxCol() : 99;
-                    zhuaCol = std::clamp(zhuaCol + step, 0, maxCol);
-                    moveChessPiece(0, zhuaCol, zhuaRow);
+                    zhuaCol = std::clamp(zhuaCol + step, 0, 99);
                     settingsPanel->setLocation(zhuaCol, zhuaRow);
                 });
 
-                // 坐标文本框提交后，移动至指定网格
+                // 坐标文本框提交后同步显示
                 connect(settingsPanel, &SettingsButton::positionEdited, this, [this](int col, int row){
-                    int maxCol = chessBoard ? chessBoard->gridMaxCol() : 199;
-                    int maxRow = chessBoard ? chessBoard->gridMaxRow() : 199;
-                    zhuaCol = std::clamp(col, 0, maxCol);
-                    zhuaRow = std::clamp(row, 0, maxRow);
-                    moveChessPiece(0, zhuaCol, zhuaRow);
+                    zhuaCol = std::clamp(col, 0, 199);
+                    zhuaRow = std::clamp(row, 0, 199);
                     if (settingsPanel) settingsPanel->setLocation(zhuaCol, zhuaRow);
                 });
-
-                /******  试管状态机  up ******/
-                // 步骤4：UI按钮 -> 触发状态切换
-                // 1) 用户点击设置页按钮（Empty/Full/Using/Error/Disable）
-                // 2) 这里监听到点击后，调用 chessBoard->setTubeState(...)
-                // 3) setTubeState 内部修改状态并调用 applyTubeStyle 套用样式，圆形外观立即变化
-                // 将按钮作用于棋盘上(50,50)的试管状态
-                if (settingsPanel->findChild<QPushButton*>("pushButtonUsing")) {
-                    connect(settingsPanel->findChild<QPushButton*>("pushButtonUsing"), &QPushButton::clicked, this, [this]{
-                        if (chessBoard) chessBoard->setTubeState(ChessBoardView::TubeState::Using);
-                    });
-                }
-                if (settingsPanel->findChild<QPushButton*>("pushButtonFull")) {
-                    connect(settingsPanel->findChild<QPushButton*>("pushButtonFull"), &QPushButton::clicked, this, [this]{
-                        if (chessBoard) chessBoard->setTubeState(ChessBoardView::TubeState::Full);
-                    });
-                }
-                if (settingsPanel->findChild<QPushButton*>("pushButtonError")) {
-                    connect(settingsPanel->findChild<QPushButton*>("pushButtonError"), &QPushButton::clicked, this, [this]{
-                        if (chessBoard) chessBoard->setTubeState(ChessBoardView::TubeState::Error);
-                    });
-                }
-                if (settingsPanel->findChild<QPushButton*>("pushButtonDisable")) {
-                    connect(settingsPanel->findChild<QPushButton*>("pushButtonDisable"), &QPushButton::clicked, this, [this]{
-                        if (chessBoard) chessBoard->setTubeState(ChessBoardView::TubeState::Disabled);
-                    });
-                }
-                if (settingsPanel->findChild<QPushButton*>("pushButtonEmpty")) {
-                    connect(settingsPanel->findChild<QPushButton*>("pushButtonEmpty"), &QPushButton::clicked, this, [this]{
-                        if (chessBoard) chessBoard->setTubeState(ChessBoardView::TubeState::Empty);
-                    });
-                }
-                /******  试管状态机  down ******/
             }
             settingsPanel->show();
             settingsPanel->raise();
@@ -253,6 +230,39 @@ MainWindow::MainWindow(QWidget *parent)
             rtspPlayerPanel->raise();
             rtspPlayerPanel->activateWindow();
         });
+
+        // 网络设置菜单项（含数据库与 TCP）
+        QAction *settingsActionNetwork = new QAction("网络设置", this);
+        ui->menuSettings->addAction(settingsActionNetwork);
+        connect(settingsActionNetwork, &QAction::triggered, this, [this] {
+            NetworkSettingsDialog dlg(dbm, tcpCore, tcpBalanceCore, this);
+            dlg.exec();
+        });
+
+        // 电机控制菜单项
+        QAction *settingsActionMotor = new QAction("电机控制", this);
+        ui->menuSettings->addAction(settingsActionMotor);
+        connect(settingsActionMotor, &QAction::triggered, this, [this] {
+            auto *dlg = new MotorControl(tcpCore, tcpBalanceCore, dbm, this);
+            dlg->setAttribute(Qt::WA_DeleteOnClose);
+            dlg->show();
+        });
+
+        // 打印调试菜单项
+        QAction *settingsActionPrintDebug = new QAction("打印调试", this);
+        ui->menuSettings->addAction(settingsActionPrintDebug);
+        connect(settingsActionPrintDebug, &QAction::triggered, this, [] {
+            if (!g_debugWindow) {
+                g_debugWindow = new DebugLogWindow(nullptr);
+                g_debugWindow->setAttribute(Qt::WA_DeleteOnClose);
+                QObject::connect(g_debugWindow, &QObject::destroyed, [] {
+                    g_debugWindow = nullptr;
+                });
+            }
+            g_debugWindow->show();
+            g_debugWindow->raise();
+            g_debugWindow->activateWindow();
+        });
     }
 
     if (ui->menuHistory) {
@@ -263,24 +273,69 @@ MainWindow::MainWindow(QWidget *parent)
         });
     }
 
+    /*** 初始化状态栏天平重量实时显示标签 ***/
+    m_statusWeightLabel = new QLabel(this);
+    m_statusWeightLabel->setFont(QFont("Courier New", 9));
+    m_statusWeightLabel->setAlignment(Qt::AlignLeft | Qt::AlignVCenter);
+    ui->statusbar->addWidget(m_statusWeightLabel, 1);
+    // 开机时用占位符填充，确保格式立刻可见
+    updateWeightStatusBar(0.0, 0.0, 0.0);
 
+    /*** 初始化状态栏日期时间标签（最右侧固定区域）***/
+    m_statusDateTimeLabel = new QLabel(this);
+    m_statusDateTimeLabel->setFont(QFont("Courier New", 9));
+    m_statusDateTimeLabel->setAlignment(Qt::AlignRight | Qt::AlignVCenter);
+    m_statusDateTimeLabel->setContentsMargins(8, 0, 4, 0);
+    ui->statusbar->addPermanentWidget(m_statusDateTimeLabel);
 
-    // 创建实例
-    tcpCamera *camera = new tcpCamera(this);
+    /*** 初始化状态栏三个连接状态指示灯（居中显示） ***/
+    QWidget *ledContainer = new QWidget(this);
+    QHBoxLayout *ledLayout = new QHBoxLayout(ledContainer);
+    ledLayout->setContentsMargins(0, 0, 0, 0);
+    ledLayout->setSpacing(6);
 
-    // 连接相机
-    if (camera->tcpCameraConnect()) {
-        // 发送命令
-        camera->startTime(10000, true);
+    // 创建三个灯（无文字，hover 显示 tooltip）
+    m_ledMain = new QLabel(ledContainer);
+    m_ledBalance = new QLabel(ledContainer);
+    m_ledDb = new QLabel(ledContainer);
+
+    for (QLabel *led : {m_ledMain, m_ledBalance, m_ledDb}) {
+        led->setMinimumSize(16, 16);
+        led->setMaximumSize(16, 16);
     }
+    m_ledMain->setToolTip("主控 TCP");
+    m_ledBalance->setToolTip("天平 TCP");
+    m_ledDb->setToolTip("数据库");
+
+    // 居中布局：stretch - LED - LED - LED - stretch
+    ledLayout->addStretch();
+    ledLayout->addWidget(m_ledDb);
+    ledLayout->addWidget(m_ledMain);
+    ledLayout->addWidget(m_ledBalance);
+    ledLayout->addStretch();
+
+    // 插入到状态栏中间（index 1，在 weight label 右侧）
+    ui->statusbar->insertWidget(1, ledContainer);
+
+    // 启动 1s 定时器更新 LED（读缓存，不阻塞 UI）
+    m_connectionStatusTimer = new QTimer(this);
+    connect(m_connectionStatusTimer, &QTimer::timeout, this, &MainWindow::updateConnectionStatusLeds);
+    m_connectionStatusTimer->start(1000);
+
+    // 启动 10s 慢速定时器做真实 DB 探测（SELECT 1），结果写入缓存
+    m_dbLastKnownConnected = dbm && dbm->isConnected();
+    m_dbHealthCheckTimer = new QTimer(this);
+    connect(m_dbHealthCheckTimer, &QTimer::timeout, this, [this]() {
+        m_dbLastKnownConnected = dbm && dbm->isConnected();
+    });
+    m_dbHealthCheckTimer->start(10000);
+
+    updateConnectionStatusLeds();
 
 }
 
 MainWindow::~MainWindow()
 {
-    // 清空单例实例
-    instance = nullptr;
-    
     // 清理资源（在 closeEvent 中已经处理，这里作为保险）
     cleanupResources();
     
@@ -299,45 +354,110 @@ void MainWindow::closeEvent(QCloseEvent *event)
     qDebug() << "主窗口关闭完成";
 }
 
-// UI“紧急暂停”按钮槽：预留紧急停止逻辑
-void MainWindow::onEmergencyStopButtonClicked()
+// update emergency stop button text and color
+void MainWindow::updateEmergencyStopButton()
 {
-    // ========== 检查并重置中断的配方（开机时调用）==========
-    checkAndResetInterruptedRecipes();
+    if (!ui->pushButton_Stop) return;
+    if (m_isEmergencyPaused) {
+        ui->pushButton_Stop->setText(QString::fromUtf8("继续运行"));
+        ui->pushButton_Stop->setStyleSheet(QStringLiteral("color: green;"));
+    } else {
+        ui->pushButton_Stop->setText(QString::fromUtf8("紧急暂停"));
+        ui->pushButton_Stop->setStyleSheet(QStringLiteral("color: red;"));
+    }
+}
 
-    // 暂停当前的配方队列
-    if (!tcpCore) {
-        qWarning() << "TCP核心对象未初始化，无法暂停配方队列";
+// 放弃当前配方并预载下一条
+void MainWindow::abandonCurrentRecipeAndLoadNext()
+{
+    qDebug() << "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━";
+    qDebug() << "放弃当前配方并预载下一条";
+    qDebug() << "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━";
+
+    if (!tcpCore || !dbm) {
+        qWarning() << "TCP核心或数据库未初始化";
         return;
     }
+
+    // 1. 清空 TCP 队列
     tcpCore->clearMessageQueue();
+    qDebug() << "  步骤1: 已清空 TCP 队列";
 
+    // 2. 更新数据库：将当前正在执行的配方标记为"已放弃"（状态码 8）
+    QString updateSql = QString("UPDATE recipeQueue SET processState = 8 WHERE processState = %1")
+        .arg(RecipeProcessing);
+    QSqlQuery updateQuery = dbm->query(updateSql);
+    if (updateQuery.lastError().isValid()) {
+        qWarning() << "  步骤2: 更新配方状态为已放弃失败:" << updateQuery.lastError().text();
+    } else {
+        int rowsAffected = updateQuery.numRowsAffected();
+        qDebug() << "  步骤2: 已将" << rowsAffected << "个配方标记为已放弃（状态码 8）";
+    }
 
-    RecipeQueueItem newRecipe;
-    newRecipe.recipeName = "STOP";                     // 使用化学方程式作为配方名称
-    newRecipe.createTime = QDateTime::currentDateTime(); // 记录创建时间
-    newRecipe.processState = RecipeNotProcessed;         // 配方初始为“未处理”
+    // 3. 预载下一条配方（但不启动执行，因为仍处于暂停状态）
+    qDebug() << "  步骤3: 预载下一条配方到队列（不自动启动）";
 
-    // 左侧的xyz  2，3，4号电机。立刻停止
-    QString stop02Command = tcpCore->buildDeviceCommand("02", "K", 0, 0);
-    newRecipe.messageQueue.enqueue(MessageQueueItem(stop02Command.toUtf8(), true));
-    QString release02Command = tcpCore->buildDeviceCommand("02", "a", 0, 0);
-    newRecipe.messageQueue.enqueue(MessageQueueItem(release02Command.toUtf8(), true, "02a"));
+    // 调用 loadAndExecuteNextRecipeFromDatabase，但由于 m_isQueuePaused = true，
+    // sendMessage() 不会自动启动定时器
+    if (!loadAndExecuteNextRecipeFromDatabase()) {
+        qDebug() << "  ⚠ 没有更多待执行的配方";
+    } else {
+        qDebug() << "  ✓ 下一条配方已预载到队列，等待用户点击「继续运行」";
+    }
 
-    saveAndExecuteRecipe(newRecipe);
+    qDebug() << "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n";
+}
 
-    // QString stopLeftXyzCommand = tcpCore->buildDeviceCommand("02", "K", 0, 0);
-    // tcpCore->sendMessageAsync(stopLeftXyzCommand.toUtf8(), true, "02K");
-    // QString stopLeftYzCommand = tcpCore->buildDeviceCommand("03", "K", 0, 0);
-    // tcpCore->sendMessageAsync(stopLeftYzCommand.toUtf8(), true, "03K");
-    // QString stopLeftZCommand = tcpCore->buildDeviceCommand("04", "K", 0, 0);
-    // tcpCore->sendMessageAsync(stopLeftZCommand.toUtf8(), true, "04K");
+void MainWindow::onEmergencyStopButtonClicked()
+{
+    if (!tcpCore) {
+        qWarning() << "tcpCore not initialized";
+        return;
+    }
 
-    // 左侧电机   1号电机
+    if (!m_isEmergencyPaused) {
+        // running -> pause: 先暂停队列并刹停所有设备
+        tcpCore->pauseQueue();
 
-    // 右侧xyz   6，8，9，10号电机
+        QString stop02 = tcpCore->buildDeviceCommand("02", "K", 0, 1);
+        tcpCore->sendMessage(stop02.toUtf8(), true);
+        QString stop03 = tcpCore->buildDeviceCommand("03", "K", 0, 1);
+        tcpCore->sendMessage(stop03.toUtf8(), true);
+        QString stop04 = tcpCore->buildDeviceCommand("04", "K", 0, 1);
+        tcpCore->sendMessage(stop04.toUtf8(), true);
+        QString stop06 = tcpCore->buildDeviceCommand("06", "K", 0, 1);
+        tcpCore->sendMessage(stop06.toUtf8(), true);
+        QString stop09 = tcpCore->buildDeviceCommand("09", "K", 0, 1);
+        tcpCore->sendMessage(stop09.toUtf8(), true);
+        QString stop0A = tcpCore->buildDeviceCommand("0A", "K", 0, 1);
+        tcpCore->sendMessage(stop0A.toUtf8(), true);
 
-    // 右侧电机   5，7号电机
+        m_isEmergencyPaused = true;
+        updateEmergencyStopButton();
+
+        // 弹出选择对话框
+        QMessageBox msgBox(this);
+        msgBox.setWindowTitle(QString::fromUtf8("紧急暂停"));
+        msgBox.setText(QString::fromUtf8("已暂停当前配方执行，请选择操作："));
+        QPushButton *btnPauseOnly = msgBox.addButton(
+            QString::fromUtf8("仅暂停"), QMessageBox::AcceptRole);
+        QPushButton *btnAbandon   = msgBox.addButton(
+            QString::fromUtf8("放弃当前配方"), QMessageBox::DestructiveRole);
+        msgBox.setDefaultButton(btnPauseOnly);
+        msgBox.exec();
+
+        if (msgBox.clickedButton() == btnAbandon) {
+            abandonCurrentRecipeAndLoadNext();
+        }
+        // 若选"仅暂停"，保持暂停状态等待用户点「继续运行」
+
+    } else {
+        // paused -> resume
+        tcpCore->resumeQueue();
+
+        m_isEmergencyPaused = false;
+        updateEmergencyStopButton();
+    }
 }
 
 void MainWindow::cleanupResources()
@@ -424,34 +544,250 @@ void MainWindow::cleanupResources()
         QApplication::processEvents(QEventLoop::ExcludeUserInputEvents, 50);
     }
     
-    // 清理棋盘和流程图（它们是 this 的子对象，会自动清理）
-    // 但为了确保，我们可以显式停止它们
-    if (chessBoard) {
-        chessBoard = nullptr; // 是 this 的子对象，会在析构时自动删除
-    }
-    
-    if (flowManager) {
-        flowManager = nullptr; // 是 this 的子对象，会在析构时自动删除
-    }
-    
     // 最后处理一次事件，确保所有删除操作完成
     QApplication::processEvents(QEventLoop::ExcludeUserInputEvents, 100);
     
     qDebug() << "资源清理完成";
 }
 
-// 每秒刷新日期与时间显示
+void MainWindow::updateConnectionStatusLeds()
+{
+    // 防御：组件未初始化时直接跳过
+    if (!m_ledMain || !m_ledBalance || !m_ledDb)
+        return;
+
+    auto setLed = [](QLabel *led, bool on, const QString &name) {
+        if (!led) return;
+        if (on) {
+            led->setStyleSheet(
+                "QLabel {"
+                "  background-color: #4caf50;"
+                "  border-radius: 8px;"
+                "  border: 2px solid #388e3c;"
+                "}"
+            );
+            led->setToolTip(name + " - 已连接");
+        } else {
+            led->setStyleSheet(
+                "QLabel {"
+                "  background-color: #f44336;"
+                "  border-radius: 8px;"
+                "  border: 2px solid #c62828;"
+                "}"
+            );
+            led->setToolTip(name + " - 未连接");
+        }
+    };
+    setLed(m_ledMain,    tcpCore        && tcpCore->isConnected(),       "主控 TCP");
+    setLed(m_ledBalance, tcpBalanceCore  && tcpBalanceCore->isConnected(), "天平 TCP");
+    setLed(m_ledDb,      m_dbLastKnownConnected,                          "数据库");
+}
+
+// 更新状态栏天平重量显示（三列：当前 / 目标 / 目的，各占8位，靠左对齐）
+void MainWindow::updateWeightStatusBar(double current, double target, double goal)
+{
+    if (!m_statusWeightLabel) return;
+
+    // 将数值格式化为宽度8、保留4位小数、靠左显示的字段
+    // 若值为0则以 "--" 占位，保持列宽一致
+    auto fmtField = [](double v) -> QString {
+        if (v == 0.0)
+            return QString("--").leftJustified(8);
+        return QString::number(v, 'f', 4).leftJustified(8);
+    };
+    auto fmtCurrent = [](double v) -> QString {
+        return QString::number(v, 'f', 4).leftJustified(8);
+    };
+
+    QString text = QString("当前：<b>%1</b>  目标：<b>%2</b>  目的：<b>%3</b>")
+                       .arg(fmtCurrent(current))
+                       .arg(fmtField(target))
+                       .arg(fmtField(goal));
+    m_statusWeightLabel->setText(text);
+}
+
+// 每秒刷新日期与时间显示（底部状态栏最右侧）
 void MainWindow::updateTime()
 {
     QDateTime currentDateTime = QDateTime::currentDateTime();
+    if (m_statusDateTimeLabel) {
+        m_statusDateTimeLabel->setText(
+            currentDateTime.toString("yyyy.M.d") + "  " + currentDateTime.toString("hh:mm:ss"));
+    }
+    updateRecipeQueuePanel();
 
-    // 更新日期显示 (格式: 2025.10.1)DD
-    QString dateStr = currentDateTime.toString("yyyy.M.d");
-    ui->labelDate->setText(dateStr);
+    // 每2秒刷新一次四盘看板
+    ++m_dashboardRefreshTick;
+    if (m_dashboardRefreshTick >= 2) {
+        m_dashboardRefreshTick = 0;
+        renderDashboardScene();
+    }
+}
 
-    // 更新时间显示 (格式: 12:33:21)
-    QString timeStr = currentDateTime.toString("hh:mm:ss");
-    ui->labelTime->setText(timeStr);
+// 初始化四盘看板：创建场景并挂入 graphicsView
+void MainWindow::initDashboardScene()
+{
+    if (!ui->graphicsView) return;
+    m_dashboardScene = new QGraphicsScene(this);
+    ui->graphicsView->setScene(m_dashboardScene);
+    ui->graphicsView->setRenderHint(QPainter::Antialiasing);
+    ui->graphicsView->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+    ui->graphicsView->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+    renderDashboardScene();
+}
+
+// 刷新四盘看板：查询四张表，按槽位绘制格子
+void MainWindow::renderDashboardScene()
+{
+    if (!m_dashboardScene) return;
+    m_dashboardScene->clear();
+
+    // 视口尺寸
+    const QRectF vr = ui->graphicsView->rect();
+    const double W  = vr.width()  > 10 ? vr.width()  - 4 : 650;
+    const double H  = vr.height() > 10 ? vr.height() - 4 : 440;
+
+    // 单盘区块尺寸（2列2行，留少量间距）
+    const double gapOuter = 6;
+    const double gapInner = 4;
+    const double panW = (W - gapOuter * 3) / 2.0;
+    const double panH = (H - gapOuter * 3) / 2.0;
+
+    // 四盘：名称 + 数据表
+    struct PanInfo { QString title; QString tableName; double ox; double oy; };
+    PanInfo pans[4] = {
+        { "液体盘",   "pan_LiquidPosition",         gapOuter,         gapOuter         },
+        { "空瓶盘",   "pan_EmptyBottlePosition",     gapOuter * 2 + panW, gapOuter         },
+        { "药品盘",   "tray2",                       gapOuter,         gapOuter * 2 + panH },
+        { "成品盘",   "pan_FinishedProductLocation", gapOuter * 2 + panW, gapOuter * 2 + panH }
+    };
+
+    // 每盘 15 个槽（3列5行）
+    const int COLS = 5;
+    const int ROWS = 3;
+    const int SLOTS = COLS * ROWS;    // 15
+
+    for (auto& pan : pans) {
+        // 盘背景
+        QGraphicsRectItem *bg = m_dashboardScene->addRect(
+            pan.ox, pan.oy, panW, panH,
+            QPen(QColor(180, 180, 180), 1),
+            QBrush(QColor(245, 245, 250)));
+        Q_UNUSED(bg);
+
+        // 盘标题
+        QGraphicsTextItem *titleItem = m_dashboardScene->addText(pan.title);
+        titleItem->setDefaultTextColor(QColor(60, 60, 60));
+        QFont tf = titleItem->font();
+        tf.setPixelSize(12);
+        tf.setBold(true);
+        titleItem->setFont(tf);
+        titleItem->setPos(pan.ox + 4, pan.oy + 2);
+
+        // 标题栏高度
+        const double titleH = 20;
+        const double cellAreaW = panW - gapInner * 2;
+        const double cellAreaH = panH - titleH - gapInner * 2;
+        const double cellW = cellAreaW / COLS;
+        const double cellH = cellAreaH / ROWS;
+
+        // 查询槽位数据（slot_index, drug_name, value）
+        // 用 map 缓存，未出现的槽位保持空
+        QMap<int, QPair<QString, QString>> slotData;  // slot_index -> (drug_name, value)
+        if (dbm) {
+            QString sql = QString("SELECT slot_index, drug_name, value FROM %1").arg(pan.tableName);
+            QSqlQuery q = dbm->query(sql);
+            while (q.next()) {
+                int idx = q.value("slot_index").toInt();
+                QString name = q.value("drug_name").toString().trimmed();
+                QString val  = q.value("value").toString().trimmed();
+                slotData[idx] = qMakePair(name, val);
+            }
+        }
+
+        // 绘制 15 个格子
+        for (int slot = 0; slot < SLOTS; ++slot) {
+            int col = slot % COLS;
+            int row = slot / COLS;
+            double cx = pan.ox + gapInner + col * cellW;
+            double cy = pan.oy + titleH + gapInner + row * cellH;
+
+            // 格子背景
+            bool hasContent = slotData.contains(slot) && !slotData[slot].first.isEmpty();
+            QColor cellBg = hasContent ? QColor(235, 245, 255) : QColor(252, 252, 252);
+            m_dashboardScene->addRect(cx, cy, cellW - 2, cellH - 2,
+                QPen(QColor(210, 210, 210), 0.5), QBrush(cellBg));
+
+            // 槽位编号（左上角灰色小字）
+            QGraphicsTextItem *numItem = m_dashboardScene->addText(QString::number(slot));
+            numItem->setDefaultTextColor(QColor(160, 160, 160));
+            QFont nf = numItem->font();
+            nf.setPixelSize(9);
+            numItem->setFont(nf);
+            numItem->setPos(cx + 2, cy + 1);
+
+            if (hasContent) {
+                QString drugName = slotData[slot].first;
+                QString valueStr = slotData[slot].second;
+
+                // drug_name（中间加粗）
+                QGraphicsTextItem *nameItem = m_dashboardScene->addText(drugName);
+                nameItem->setDefaultTextColor(QColor(30, 30, 30));
+                QFont dnf = nameItem->font();
+                dnf.setPixelSize(10);
+                dnf.setBold(true);
+                nameItem->setFont(dnf);
+                // 水平居中
+                double nameW = nameItem->boundingRect().width();
+                nameItem->setPos(cx + (cellW - 2 - nameW) / 2.0, cy + cellH * 0.3);
+
+                // value mg（底部）
+                if (!valueStr.isEmpty()) {
+                    QGraphicsTextItem *valItem = m_dashboardScene->addText(valueStr + " mg");
+                    valItem->setDefaultTextColor(QColor(80, 80, 80));
+                    QFont vf = valItem->font();
+                    vf.setPixelSize(9);
+                    valItem->setFont(vf);
+                    double valW = valItem->boundingRect().width();
+                    valItem->setPos(cx + (cellW - 2 - valW) / 2.0, cy + cellH * 0.62);
+                }
+            }
+        }
+    }
+
+    m_dashboardScene->setSceneRect(0, 0, W, H);
+    ui->graphicsView->fitInView(m_dashboardScene->sceneRect(), Qt::KeepAspectRatio);
+}
+
+// 刷新 widget_m 配方队列面板（当前执行 + 即将执行）
+void MainWindow::updateRecipeQueuePanel()
+{
+    if (!dbm || !m_recipeCurrentLabel || !m_recipeQueueList) return;
+
+    // 当前执行（processState = 1）
+    QSqlQuery curQ = dbm->query(
+        "SELECT id, recipeName, createTime FROM recipeQueue "
+        "WHERE processState = 1 LIMIT 1");
+    if (curQ.next()) {
+        QString id   = curQ.value("id").toString();
+        QString name = curQ.value("recipeName").toString();
+        QString dt   = curQ.value("createTime").toString();
+        m_recipeCurrentLabel->setText(QString("%1 - %2 - %3").arg(id, name, dt));
+    } else {
+        m_recipeCurrentLabel->setText(tr("无"));
+    }
+
+    // 即将执行（processState = 0，按 executionOrder 排序）
+    QSqlQuery pendQ = dbm->query(
+        "SELECT id, recipeName, createTime FROM recipeQueue "
+        "WHERE processState = 0 ORDER BY executionOrder ASC");
+    m_recipeQueueList->clear();
+    while (pendQ.next()) {
+        QString id   = pendQ.value("id").toString();
+        QString name = pendQ.value("recipeName").toString();
+        QString dt   = pendQ.value("createTime").toString();
+        m_recipeQueueList->addItem(QString("%1 - %2 - %3").arg(id, name, dt));
+    }
 }
 
 // 摇床为空检查定时器回调：每10秒执行一次，检查摇床是否为空并停止摇床
@@ -496,7 +832,7 @@ void MainWindow::onShakeBedEmptyCheckTimeout()
 
     // 如果表中有记录且所有记录的isEmpty都为1，则停止摇床
     if (hasRecords && allEmpty) {
-        qDebug() << "摇床区域全部为空，正在停止摇床...";
+        // qDebug() << "摇床区域全部为空，正在停止摇床...";
         controlShakeBed(false, true);
     }
 }
@@ -563,7 +899,7 @@ void MainWindow::checkShakeBedTimeout()
             newRecipeTianPing.processState = RecipeNotProcessed;
 
             // ++++ 2.填充配方内容 ++++
-            qDebug() << QString("摇床位置 %1 的结束时间已到，正在停止摇床...").arg(selfLocation);
+            qWarning() << QString("摇床位置 %1 的结束时间已到，正在停止摇床...").arg(selfLocation);
             // 停止摇床
             controlShakeBed(false, newRecipeTianPing.messageQueue, true);
             // 取到放置区（摇床到成品区）
@@ -572,17 +908,18 @@ void MainWindow::checkShakeBedTimeout()
             QString leaveCmd = QString("AAleaveTheShaker:%1").arg(selfLocation);
             newRecipeTianPing.messageQueue.enqueue(MessageQueueItem(leaveCmd.toUtf8(), true));
 
-            resetXYZMotorsToZero(newRecipeTianPing.messageQueue);
+            resetXYZMotorsToZero(newRecipeTianPing.messageQueue, "xyzBackToOrigin2");
 
             // ++++ 3.保存到数据库并执行（插队模式：插入到第一个未执行配方之前） ++++
             saveAndExecuteRecipe(newRecipeTianPing, true);
 
             // ++++ 4.isEmpty自加1 ++++（表示已记录在流程里，值变为4，放置后4改1）
-            QString updateSql = "UPDATE shakeBedArea SET isEmpty = isEmpty+1 WHERE selfLocation = ?";
-            if (dbm->preparedUpdate(updateSql, {selfLocation})) {
-                qDebug() << QString("已更新摇床位置 %1 的状态为空").arg(selfLocation);
+            QString updateSql = QString("UPDATE shakeBedArea SET isEmpty = isEmpty+1 WHERE selfLocation = %1").arg(selfLocation);
+            QSqlQuery updateQuery = dbm->query(updateSql);
+            if (updateQuery.lastError().isValid()) {
+                qWarning() << "更新shakeBedArea表失败:" << updateQuery.lastError().text();
             } else {
-                qWarning() << "更新shakeBedArea表失败";
+                qDebug() << QString("已更新摇床位置 %1 的状态为空").arg(selfLocation);
             }
 
             break;
@@ -594,12 +931,20 @@ void MainWindow::checkShakeBedTimeout()
 void MainWindow::moveShakeBedToFinishedProductArea(int selfLocation, QQueue<MessageQueueItem>& messageQueue)
 {
     if (!dbm) {
-        qWarning() << "数据库对象未初始化，无法执行摇床到成品区操作";
+        qCritical() << "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━";
+        qCritical() << "数据库对象未初始化，无法执行摇床到成品区操作，触发紧急暂停";
+        qCritical() << "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━";
+        if (ui && ui->pushButton_Stop)
+            QMetaObject::invokeMethod(ui->pushButton_Stop, "click", Qt::QueuedConnection);
         return;
     }
 
     if (!tcpCore) {
-        qWarning() << "TCP核心对象未初始化，无法执行摇床到成品区操作";
+        qCritical() << "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━";
+        qCritical() << "TCP核心对象未初始化，无法执行摇床到成品区操作，触发紧急暂停";
+        qCritical() << "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━";
+        if (ui && ui->pushButton_Stop)
+            QMetaObject::invokeMethod(ui->pushButton_Stop, "click", Qt::QueuedConnection);
         return;
     }
 
@@ -614,7 +959,11 @@ void MainWindow::moveShakeBedToFinishedProductArea(int selfLocation, QQueue<Mess
         qDebug() << "+++++++++++++1" << shakeBedAreaSelfLocation;
     }
     else {
-        qWarning() << "未找到 isEmpty = 2 的记录";
+        qCritical() << "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━";
+        qCritical() << "未找到 shakeBedArea 中 isEmpty = 3 的记录，触发紧急暂停";
+        qCritical() << "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━";
+        if (ui && ui->pushButton_Stop)
+            QMetaObject::invokeMethod(ui->pushButton_Stop, "click", Qt::QueuedConnection);
         return;
     }
     
@@ -626,7 +975,7 @@ void MainWindow::moveShakeBedToFinishedProductArea(int selfLocation, QQueue<Mess
 
 
     // 去other表，获取originX, originY, gripperZ, rightSpacing, bottomSpacing, cols, rows, currentIndex
-    QString otherSql = "SELECT originX, originY, gripperZ, rightSpacing, bottomSpacing, cols, rows, currentIndex FROM other WHERE name = 'shakeBedArea'";
+    QString otherSql = "SELECT originX, originY, gripperZ, rightSpacing, bottomSpacing, cols, `rows`, currentIndex FROM other WHERE name = 'shakeBedArea'";
     QSqlQuery otherQuery = dbm->query(otherSql);
     int otherOriginX=0, otherOriginY=0, otherGripperZ=0;
     double otherRightSpacing=0, otherBottomSpacing=0;
@@ -643,7 +992,11 @@ void MainWindow::moveShakeBedToFinishedProductArea(int selfLocation, QQueue<Mess
         qDebug() << "+++++++++++++2" << otherOriginX << otherOriginY << otherGripperZ << otherRightSpacing << otherBottomSpacing << otherCols << otherRows << otherCurrentIndex;
     }
     else {
-        qWarning() << "未找到 other 的数据";
+        qCritical() << "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━";
+        qCritical() << "未找到 other 表中 shakeBedArea 记录，触发紧急暂停";
+        qCritical() << "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━";
+        if (ui && ui->pushButton_Stop)
+            QMetaObject::invokeMethod(ui->pushButton_Stop, "click", Qt::QueuedConnection);
         return;
     }
     // 通过originX, originY, gripperZ, rightSpacing, bottomSpacing, cols, rows, currentIndex计算出摇床的空位坐标
@@ -687,65 +1040,75 @@ void MainWindow::moveShakeBedToFinishedProductArea(int selfLocation, QQueue<Mess
     //tcpCore->sendMessageAsync(waitTransferZRaisedCommand.toUtf8(), true, "06d01");
     messageQueue.enqueue(MessageQueueItem(waitTransferZRaisedCommand.toUtf8(), true, "06d01"));
 
-    // 找到 字段name为transferRightArea的originX, originY, gripperZ, rightSpacing, bottomSpacing, cols, rows, currentIndex
-    QString transferRightAreaSql = "SELECT originX, originY, gripperZ, rightSpacing, bottomSpacing, cols, rows, currentIndex FROM other WHERE name = 'transferRightArea'";
-    QSqlQuery transferRightAreaQuery = dbm->query(transferRightAreaSql);
-    int transferRightAreaX=0, transferRightAreaY=0, transferRightAreaZ=0;
-    double transferRightAreaRightSpacing=0, transferRightAreaBottomSpacing=0;
-    int transferRightAreaCols=0, transferRightAreaRows=0, transferRightAreaCurrentIndex=0;
-    if (transferRightAreaQuery.next()) {
-        transferRightAreaX = transferRightAreaQuery.value("originX").toInt();
-        transferRightAreaY = transferRightAreaQuery.value("originY").toInt();
-        transferRightAreaZ = transferRightAreaQuery.value("gripperZ").toInt();
-        transferRightAreaRightSpacing = transferRightAreaQuery.value("rightSpacing").toDouble();
-        transferRightAreaBottomSpacing = transferRightAreaQuery.value("bottomSpacing").toDouble();
-        transferRightAreaCols = transferRightAreaQuery.value("cols").toInt();
-        transferRightAreaRows = transferRightAreaQuery.value("rows").toInt();
-        transferRightAreaCurrentIndex = transferRightAreaQuery.value("currentIndex").toInt();
-    }
-    else {
-        qWarning() << "未找到 transferRightArea 的数据";
+    // 从 pan_init 获取成品区盘首坐标和网格参数
+    QString finishedPanSql = "SELECT x, y, gripperZ, rightSpacing, bottomSpacing, cols, `rows` FROM pan_init WHERE name = 'finashedPositon'";
+    QSqlQuery finishedPanQuery = dbm->query(finishedPanSql);
+    int finishedX=0, finishedY=0, finishedZ=0;
+    int finishedRightSpacing=0, finishedBottomSpacing=0, finishedCols=1, finishedRows=1;
+    if (finishedPanQuery.next()) {
+        finishedX             = finishedPanQuery.value("x").toInt();
+        finishedY             = finishedPanQuery.value("y").toInt();
+        finishedZ             = finishedPanQuery.value("gripperZ").toInt();
+        finishedRightSpacing  = finishedPanQuery.value("rightSpacing").toInt();
+        finishedBottomSpacing = finishedPanQuery.value("bottomSpacing").toInt();
+        finishedCols          = finishedPanQuery.value("cols").toInt();
+        finishedRows          = finishedPanQuery.value("rows").toInt();
+    } else {
+        qCritical() << "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━";
+        qCritical() << "未找到 pan_init 中 finashedPositon 记录，触发紧急暂停";
+        qCritical() << "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━";
+        if (ui && ui->pushButton_Stop)
+            QMetaObject::invokeMethod(ui->pushButton_Stop, "click", Qt::QueuedConnection);
         return;
     }
-    // 通过originX, originY, gripperZ, rightSpacing, bottomSpacing, cols, rows, currentIndex计算出成品区的空位坐标
-    SlotPositionConfig transferRightAreaConfig(transferRightAreaX, transferRightAreaY, transferRightAreaCols, transferRightAreaRows, transferRightAreaRightSpacing, transferRightAreaBottomSpacing);
-    QPoint transferRightAreaTargetPos = calculateSlotPosition(transferRightAreaConfig, transferRightAreaCurrentIndex);
-    int transferRightAreaTargetX = transferRightAreaTargetPos.x();
-    int transferRightAreaTargetY = transferRightAreaTargetPos.y();
+
+    // 从 pan_FinishedProductLocation 找 drug_name 为空的最小 slot_index
+    QString finishedSlotSql = "SELECT slot_index FROM pan_FinishedProductLocation WHERE (drug_name IS NULL OR drug_name = '') ORDER BY slot_index ASC LIMIT 1";
+    QSqlQuery finishedSlotQuery = dbm->query(finishedSlotSql);
+    int finishedSlotIndex = -1;
+    if (finishedSlotQuery.next()) {
+        finishedSlotIndex = finishedSlotQuery.value("slot_index").toInt();
+    } else {
+        qCritical() << "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━";
+        qCritical() << "pan_FinishedProductLocation 中无空槽（drug_name 均非空），触发紧急暂停";
+        qCritical() << "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━";
+        if (ui && ui->pushButton_Stop)
+            QMetaObject::invokeMethod(ui->pushButton_Stop, "click", Qt::QueuedConnection);
+        return;
+    }
+
+    // 校验槽位范围
+    int finishedMaxSlot = finishedCols * finishedRows - 1;
+    if (finishedSlotIndex < 0 || finishedSlotIndex > finishedMaxSlot) {
+        qWarning() << "slot_index" << finishedSlotIndex << "超出范围 [0," << finishedMaxSlot << "]，使用 0";
+        finishedSlotIndex = 0;
+    }
+
+    // 计算目标坐标
+    SlotPositionConfig finishedConfig(finishedX, finishedY, finishedCols, finishedRows, finishedRightSpacing, finishedBottomSpacing);
+    QPoint finishedTargetPos = calculateSlotPosition(finishedConfig, finishedSlotIndex);
+    int finishedTargetX = finishedTargetPos.x();
+    int finishedTargetY = finishedTargetPos.y();
+
     // 移动到成品区指定位置
-    QString moveToTransferRightAreaXCommand = tcpCore->buildDeviceCommand("0A", "D", transferRightAreaTargetX, 8);
-    //tcpCore->sendMessageAsync(moveToTransferRightAreaXCommand.toUtf8(), true);
+    QString moveToTransferRightAreaXCommand = tcpCore->buildDeviceCommand("0A", "D", finishedTargetX, 8);
     messageQueue.enqueue(MessageQueueItem(moveToTransferRightAreaXCommand.toUtf8(), true, "0AD"));
     QString waitTransferRightAreaXCommand = tcpCore->buildDeviceCommand("0A", "d", 0, 0);
-    //tcpCore->sendMessageAsync(waitTransferRightAreaXCommand.toUtf8(), true, "0Ad01");
     messageQueue.enqueue(MessageQueueItem(waitTransferRightAreaXCommand.toUtf8(), true, "0Ad01"));
-    QString moveToTransferRightAreaYCommand = tcpCore->buildDeviceCommand("09", "D", transferRightAreaTargetY, 8);
-    //tcpCore->sendMessageAsync(moveToTransferRightAreaYCommand.toUtf8(), true);
+    QString moveToTransferRightAreaYCommand = tcpCore->buildDeviceCommand("09", "D", finishedTargetY, 8);
     messageQueue.enqueue(MessageQueueItem(moveToTransferRightAreaYCommand.toUtf8(), true, "09D"));
     QString waitTransferRightAreaYCommand = tcpCore->buildDeviceCommand("09", "d", 0, 0);
-    //tcpCore->sendMessageAsync(waitTransferRightAreaYCommand.toUtf8(), true, "09d01");
     messageQueue.enqueue(MessageQueueItem(waitTransferRightAreaYCommand.toUtf8(), true, "09d01"));
-    QString moveToTransferRightAreaZCommand = tcpCore->buildDeviceCommand("06", "D", transferRightAreaZ, 8);
-    //tcpCore->sendMessageAsync(moveToTransferRightAreaZCommand.toUtf8(), true);
+    QString moveToTransferRightAreaZCommand = tcpCore->buildDeviceCommand("06", "D", finishedZ, 8);
     messageQueue.enqueue(MessageQueueItem(moveToTransferRightAreaZCommand.toUtf8(), true, "06D"));
     QString waitTransferRightAreaZCommand = tcpCore->buildDeviceCommand("06", "d", 0, 0);
-    //tcpCore->sendMessageAsync(waitTransferRightAreaZCommand.toUtf8(), true, "06d01");
     messageQueue.enqueue(MessageQueueItem(waitTransferRightAreaZCommand.toUtf8(), true, "06d01"));
 
     // 松夹爪
     QString releaseGripperCommand = tcpCore->buildDeviceCommand("05", "06", "0105", 0, 4);
-    //tcpCore->sendMessageAsync(releaseGripperCommand.toUtf8(), false);
     messageQueue.enqueue(MessageQueueItem(releaseGripperCommand.toUtf8(), false));
     QString waitGripperReleaseCommand = tcpCore->buildDeviceCommand("05", "03", "0202", 1, 4);
-    //tcpCore->sendMessageAsync(waitGripperReleaseCommand.toUtf8(), false, "0503020001");
     messageQueue.enqueue(MessageQueueItem(waitGripperReleaseCommand.toUtf8(), false, "0503020001"));
-    // 更新数据库：将成品区的currentIndex加1
-    QString updateSql = "UPDATE other SET currentIndex = currentIndex + 1 WHERE name = ?";
-    if (dbm->preparedUpdate(updateSql, {"transferRightArea"})) {
-        qDebug() << QString("已更新成品区的currentIndex为 %1").arg(transferRightAreaCurrentIndex + 1);
-    } else {
-        qWarning() << "更新other表失败";
-    }
     // 上移Z轴
     // QString raiseTransferZCommand = tcpCore->buildDeviceCommand("06", "D", 100, 8);
     //tcpCore->sendMessageAsync(raiseTransferZCommand.toUtf8(), true);
@@ -763,24 +1126,16 @@ void MainWindow::moveShakeBedToFinishedProductArea(int selfLocation, QQueue<Mess
     qDebug() << QString("摇床位置 %1 的瓶子已成功移动到成品区").arg(selfLocation);
 }
 
-// 将指定棋子移动到网格(col,row)
-void MainWindow::moveChessPiece(int pieceIndex, int col, int row)
-{
-    if (!chessBoard) return;
-    chessBoard->movePiece(pieceIndex, col, row);
-}
-
 void MainWindow::resizeEvent(QResizeEvent *event)
 {
     QMainWindow::resizeEvent(event);
-    if (chessBoard) chessBoard->relayout();
+    renderDashboardScene();
 }
 
 void MainWindow::showEvent(QShowEvent *event)
 {
     QMainWindow::showEvent(event);
-    // 首次显示后再次自适应
-    if (chessBoard) chessBoard->relayout();
+    renderDashboardScene();
 }
 
 // 初始化data.ini文件G
@@ -788,116 +1143,221 @@ void MainWindow::initializeDataIni()
 {
     QString iniFilePath = "BoxData.ini";
     QFileInfo fileInfo(iniFilePath);
-    
-    // 检查文件是否存在
+    QSettings settings(iniFilePath, QSettings::IniFormat);
+
+    // 辅助lambda：检查并补全指定组的键
+    auto ensureGroup = [&settings](const char* group, const QMap<QString, QVariant>& defaults) {
+        settings.beginGroup(group);
+        bool groupExists = false;
+        for (auto it = defaults.constBegin(); it != defaults.constEnd(); ++it) {
+            if (settings.contains(it.key())) {
+                groupExists = true;
+                break;
+            }
+        }
+        if (!groupExists) {
+            qDebug() << "[" << group << "] 组不存在或为空，正在创建默认配置...";
+            for (auto it = defaults.constBegin(); it != defaults.constEnd(); ++it) {
+                settings.setValue(it.key(), it.value());
+            }
+        } else {
+            qDebug() << "[" << group << "] 组已存在";
+        }
+        settings.endGroup();
+    };
+
     if (!fileInfo.exists()) {
         qDebug() << "BoxData.ini文件不存在，正在创建默认配置文件...";
-        
-        // 创建QSettings对象来写入INI文件
-        QSettings settings(iniFilePath, QSettings::IniFormat);
-        
-        // 设置默认配置值
-        settings.beginGroup("Box-Solid-Top"); // 盒子-固体-上面
-        settings.setValue("axisX", "0");
-        settings.setValue("axisY", "0");
-        settings.setValue("gripperDepth", "0"); // 夹爪深度 /ˈɡrɪpər/
-        settings.setValue("liquidExtractionDepth", "0"); // 取液深度 /ɪkˈstrækʃ(ə)n/
-        settings.setValue("solidDepth", "0"); // 固体深度 /ˈsɑːlɪd/
-        settings.endGroup();
-        
-        settings.beginGroup("Box-Solid-Bottom"); // 盒子-固体-下面
-        settings.setValue("axisX", "0");
-        settings.setValue("axisY", "0");
-        settings.setValue("gripperDepth", "0"); // 夹爪深度
-        settings.setValue("liquidExtractionDepth", "0"); // 取液深度
-        settings.setValue("solidDepth", "0"); // 固体深度
-        settings.endGroup();
-        
-        settings.beginGroup("Box-Tips-Left"); // 盒子-tips左边
-        settings.setValue("axisX", "0");
-        settings.setValue("axisY", "0");
-        settings.setValue("gripperDepth", "0"); // 夹爪深度
-        settings.setValue("liquidExtractionDepth", "0"); // 取液深度
-        settings.setValue("solidDepth", "0"); // 固体深度
-        settings.endGroup();
-        
-        settings.beginGroup("Box-Tips-Right"); // 盒子-tips右边
-        settings.setValue("axisX", "0");
-        settings.setValue("axisY", "0");
-        settings.setValue("gripperDepth", "0"); // 夹爪深度
-        settings.setValue("liquidExtractionDepth", "0"); // 取液深度
-        settings.setValue("solidDepth", "0"); // 固体深度
-        settings.endGroup();
-        
-        settings.beginGroup("Box-Shake-Bed"); // 盒子-摇床 /ʃeɪk/
-        settings.setValue("axisX", "0");
-        settings.setValue("axisY", "0");
-        settings.setValue("gripperDepth", "0"); // 夹爪深度
-        settings.setValue("liquidExtractionDepth", "0"); // 取液深度
-        settings.setValue("solidDepth", "0"); // 固体深度
-        settings.endGroup();
-        
-        settings.beginGroup("Box-Liquid-Material"); // 盒子-液体材料
-        settings.setValue("axisX", "0");
-        settings.setValue("axisY", "0");
-        settings.setValue("gripperDepth", "0"); // 夹爪深度
-        settings.setValue("liquidExtractionDepth", "0"); // 取液深度
-        settings.setValue("solidDepth", "0"); // 固体深度
-        settings.endGroup();
-        
-        settings.beginGroup("Box-Empty-Bottle"); // 盒子-空瓶
-        settings.setValue("axisX", "0");
-        settings.setValue("axisY", "0");
-        settings.setValue("gripperDepth", "0"); // 夹爪深度
-        settings.setValue("liquidExtractionDepth", "0"); // 取液深度
-        settings.setValue("solidDepth", "0"); // 固体深度
-        settings.endGroup();
-        
-        settings.beginGroup("Box-Transfer-Area-Left"); // 盒子-转移区左边
-        settings.setValue("axisX", "00003A99");
-        settings.setValue("axisY", "000058DF");
-        settings.setValue("gripperDepth", "00041AC7"); // 夹爪深度
-        settings.setValue("liquidExtractionDepth", "0"); // 取液深度
-        settings.setValue("solidDepth", "0"); // 固体深度
-        settings.endGroup();
-        
-        settings.beginGroup("Box-Transfer-Area-Right"); // 盒子-转移区右边
-        settings.setValue("axisX", "0");
-        settings.setValue("axisY", "0");
-        settings.setValue("gripperDepth", "0"); // 夹爪深度
-        settings.setValue("liquidExtractionDepth", "0"); // 取液深度
-        settings.setValue("solidDepth", "0"); // 固体深度
-        settings.endGroup();
-        
-        settings.beginGroup("Box-Hold-Region");  // 夹持区域 /ˈriːdʒən/
-        settings.setValue("axisX", "20326");
-        settings.setValue("axisY", "35517");
-        settings.setValue("gripperDepth", "265192"); // 夹爪深度
-        settings.setValue("liquidExtractionDepth", "0"); // 取液深度
-        settings.setValue("solidDepth", "0"); // 固体深度
-        settings.endGroup();
-
-        settings.beginGroup("TCP-Info");
-        settings.setValue("LocalIP", "192.168.5.22");        // 本机IP
-        settings.setValue("RemoteIP", "192.168.5.201");      // 远端IP
-        settings.setValue("RemotePort", "4196");      // 远端端口
-        settings.setValue("ProxyDisabled", true); // 是否禁用代理
-        settings.endGroup();
-
-        settings.beginGroup("Liquid-Info");
-        settings.setValue("LocalIP", "192.168.5.22");
-        settings.setValue("RemoteIP", "192.168.5.201");
-        settings.setValue("RemotePort", "4196");
-        settings.setValue("ProxyDisabled", true); // 是否禁用代理
-        settings.endGroup();
-
-        // 确保文件被写入磁盘
-        settings.sync();
-        
-        qDebug() << "data.ini文件创建成功，默认配置已写入";
-    } else {
-        qDebug() << "data.ini文件已存在，跳过初始化";
     }
+
+    // [TCP]
+    ensureGroup("TCP", {
+        {"localIP", "192.168.5.27"},
+        {"tcpCoreRemoteIP", "192.168.5.201"},
+        {"tcpCoreRemotePort", "4196"},
+        {"tcpBalanceRemoteIP", "192.168.5.201"},
+        {"tcpBalanceRemotePort", "4197"}
+    });
+
+    // [Database]
+    ensureGroup("Database", {
+        {"host", "192.168.10.170"},
+        {"port", "3306"},
+        {"database", "PhenoLabHT"},
+        {"user", "root"},
+        {"password", "Zq17122320_"}
+    });
+
+    // [Process-Steps]
+    ensureGroup("Process-Steps", {
+        {"reset", true},
+        {"xyzBackToOrigin1", true},
+        {"takeEmptyBottle", true},
+        {"getSolid", false},
+        {"xyzBackToOrigin2", true},
+        {"getLiquid", true},
+        {"capBottleAndTransferToShaker", true}
+    });
+
+    settings.sync();
+    qDebug() << "BoxData.ini 初始化完成";
+}
+
+// 流程步骤定义（顺序即执行顺序）
+static const QStringList PROCESS_STEPS = {
+    "reset",
+    "xyzBackToOrigin1",
+    "takeEmptyBottle",
+    "getSolid",
+    "xyzBackToOrigin2",
+    "getLiquid",
+    "capBottleAndTransferToShaker"
+};
+
+// 保存流程步骤的选中状态到ini文件
+void MainWindow::saveProcessStepsState()
+{
+    QSettings settings("BoxData.ini", QSettings::IniFormat);
+    settings.beginGroup("Process-Steps");
+
+    if (m_processCheckBox_reset)
+        settings.setValue("reset", m_processCheckBox_reset->isChecked());
+    if (m_processCheckBox_xyzBackToOrigin1)
+        settings.setValue("xyzBackToOrigin1", m_processCheckBox_xyzBackToOrigin1->isChecked());
+    if (m_processCheckBox_takeEmptyBottle)  
+        settings.setValue("takeEmptyBottle", m_processCheckBox_takeEmptyBottle->isChecked());
+    if (m_processCheckBox_getSolid)
+        settings.setValue("getSolid", m_processCheckBox_getSolid->isChecked());
+    if (m_processCheckBox_xyzBackToOrigin2)
+        settings.setValue("xyzBackToOrigin2", m_processCheckBox_xyzBackToOrigin2->isChecked());
+    if (m_processCheckBox_getLiquid)
+        settings.setValue("getLiquid", m_processCheckBox_getLiquid->isChecked());
+    if (m_processCheckBox_tightenBottle)
+        settings.setValue("capBottleAndTransferToShaker", m_processCheckBox_tightenBottle->isChecked());
+
+    settings.endGroup();
+    settings.sync();
+}
+
+// 从ini文件加载流程步骤的选中状态
+void MainWindow::loadProcessStepsState()
+{
+    QSettings settings("BoxData.ini", QSettings::IniFormat);
+    settings.beginGroup("Process-Steps");
+
+    if (m_processCheckBox_reset)
+        m_processCheckBox_reset->setChecked(settings.value("reset", true).toBool());
+    if (m_processCheckBox_xyzBackToOrigin1)
+        m_processCheckBox_xyzBackToOrigin1->setChecked(settings.value("xyzBackToOrigin1", true).toBool());
+    if (m_processCheckBox_takeEmptyBottle)
+        m_processCheckBox_takeEmptyBottle->setChecked(settings.value("takeEmptyBottle", true).toBool());
+    if (m_processCheckBox_getSolid)
+        m_processCheckBox_getSolid->setChecked(settings.value("getSolid", true).toBool());
+    if (m_processCheckBox_xyzBackToOrigin2)
+        m_processCheckBox_xyzBackToOrigin2->setChecked(settings.value("xyzBackToOrigin2", true).toBool());
+    if (m_processCheckBox_getLiquid)
+        m_processCheckBox_getLiquid->setChecked(settings.value("getLiquid", true).toBool());
+    if (m_processCheckBox_tightenBottle)
+        m_processCheckBox_tightenBottle->setChecked(settings.value("capBottleAndTransferToShaker", true).toBool());
+
+    settings.endGroup();
+}
+
+void MainWindow::resetProcessStateDisplay()
+{
+    m_completedSteps.clear();
+    m_skippedSteps.clear();
+    const QString grayStyle = "color: gray;";
+    if (m_processCheckBox_reset)           m_processCheckBox_reset->setStyleSheet(grayStyle);
+    if (m_processCheckBox_xyzBackToOrigin1) m_processCheckBox_xyzBackToOrigin1->setStyleSheet(grayStyle);
+    if (m_processCheckBox_takeEmptyBottle) m_processCheckBox_takeEmptyBottle->setStyleSheet(grayStyle);
+    if (m_processCheckBox_getSolid)        m_processCheckBox_getSolid->setStyleSheet(grayStyle);
+    if (m_processCheckBox_xyzBackToOrigin2)        m_processCheckBox_xyzBackToOrigin2->setStyleSheet(grayStyle);
+    if (m_processCheckBox_getLiquid)       m_processCheckBox_getLiquid->setStyleSheet(grayStyle);
+    if (m_processCheckBox_tightenBottle)   m_processCheckBox_tightenBottle->setStyleSheet(grayStyle);
+}
+
+void MainWindow::updateProcessStateDisplay(const QString& stateName)
+{
+    // 状态名称 -> 对应的 QCheckBox 指针
+    QMap<QString, QCheckBox*> checkBoxMap = {
+        {"reset",           m_processCheckBox_reset},
+        {"xyzBackToOrigin1", m_processCheckBox_xyzBackToOrigin1},
+        {"takeEmptyBottle", m_processCheckBox_takeEmptyBottle},
+        {"getSolid",        m_processCheckBox_getSolid},
+        {"getLiquid",       m_processCheckBox_getLiquid},
+        {"xyzBackToOrigin2", m_processCheckBox_xyzBackToOrigin2},
+        {"capBottleAndTransferToShaker",   m_processCheckBox_tightenBottle}
+    };
+
+    const QString doneStyle    = "color: green; font-weight: bold;";
+    const QString currentStyle = "color: #00aa00; font-weight: bold; text-decoration: underline;";
+    const QString pendingStyle = "color: gray;";
+    const QString skippedStyle = "color: gray; text-decoration: line-through;";
+
+    // 渲染规则（按优先级）：
+    // 1. skipped（灰+删除线）- 最高优先级
+    // 2. current（绿+下划线）
+    // 3. completed（绿加粗）
+    // 4. selected-but-not-run-yet（灰，无删除线）
+    // 5. unselected（灰+删除线）
+    for (const QString& step : PROCESS_STEPS) {
+        QCheckBox* checkBox = checkBoxMap.value(step, nullptr);
+        if (!checkBox) continue;
+
+        if (m_skippedSteps.contains(step)) {
+            // 已跳过：灰色+删除线
+            checkBox->setStyleSheet(skippedStyle);
+        } else if (step == stateName && !stateName.isEmpty()) {
+            // 当前执行：绿色加粗+下划线
+            checkBox->setStyleSheet(currentStyle);
+        } else if (m_completedSteps.contains(step)) {
+            // 已完成：绿色加粗
+            checkBox->setStyleSheet(doneStyle);
+        } else if (m_selectedSteps.contains(step)) {
+            // 已选中但未执行：灰色（无删除线）
+            checkBox->setStyleSheet(pendingStyle);
+        } else {
+            // 未选中：灰色+删除线
+            checkBox->setStyleSheet(skippedStyle);
+        }
+    }
+}
+
+// 处理流程状态变更（接收 TcpClientCore 的 processStateChanged 信号）
+void MainWindow::onProcessStateChanged(const QString& stateName)
+{
+    qDebug() << "流程状态变更:" << stateName;
+
+    // 如果存在当前步骤，且它属于本次选中且未被跳过，则标记为已完成
+    if (!m_currentStep.isEmpty()
+        && m_selectedSteps.contains(m_currentStep)
+        && !m_skippedSteps.contains(m_currentStep)) {
+        m_completedSteps.insert(m_currentStep);
+    }
+
+    // 更新当前步骤
+    m_currentStep = stateName;
+
+    // 刷新UI显示
+    updateProcessStateDisplay(stateName);
+}
+
+// 处理步骤跳过（接收 TcpClientCore 的 stepSkipped 信号）
+void MainWindow::onStepSkipped(const QString& stepName)
+{
+    qDebug() << "步骤已跳过:" << stepName;
+
+    // 将步骤加入跳过集合
+    m_skippedSteps.insert(stepName);
+
+    // 如果跳过的是当前步骤，清空当前步骤
+    if (m_currentStep == stepName) {
+        m_currentStep.clear();
+    }
+
+    // 刷新UI显示
+    updateProcessStateDisplay(m_currentStep);
 }
 
 

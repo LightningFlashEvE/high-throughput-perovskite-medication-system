@@ -17,7 +17,7 @@ void ProtocolFactory::registerProtocol(const QString &name, std::function<Protoc
         m_prototypes[name] = creator();
     }
     
-    qDebug() << "协议已注册:" << name;
+    qDebug() << "协议已注册:" << name;    
 }
 
 ProtocolBase* ProtocolFactory::createProtocol(const QString &name)
