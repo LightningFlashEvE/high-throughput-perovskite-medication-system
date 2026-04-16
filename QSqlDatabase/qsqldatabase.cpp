@@ -10,6 +10,7 @@
 #include <QVariant>
 #include <QMessageBox>
 #include <QTimer>
+#include <QMutexLocker>
 
 const char* AppSqlDatabase::kConnName = "app_sqlite_conn";
 
