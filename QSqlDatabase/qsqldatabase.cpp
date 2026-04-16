@@ -17,7 +17,7 @@ AppSqlDatabase::AppSqlDatabase(QObject *parent)
     : QObject{parent}
 {
     if (!openDatabase()) {
-        const QString errorMsg = QStringLiteral("无法连接 MySQL (ODBC): 192.168.10.170:3306/PhenoLabHT");
+        const QString errorMsg = QStringLiteral("无法连接 MySQL: 192.168.10.170:3306/PhenoLabHT");
         qWarning() << errorMsg;
         if (auto *parentWidget = qobject_cast<QWidget*>(parent)) {
             // 事件循环未启动时不能直接show QMessageBox，否则会阻塞
@@ -84,23 +84,20 @@ bool AppSqlDatabase::openDatabase()
         QSqlDatabase::removeDatabase(kConnName);
     }
 
-    QSqlDatabase db = QSqlDatabase::addDatabase("QODBC", kConnName);
-    db.setDatabaseName(
-        QStringLiteral("DRIVER={MySQL ODBC 9.6 Unicode Driver};"
-                       "SERVER=%1;PORT=%2;"
-                       "DATABASE=%3;"
-                       "USER=%4;PASSWORD=%5;"
-                       "OPTION=3;"
-                       "Connect Timeout=5;")
-        .arg(host).arg(port).arg(database).arg(user).arg(password)
-    );
+    QSqlDatabase db = QSqlDatabase::addDatabase("QMYSQL", kConnName);
+    db.setHostName(host);
+    db.setPort(port.toInt());
+    db.setDatabaseName(database);
+    db.setUserName(user);
+    db.setPassword(password);
+    db.setConnectOptions("MYSQL_OPT_CONNECT_TIMEOUT=5");
 
     if (!db.open()) {
-        qWarning() << "QODBC 打开失败:" << db.lastError().text();
+        qWarning() << "QMYSQL 打开失败:" << db.lastError().text();
         return false;
     }
 
-    qDebug() << "QODBC 已连接:" << host << ":" << port << "/" << database;
+    qDebug() << "QMYSQL 已连接:" << host << ":" << port << "/" << database;
     return true;
 }
 
