@@ -100,6 +100,9 @@ MainWindow::MainWindow(QWidget *parent)
     // 先加载保存的状态（在连接信号之前，避免触发保存）
     loadProcessStepsState();
 
+    // 加载摇床时间设置
+    loadShakeDurationSetting();
+
     // 连接复选框状态改变信号，保存到ini文件
     connect(m_processCheckBox_reset, &QCheckBox::stateChanged, this, &MainWindow::saveProcessStepsState);
     connect(m_processCheckBox_xyzBackToOrigin1, &QCheckBox::stateChanged, this, &MainWindow::saveProcessStepsState);
@@ -108,6 +111,12 @@ MainWindow::MainWindow(QWidget *parent)
     connect(m_processCheckBox_xyzBackToOrigin2, &QCheckBox::stateChanged, this, &MainWindow::saveProcessStepsState);
     connect(m_processCheckBox_getLiquid, &QCheckBox::stateChanged, this, &MainWindow::saveProcessStepsState);
     connect(m_processCheckBox_tightenBottle, &QCheckBox::stateChanged, this, &MainWindow::saveProcessStepsState);
+
+    // 连接摇床时间输入框信号，失去焦点时自动保存
+    if (ui->m_shakeDurationLineEdit) {
+        connect(ui->m_shakeDurationLineEdit, &QLineEdit::editingFinished,
+                this, &MainWindow::saveShakeDurationSetting);
+    }
 
     // 绑定运行按钮
     m_runSelectedStepsButton = ui->m_runSelectedStepsButton;
@@ -840,90 +849,125 @@ void MainWindow::onShakeBedEmptyCheckTimeout()
 // 检查摇床超时并停止
 void MainWindow::checkShakeBedTimeout()
 {
-    // 获取当前时间（用于比较）
+    // 【新增】每次调用时输出简短日志（帮助确认定时器是否工作）
+    static int callCount = 0;
+    callCount++;
+
+    // 获取当前时间
     QDateTime currentDateTime = QDateTime::currentDateTime();
 
+    // 【修改】只在前3次和每60次输出一次，避免日志刷屏
+    if (callCount <= 3 || callCount % 60 == 0) {
+        qDebug() << QString("[摇床检查 #%1] 当前时间: %2")
+                    .arg(callCount)
+                    .arg(currentDateTime.toString("yyyy-MM-dd hh:mm:ss"));
+    }
+
     if (!dbm) {
-        qWarning() << "数据库对象未初始化，无法检查摇床超时";
+        qWarning() << "[摇床检查] 数据库对象未初始化";
         return;
     }
 
     if (!tcpCore) {
-        qWarning() << "TCP核心对象未初始化，无法停止摇床";
+        qWarning() << "[摇床检查] TCP核心对象未初始化";
         return;
     }
 
-    if (m_allDevicesInitialized) { // 如果已经初始化,则开启摇床为空检查定时器
+    // 【保留】在首次调用时启动 shakeBedEmptyCheckTimer
+    if (m_allDevicesInitialized) {
         if (shakeBedEmptyCheckTimer && !shakeBedEmptyCheckTimer->isActive()) {
-            shakeBedEmptyCheckTimer->start(10000);  // 10秒 = 10000毫秒
-            qDebug() << "摇床为空检查定时器已启动（10秒执行一次，当摇床为空时停止摇床）";
+            shakeBedEmptyCheckTimer->start(10000);
+            qDebug() << "[摇床检查] 摇床为空检查定时器已启动（10秒执行一次）";
         }
     }
 
-
-
-
-
-    // 查询shakeBedArea表中isEmpty为3的记录
+    // 查询 shakeBedArea 表中 isEmpty = 3 的记录（正在摇床）
     QString sql = "SELECT selfLocation, endTime, isEmpty FROM shakeBedArea WHERE isEmpty = 3";
     QSqlQuery query = dbm->query(sql);
 
     if (query.lastError().isValid()) {
-        qWarning() << "查询shakeBedArea表失败:" << query.lastError().text();
+        qWarning() << "[摇床检查] SQL查询失败:" << query.lastError().text();
         return;
     }
+
+    int recordCount = 0;
     // 遍历查询结果
     while (query.next()) {
+        recordCount++;
         int selfLocation = query.value("selfLocation").toInt();
         QString endTimeStr = query.value("endTime").toString().trimmed();
         int isEmpty = query.value("isEmpty").toInt();
-        qDebug() << "检查摇床位置:" << selfLocation << "endTimeStr:" << endTimeStr << "isEmpty():" << endTimeStr.isEmpty() << "length:" << endTimeStr.length();
-        // 如果endTime为空，跳过
+
+        // 【新增】输出详细信息
+        qDebug() << QString("[摇床检查] 发现正在摇床的位置 %1: endTime=%2, isEmpty=%3")
+                    .arg(selfLocation).arg(endTimeStr).arg(isEmpty);
+
+        // 验证 endTime 格式
         if (endTimeStr.isEmpty()) {
-            qDebug() << "摇床位置" << selfLocation << "的endTime为空，跳过此记录";
+            qDebug() << QString("[摇床检查] 位置 %1 的endTime为空，跳过").arg(selfLocation);
             continue;
         }
-        // 将字符串时间转换为QDateTime进行比较
+
         QDateTime endDateTime = QDateTime::fromString(endTimeStr, "yyyy-MM-dd hh:mm:ss");
         if (!endDateTime.isValid()) {
-            qWarning() << QString("摇床位置 %1 的结束时间格式无效: %2").arg(selfLocation).arg(endTimeStr);
+            qWarning() << QString("[摇床检查] 位置 %1 的endTime格式无效: '%2'")
+                          .arg(selfLocation).arg(endTimeStr);
             continue;
         }
 
-        if (currentDateTime > endDateTime && isEmpty == 3) {
+        // 【新增】输出时间比较结果
+        qint64 secondsRemaining = currentDateTime.secsTo(endDateTime);
+        if (secondsRemaining > 0) {
+            qDebug() << QString("[摇床检查] 位置 %1 还剩 %2 秒完成摇床")
+                        .arg(selfLocation).arg(secondsRemaining);
+        } else {
+            qDebug() << QString("[摇床检查] 位置 %1 已超时 %2 秒")
+                        .arg(selfLocation).arg(-secondsRemaining);
+        }
 
-            // ++++ 1.创建配方 ++++
+        // 核心逻辑：当前时间 > 结束时间 且 isEmpty = 3
+        if (currentDateTime > endDateTime && isEmpty == 3) {
+            qWarning() << QString("[摇床检查] *** 位置 %1 摇床超时，开始自动取瓶流程 ***").arg(selfLocation);
+
+            // 1. 创建配方
             RecipeQueueItem newRecipeTianPing;
             newRecipeTianPing.recipeName = "tianPing";
             newRecipeTianPing.createTime = QDateTime::currentDateTime();
             newRecipeTianPing.processState = RecipeNotProcessed;
 
-            // ++++ 2.填充配方内容 ++++
-            qWarning() << QString("摇床位置 %1 的结束时间已到，正在停止摇床...").arg(selfLocation);
-            // 停止摇床
+            // 2. 填充配方内容
+            qWarning() << QString("[摇床检查] 位置 %1 停止摇床...").arg(selfLocation);
             controlShakeBed(false, newRecipeTianPing.messageQueue, true);
-            // 取到放置区（摇床到成品区）
+
+            qDebug() << QString("[摇床检查] 位置 %1 从摇床区取瓶到成品区...").arg(selfLocation);
             moveShakeBedToFinishedProductArea(selfLocation, newRecipeTianPing.messageQueue);
-            // 通过 AAleaveTheShaker 指令，将 selfLocation 里面的状态4改1
+
             QString leaveCmd = QString("AAleaveTheShaker:%1").arg(selfLocation);
             newRecipeTianPing.messageQueue.enqueue(MessageQueueItem(leaveCmd.toUtf8(), true));
 
             resetXYZMotorsToZero(newRecipeTianPing.messageQueue, "xyzBackToOrigin2");
 
-            // ++++ 3.保存到数据库并执行（插队模式：插入到第一个未执行配方之前） ++++
+            // 3. 保存到数据库并插队执行
+            qDebug() << QString("[摇床检查] 位置 %1 自动取瓶配方已插队保存").arg(selfLocation);
             saveAndExecuteRecipe(newRecipeTianPing, true);
 
-            // ++++ 4.isEmpty自加1 ++++（表示已记录在流程里，值变为4，放置后4改1）
-            QString updateSql = QString("UPDATE shakeBedArea SET isEmpty = isEmpty+1 WHERE selfLocation = %1").arg(selfLocation);
+            // 4. 更新 isEmpty 状态：3 → 4
+            QString updateSql = QString("UPDATE shakeBedArea SET isEmpty = isEmpty+1 WHERE selfLocation = %1")
+                .arg(selfLocation);
             QSqlQuery updateQuery = dbm->query(updateSql);
             if (updateQuery.lastError().isValid()) {
-                qWarning() << "更新shakeBedArea表失败:" << updateQuery.lastError().text();
+                qWarning() << "[摇床检查] 更新isEmpty失败:" << updateQuery.lastError().text();
             } else {
-                qDebug() << QString("已更新摇床位置 %1 的状态为空").arg(selfLocation);
+                qDebug() << QString("[摇床检查] 位置 %1 状态已更新: isEmpty 3→4（取回中）").arg(selfLocation);
             }
 
-            break;
+            break;  // 一次只处理一个位置
         }
+    }
+
+    // 【新增】如果没有找到任何正在摇床的位置
+    if (recordCount == 0 && callCount <= 3) {
+        qDebug() << "[摇床检查] 当前没有正在摇床的位置（isEmpty=3）";
     }
 }
 
@@ -950,22 +994,9 @@ void MainWindow::moveShakeBedToFinishedProductArea(int selfLocation, QQueue<Mess
 
     qDebug() << QString("开始执行摇床位置 %1 到成品区的操作").arg(selfLocation);
 
-    // 去shakeBedArea找字段isEmpty的值为3的记录，然后取字段selfLocation的值出来待用
-    QString shakeBedAreaSql = "SELECT selfLocation FROM shakeBedArea WHERE isEmpty = 3";
-    QSqlQuery shakeBedAreaQuery = dbm->query(shakeBedAreaSql);
-    int shakeBedAreaSelfLocation=0;
-    if (shakeBedAreaQuery.next()) {
-        shakeBedAreaSelfLocation = shakeBedAreaQuery.value("selfLocation").toInt();
-        qDebug() << "+++++++++++++1" << shakeBedAreaSelfLocation;
-    }
-    else {
-        qCritical() << "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━";
-        qCritical() << "未找到 shakeBedArea 中 isEmpty = 3 的记录，触发紧急暂停";
-        qCritical() << "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━";
-        if (ui && ui->pushButton_Stop)
-            QMetaObject::invokeMethod(ui->pushButton_Stop, "click", Qt::QueuedConnection);
-        return;
-    }
+    // 直接使用传入的 selfLocation，不重新查询（避免多摇床位同时触发时取错位置）
+    int shakeBedAreaSelfLocation = selfLocation;
+    qDebug() << "+++++++++++++1" << shakeBedAreaSelfLocation;
     
     // 关闭摇床
     QString stopShakeCommand = tcpCore->buildMessageWithCrc(QStringLiteral(">0Cxi30100000000"));
@@ -1199,6 +1230,11 @@ void MainWindow::initializeDataIni()
         {"capBottleAndTransferToShaker", true}
     });
 
+    // [ShakeBed]
+    ensureGroup("ShakeBed", {
+        {"shakeDuration", 30}
+    });
+
     settings.sync();
     qDebug() << "BoxData.ini 初始化完成";
 }
@@ -1261,6 +1297,54 @@ void MainWindow::loadProcessStepsState()
         m_processCheckBox_tightenBottle->setChecked(settings.value("capBottleAndTransferToShaker", true).toBool());
 
     settings.endGroup();
+}
+
+// 保存摇床时间设置到ini文件
+void MainWindow::saveShakeDurationSetting()
+{
+    if (!ui || !ui->m_shakeDurationLineEdit) return;
+
+    QSettings settings("BoxData.ini", QSettings::IniFormat);
+    settings.beginGroup("ShakeBed");
+
+    QString text = ui->m_shakeDurationLineEdit->text().trimmed();
+    bool ok = false;
+    int value = text.toInt(&ok);
+
+    // 仅保存有效的正整数值
+    if (ok && value > 0) {
+        settings.setValue("shakeDuration", value);
+        settings.endGroup();
+        settings.sync();
+        qDebug() << "摇床时间已保存到INI:" << value << "秒";
+    } else {
+        settings.endGroup();
+        qWarning() << "摇床时间输入无效，未保存:" << text;
+    }
+}
+
+// 从ini文件加载摇床时间设置
+void MainWindow::loadShakeDurationSetting()
+{
+    if (!ui || !ui->m_shakeDurationLineEdit) return;
+
+    QSettings settings("BoxData.ini", QSettings::IniFormat);
+    settings.beginGroup("ShakeBed");
+
+    // 默认值30秒（与UI文件保持一致）
+    int shakeDuration = settings.value("shakeDuration", 30).toInt();
+
+    // 验证范围（1-3600秒，即1秒到1小时）
+    if (shakeDuration < 1 || shakeDuration > 3600) {
+        qWarning() << "INI中摇床时间超出范围:" << shakeDuration << "，使用默认值30秒";
+        shakeDuration = 30;
+    }
+
+    ui->m_shakeDurationLineEdit->setText(QString::number(shakeDuration));
+
+    settings.endGroup();
+
+    qDebug() << "摇床时间已从INI加载:" << shakeDuration << "秒";
 }
 
 void MainWindow::resetProcessStateDisplay()

@@ -251,6 +251,16 @@ private:
     void loadProcessStepsState();
 
     /**
+     * 保存摇床时间设置到ini文件
+     */
+    void saveShakeDurationSetting();
+
+    /**
+     * 从ini文件加载摇床时间设置
+     */
+    void loadShakeDurationSetting();
+
+    /**
      * 处理流程状态变更（接收 TcpClientCore 的 processStateChanged 信号）
      * @param stateName 新的状态名称
      */
@@ -400,8 +410,8 @@ public:
     /**
      * 检查并重置中断的配方（开机时调用）
      * 1. 将 recipeQueue 表中 processState = 1（正在执行）的记录改为 9（开机中断）
-     * 2. 将 shakeBedArea 表中 isEmpty = 2（占位但没用上）的记录改为 1（恢复为未使用），并清空 startTime 和 endTime
-     * 用于标记上次关机时正在执行的配方和释放占位但没用上的摇床位置
+     * 2. 将 shakeBedArea 表中保留 isEmpty = 3 和 4（有瓶子在摇床或即将取出），其余状态全部改为 1（空闲）并清空时间
+     * 用于标记上次关机时正在执行的配方和清理摇床槽位状态
      */
     void checkAndResetInterruptedRecipes();
 

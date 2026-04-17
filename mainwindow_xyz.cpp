@@ -1148,8 +1148,16 @@ void MainWindow::transferToShaker(QQueue<MessageQueueItem>& messageQueue)
         // 启动摇床
         messageQueue.enqueue(MessageQueueItem("AAopenShakeBed", true));
 
-        // 记录摇床时间信息（传递selfLocation和摇床持续时间，默认15秒），确认已经使用值自加1（此时为3）
-        QString recordCmd = QString("AArecordShakeBedTime:%1:%2").arg(shakeBedAreaSelfLocation).arg(15);
+        // 记录摇床时间信息，从输入框读取摇床持续时间（单位：秒），无效时默认30秒
+        int shakeDuration = 30;
+        if (ui && ui->m_shakeDurationLineEdit) {
+            bool ok = false;
+            int inputVal = ui->m_shakeDurationLineEdit->text().trimmed().toInt(&ok);
+            if (ok && inputVal > 0) {
+                shakeDuration = inputVal;
+            }
+        }
+        QString recordCmd = QString("AArecordShakeBedTime:%1:%2").arg(shakeBedAreaSelfLocation).arg(shakeDuration);
         messageQueue.enqueue(MessageQueueItem(recordCmd.toUtf8(), true));
     }
     catch (const std::exception& e)

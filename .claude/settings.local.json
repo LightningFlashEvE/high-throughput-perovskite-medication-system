@@ -39,7 +39,10 @@
       "Bash(qmake --version)",
       "Bash(xargs grep:*)",
       "Bash(find D:\\\\application\\\\high-throughput-perovskite-medication-system:*)",
-      "WebSearch"
+      "WebSearch",
+      "Bash(grep -E \"\\\\.\\(cpp|h\\)$\")",
+      "Bash(echo \"test\")",
+      "Bash(rm \"/c/Users/kkong/.claude/plans/test.txt\")"
     ]
   }
 }

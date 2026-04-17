@@ -253,6 +253,28 @@ void MainWindow::initializeSystemComponents()
         if (!m_allDevicesInitialized) {
             m_allDevicesInitialized = true;
             qDebug() << "收到AAallDevicesInitialized命令，所有设备初始化队列已执行完成，m_allDevicesInitialized = true";
+
+            // 启动摇床检查定时器（每1秒执行一次）
+            if (shakeBedCheckTimer) {
+                if (!shakeBedCheckTimer->isActive()) {
+                    shakeBedCheckTimer->start(1000);  // 1000毫秒 = 1秒
+                    qDebug() << "[AAallDevicesInitialized] 摇床检查定时器已启动（1秒执行一次）";
+                } else {
+                    qDebug() << "[AAallDevicesInitialized] 摇床检查定时器已经在运行中";
+                }
+            } else {
+                qCritical() << "[AAallDevicesInitialized] shakeBedCheckTimer 指针为空，无法启动定时器！";
+            }
+
+            // 启动摇床为空检查定时器（每10秒执行一次）
+            if (shakeBedEmptyCheckTimer) {
+                if (!shakeBedEmptyCheckTimer->isActive()) {
+                    shakeBedEmptyCheckTimer->start(10000);
+                    qDebug() << "[AAallDevicesInitialized] 摇床为空检查定时器已启动（10秒执行一次）";
+                }
+            } else {
+                qWarning() << "[AAallDevicesInitialized] shakeBedEmptyCheckTimer 指针为空";
+            }
         }
     });
 
@@ -301,7 +323,7 @@ void MainWindow::initializeSystemComponents()
     // 连接 tcpCore 的 messageQueueEmpty 信号：当前配方消息执行完毕，自动从数据库加载下一个配方
     connect(tcpCore, &TcpClientCore::messageQueueEmpty, this, [=]() {
         qDebug() << "TcpClientCore 队列已空，当前配方执行完毕";
-        
+
         // 1. 将数据库中当前正在执行的配方标记为"执行完毕"
         if (dbm) {
             QString updateSql = QString("UPDATE recipeQueue SET processState = %1 WHERE processState = %2")
@@ -316,8 +338,20 @@ void MainWindow::initializeSystemComponents()
                 }
             }
         }
-        
-        // 2. 从数据库加载并执行下一个未执行的配方
+
+        // 2. 启动摇床检查定时器（如果还没启动）- 双重保险机制
+        if (shakeBedCheckTimer && !shakeBedCheckTimer->isActive()) {
+            shakeBedCheckTimer->start(1000);
+            qDebug() << "[配方完成] 摇床检查定时器已启动（配方完成后首次启动）";
+        }
+
+        // 3. 手动触发一次摇床检查（补偿机制）
+        if (m_allDevicesInitialized) {
+            qDebug() << "[配方完成] 执行一次摇床超时检查";
+            checkShakeBedTimeout();
+        }
+
+        // 4. 从数据库加载并执行下一个未执行的配方
         qDebug() << "尝试从数据库加载下一个未执行的配方";
         if (!loadAndExecuteNextRecipeFromDatabase()) {
             qDebug() << "没有更多待执行的配方";
@@ -401,9 +435,16 @@ void MainWindow::initializeSystemComponents()
             newRecipe.messageQueue.enqueue(MessageQueueItem("AAallDevicesInitialized", true));
             saveAndExecuteRecipe(newRecipe);
 
-            if (shakeBedCheckTimer && !shakeBedCheckTimer->isActive()) {
-                shakeBedCheckTimer->start(1000);
-                qDebug() << "摇床检查定时器已启动";
+            // 尝试启动定时器（可能会失败，所以后续还有补偿机制）
+            if (shakeBedCheckTimer) {
+                if (!shakeBedCheckTimer->isActive()) {
+                    shakeBedCheckTimer->start(1000);
+                    qDebug() << "[TCP连接] 摇床检查定时器已启动（首次尝试）";
+                } else {
+                    qDebug() << "[TCP连接] 摇床检查定时器已经在运行";
+                }
+            } else {
+                qCritical() << "[TCP连接] shakeBedCheckTimer 指针为空！";
             }
         };
 
@@ -1307,39 +1348,45 @@ void MainWindow::checkAndResetInterruptedRecipes()
         qDebug() << "开机检查完成，没有发现中断的配方";
     }
 
-    // ========== 2. 处理 shakeBedArea 表中占位但没用上的记录（isEmpty = 2）==========
-    QString selectShakeBedSql = "SELECT selfLocation, startTime, endTime FROM shakeBedArea WHERE isEmpty = 2";
-    QSqlQuery selectShakeBedQuery = dbm->query(selectShakeBedSql);
-    
-    if (selectShakeBedQuery.lastError().isValid()) {
-        qWarning() << "查询shakeBedArea表失败:" << selectShakeBedQuery.lastError().text();
+    // ========== 2. 处理 shakeBedArea 表：保留 isEmpty = 3 和 4，其余全部改成 1 ==========
+    QString selectAllShakeBedSql = "SELECT selfLocation, isEmpty, startTime, endTime FROM shakeBedArea";
+    QSqlQuery selectAllShakeBedQuery = dbm->query(selectAllShakeBedSql);
+
+    if (selectAllShakeBedQuery.lastError().isValid()) {
+        qWarning() << "查询shakeBedArea表失败:" << selectAllShakeBedQuery.lastError().text();
         return;
     }
 
-    int shakeBedCount = 0;
-    while (selectShakeBedQuery.next()) {
-        int selfLocation = selectShakeBedQuery.value("selfLocation").toInt();
-        QString startTime = selectShakeBedQuery.value("startTime").toString();
-        QString endTime = selectShakeBedQuery.value("endTime").toString();
-        
-        // 恢复为未使用状态（isEmpty = 1），并清空开始时间和结束时间
-        QString updateShakeBedSql = QString("UPDATE shakeBedArea SET isEmpty = 1 WHERE selfLocation = %1").arg(selfLocation);
-        QSqlQuery updateShakeBedQuery = dbm->query(updateShakeBedSql);
-        
-        if (updateShakeBedQuery.lastError().isValid()) {
-            qWarning() << "更新shakeBedArea状态失败，位置:" << selfLocation << "错误:" << updateShakeBedQuery.lastError().text();
-        } else {
-            qDebug() << "发现占位但没用上的摇床位置，已恢复为未使用状态 - 位置:" << selfLocation 
-                     << "开始时间:" << startTime << "结束时间:" << endTime;
-            shakeBedCount++;
+    int shakeBedResetCount = 0;
+    int shakeBedKeepCount = 0;
+    while (selectAllShakeBedQuery.next()) {
+        int selfLocation = selectAllShakeBedQuery.value("selfLocation").toInt();
+        int isEmpty = selectAllShakeBedQuery.value("isEmpty").toInt();
+        QString startTime = selectAllShakeBedQuery.value("startTime").toString();
+        QString endTime = selectAllShakeBedQuery.value("endTime").toString();
+
+        // 如果 isEmpty = 3 或 4，保留不动（因为有瓶子在摇床上或即将取出）
+        if (isEmpty == 3 || isEmpty == 4) {
+            qDebug() << "摇床位置" << selfLocation << "状态为" << isEmpty << "（有瓶子），保留不动";
+            shakeBedKeepCount++;
+            continue;
+        }
+
+        // 其余状态全部改成 1（空闲），并清空时间字段
+        if (isEmpty != 1) {
+            QString updateShakeBedSql = QString("UPDATE shakeBedArea SET isEmpty = 1, startTime = '', endTime = '' WHERE selfLocation = %1").arg(selfLocation);
+            QSqlQuery updateShakeBedQuery = dbm->query(updateShakeBedSql);
+
+            if (updateShakeBedQuery.lastError().isValid()) {
+                qWarning() << "更新shakeBedArea状态失败，位置:" << selfLocation << "错误:" << updateShakeBedQuery.lastError().text();
+            } else {
+                qDebug() << "摇床位置" << selfLocation << "状态从" << isEmpty << "恢复为1（空闲）- 开始时间:" << startTime << "结束时间:" << endTime;
+                shakeBedResetCount++;
+            }
         }
     }
 
-    if (shakeBedCount > 0) {
-        qDebug() << "开机检查完成，共释放" << shakeBedCount << "个占位但没用上的摇床位置（已恢复为未使用状态）";
-    } else {
-        qDebug() << "开机检查完成，没有发现占位但没用上的摇床位置";
-    }
+    qDebug() << "开机摇床状态检查完成 - 保留" << shakeBedKeepCount << "个有瓶位置（isEmpty=3或4），重置" << shakeBedResetCount << "个空闲位置为isEmpty=1";
 }
 
 bool MainWindow::loadAndExecuteNextRecipeFromDatabase()
